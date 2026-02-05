@@ -23,7 +23,7 @@ jobs:
           script: |
             const { state, target_url } = context.payload.deployment_status;
             const { environment, ref } = context.payload.deployment;
-            
+
             // Map Vercel environments/branches to our managed GitHub environments
             let managedEnv = environment;
             if (environment.includes('preview')) {
