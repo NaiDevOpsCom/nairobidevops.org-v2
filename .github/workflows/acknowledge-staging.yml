@@ -1,90 +1,78 @@
-name: Acknowledge Vercel Deployments
+name: Handle Vercel Deployments
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [pre-staging]
   deployment_status:
+    types: [success, failure, error]
+
+permissions:
+  contents: read
+  deployments: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref || github.head_ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.deployment.ref }}
+  cancel-in-progress: false
 
 jobs:
-  acknowledge-preview:
-    if: github.event_name == 'pull_request'
+  update-github-deployment:
+    if: github.event.deployment.payload.type == 'vercel'
     runs-on: ubuntu-latest
-    environment:
-      name: preview
     steps:
-      - name: Wait for Vercel Deployment
-        uses: patrickedqvist/wait-for-vercel-preview@dca4940010f36d2d44caa487087a09b57939b24a
-        id: vercel-preview
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 300
-          check_interval: 10
-
-      - name: Set Preview URL
-        run: |
-          echo "PREVIEW_URL=${{ steps.vercel-preview.outputs.url }}" >> $GITHUB_ENV
-          echo "✅ Preview deployed to: ${{ steps.vercel-preview.outputs.url }}"
-
-      - name: Create Deployment
+      - name: Create or Update Managed Deployment
         uses: actions/github-script@v7
-        env:
-          PREVIEW_URL: ${{ steps.vercel-preview.outputs.url }}
         with:
           script: |
+            const { state, target_url } = context.payload.deployment_status;
+            const { environment, ref } = context.payload.deployment;
+            
+            // Map Vercel environments/branches to our managed GitHub environments
+            let managedEnv = environment;
+            if (environment.includes('preview')) {
+              managedEnv = 'preview';
+            } else if (ref === 'pre-staging' || environment === 'staging') {
+              managedEnv = 'staging';
+            } else if (environment === 'production') {
+              if (ref === 'main') {
+                managedEnv = 'production';
+              } else {
+                managedEnv = `${environment}-${ref}`;
+                core.warning(`Unexpected production deployment triggered from non-main branch: ${ref}. Mapping to: ${managedEnv}`);
+              }
+            }
+
             try {
+              // Create a formal GitHub deployment for our tracked environment
               const deployment = await github.rest.repos.createDeployment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: context.payload.pull_request.head.sha,
-                environment: 'preview',
-                description: 'Preview deployment via Vercel',
+                ref: ref,
+                environment: managedEnv,
+                description: `${managedEnv} deployment via Vercel`,
                 auto_merge: false,
                 required_contexts: []
               });
+
+              // Handle cases where deployment might not return an ID immediately (e.g., 202 Accepted, 409 Conflict)
+              if (!deployment.data || !deployment.data.id) {
+                const msg = `Deployment requested but no ID returned (Status: ${deployment.status}). Context: ref=${ref}, managedEnv=${managedEnv}`;
+                if (deployment.status === 202) {
+                  console.log(`${msg} - Deployment is queued.`);
+                  return;
+                } else {
+                  throw new Error(msg);
+                }
+              }
 
               await github.rest.repos.createDeploymentStatus({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 deployment_id: deployment.data.id,
-                state: 'success',
-                environment_url: process.env.PREVIEW_URL,
+                state: state,
+                environment_url: target_url,
                 log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-                description: 'Preview deployment successful'
+                description: `Managed ${managedEnv} deployment ${state}`
               });
+              
+              console.log(`Successfully acknowledged ${managedEnv} deployment with status ${state}`);
             } catch (error) {
-              console.error('Failed to create deployment status:', error);
-              // If we have a deployment ID but status failed, or if deployment creation failed
-              // We can try to set status to failure if we have the ID
+              core.setFailed(`Failed to manage deployment status: ${error.message}`);
             }
-
-  acknowledge-staging:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/pre-staging'
-    runs-on: ubuntu-latest
-    env:
-      STAGING_URL: https://site.nairobidevops.org/
-    environment:
-      name: staging
-      url: ${{ env.STAGING_URL }}
-    steps:
-      - name: Acknowledge Staging Deployment
-        run: |
-          echo "✅ Staging deployment triggered by Vercel"
-          echo "Commit: ${{ github.sha }}"
-          echo "Deployed to: ${{ env.STAGING_URL }}"
-
-  # Optional: Capture Vercel deployment status
-  vercel-deployment-status:
-    if: github.event_name == 'deployment_status'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Log Deployment
-        run: |
-          echo "Vercel deployment status: ${{ github.event.deployment_status.state }}"
-          echo "Environment: ${{ github.event.deployment.environment }}"
-          echo "URL: ${{ github.event.deployment_status.target_url }}"
