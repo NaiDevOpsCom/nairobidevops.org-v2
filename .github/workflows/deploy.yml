@@ -151,3 +151,77 @@ jobs:
             ls -1t | tail -n +6 | xargs rm -rf 2>/dev/null || true
 
             echo "Deployment successful."
+
+      # 8. Send Success Email
+      - name: Send Success Email
+        if: success()
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ Production Deployment Successful - ${{ github.repository }}"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            🎉 Congratulations! Your production deployment was successful.
+
+            📦 Deployment Details:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Repository:    ${{ github.repository }}
+            Branch:        ${{ github.ref_name }}
+            Environment:   production
+            Release ID:    ${{ env.RELEASE_TIMESTAMP }}
+            Commit SHA:    ${{ github.sha }}
+            Triggered by:  ${{ github.actor }}
+
+            🔗 Links:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Workflow Run:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Commit:        ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
+            ✨ Your application is now live! 🚀
+
+            ---
+            This is an automated message from GitHub Actions (c) Nairobi DevOps.
+
+      # 9. Send Failure Email
+      - name: Send Failure Email
+        if: failure()
+        uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Production Deployment Failed - ${{ github.repository }}"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            ⚠️ Deployment to production has failed. Immediate attention required!
+
+            📦 Deployment Details:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Repository:    ${{ github.repository }}
+            Branch:        ${{ github.ref_name }}
+            Environment:   production
+            Commit SHA:    ${{ github.sha }}
+            Triggered by:  ${{ github.actor }}
+
+            🔗 Action Required:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Please review the workflow logs immediately:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Commit details:
+            ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
+            🔧 Next Steps:
+            1. Check the workflow logs for error details
+            2. Review the commit changes
+            3. Fix the issue and push a new commit or re-run the workflow
+
+            ---
+            This is an automated message from GitHub Actions (c) Nairobi DevOps.
