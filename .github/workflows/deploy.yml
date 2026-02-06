@@ -154,7 +154,7 @@ jobs:
 
       # 8. Send Success Email
       - name: Send Success Email
-        if: success()
+        if: ${{ always() && success() }}
         continue-on-error: true
         uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
         with:
@@ -189,7 +189,7 @@ jobs:
 
       # 9. Send Failure Email
       - name: Send Failure Email
-        if: failure()
+        if: ${{ always() && failure() }}
         continue-on-error: true
         uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
         with:

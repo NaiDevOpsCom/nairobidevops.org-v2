@@ -2,14 +2,14 @@ name: Handle Vercel Deployments
 
 on:
   deployment_status:
-    types: [success, failure, error]
+    types: [created]
 
 permissions:
   contents: read
   deployments: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.deployment.ref }}
+  group: ${{ github.workflow }}-${{ github.event.deployment.id || github.event.deployment_status.id }}
   cancel-in-progress: false
 
 jobs:
@@ -22,56 +22,94 @@ jobs:
         with:
           script: |
             const { state, target_url } = context.payload.deployment_status;
-            const { environment, ref } = context.payload.deployment;
+            const { environment, ref, sha } = context.payload.deployment;
+            const rawEnv = typeof environment === 'string' ? environment : '';
+            const rawRef = typeof ref === 'string' ? ref : '';
+            const deploymentRef = sha || rawRef;
+            const allowedStates = new Set(['success', 'failure', 'error']);
+
+            if (!allowedStates.has(state)) {
+              throw new Error(`Unexpected deployment_status.state: ${String(state)}`);
+            }
+
+            if (!target_url && state === 'success') {
+              core.setFailed('Missing target_url from Vercel deployment status event for successful deployment.');
+              return;
+            }
 
             // Map Vercel environments/branches to our managed GitHub environments
-            let managedEnv = environment;
-            if (environment.includes('preview')) {
+            let managedEnv = rawEnv || 'unknown';
+            if (rawEnv.includes('preview')) {
               managedEnv = 'preview';
-            } else if (ref === 'pre-staging' || environment === 'staging') {
+            } else if (rawRef === 'pre-staging' || rawEnv === 'staging') {
               managedEnv = 'staging';
-            } else if (environment === 'production') {
-              if (ref === 'main') {
+            } else if (rawEnv === 'production') {
+              if (rawRef === 'main') {
                 managedEnv = 'production';
               } else {
-                managedEnv = `${environment}-${ref}`;
-                core.warning(`Unexpected production deployment triggered from non-main branch: ${ref}. Mapping to: ${managedEnv}`);
+                const safeRef = rawRef.replace(/[^a-zA-Z0-9._-]+/g, '-');
+                managedEnv = `${rawEnv}-${safeRef}`;
+                core.warning(`Unexpected production deployment triggered from non-main branch: ${rawRef}. Mapping to: ${managedEnv}`);
               }
             }
 
-            try {
-              // Create a formal GitHub deployment for our tracked environment
-              const deployment = await github.rest.repos.createDeployment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: ref,
-                environment: managedEnv,
-                description: `${managedEnv} deployment via Vercel`,
-                auto_merge: false,
-                required_contexts: []
-              });
+            managedEnv = managedEnv.replace(/[^a-zA-Z0-9._-]+/g, '-');
 
-              // Handle cases where deployment might not return an ID immediately (e.g., 202 Accepted, 409 Conflict)
-              if (!deployment.data || !deployment.data.id) {
-                const msg = `Deployment requested but no ID returned (Status: ${deployment.status}). Context: ref=${ref}, managedEnv=${managedEnv}`;
-                if (deployment.status === 202) {
-                  console.log(`${msg} - Deployment is queued.`);
+            try {
+              let deploymentId;
+
+              // Create a formal GitHub deployment for our tracked environment
+              try {
+                const deployment = await github.rest.repos.createDeployment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: deploymentRef,
+                  environment: managedEnv,
+                  description: `${managedEnv} deployment via Vercel`,
+                  auto_merge: false,
+                  required_contexts: []
+                });
+
+                if (deployment?.data?.id) {
+                  deploymentId = deployment.data.id;
+                } else if (deployment?.status === 202) {
+                  console.log(`Deployment is queued (no ID yet). Context: ref=${ref}, managedEnv=${managedEnv}`);
                   return;
                 } else {
-                  throw new Error(msg);
+                  throw new Error(`Deployment requested but no ID returned (Status: ${deployment?.status}). Context: ref=${deploymentRef}, managedEnv=${managedEnv}`);
+                }
+              } catch (error) {
+                if (error?.status === 409) {
+                  const existing = await github.rest.repos.listDeployments({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ref: deploymentRef,
+                    environment: managedEnv,
+                    per_page: 1
+                  });
+                  deploymentId = existing?.data?.[0]?.id;
+                }
+
+                if (!deploymentId) {
+                  throw error;
                 }
               }
 
-              await github.rest.repos.createDeploymentStatus({
+              const statusParams = {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                deployment_id: deployment.data.id,
+                deployment_id: deploymentId,
                 state: state,
-                environment_url: target_url,
                 log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
                 description: `Managed ${managedEnv} deployment ${state}`
-              });
-              
+              };
+
+              if (target_url) {
+                statusParams.environment_url = target_url;
+              }
+
+              await github.rest.repos.createDeploymentStatus(statusParams);
+
               console.log(`Successfully acknowledged ${managedEnv} deployment with status ${state}`);
             } catch (error) {
               core.setFailed(`Failed to manage deployment status: ${error.message}`);
