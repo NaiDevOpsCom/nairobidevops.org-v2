@@ -1,8 +1,6 @@
 import { MapPin, Phone, Mail, ArrowUp } from "lucide-react";
 import { Link } from "wouter";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import SocialIconLink from "@/components/SocialIconLink";
 
 export default function Footer() {
@@ -120,21 +118,46 @@ export default function Footer() {
           </div>
 
           {/* Newsletter */}
-          <div id="newsletter">
-            <div className="font-bold mb-2">Subscribe to our newsletter</div>
-            <form className="flex flex-col gap-2">
-              <Input
-                type="email"
-                placeholder="Enter your email Address"
-                className="bg-white border border-gray-300 text-foreground placeholder:text-gray-400 focus:border-primary h-10 rounded"
-              />
-              <Button
-                type="submit"
-                className="bg-primary hover:bg-ndc-darkblue transition-colors duration-200 text-white rounded h-8 text-sm font-semibold"
-              >
-                Subscribe
-              </Button>
-            </form>
+          <div id="newsletter" className="md:col-span-1">
+            {/* Gradient border wrapper */}
+            <div className="relative p-[2px] rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 transition-all duration-300 hover:shadow-lg">
+              <div className="bg-white hover:bg-primary-light-blue dark:bg-gray-900 dark:hover:bg-gray-800 rounded-xl p-5 transition-colors duration-300">
+                {/* Header */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <Mail className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-primary leading-tight">
+                      Nairobi DevOps Community Newsletter
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Social proof */}
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
+                  Top rated Community Newsletter with{" "}
+                  <span className="font-semibold text-gray-800 dark:text-white">5,000+</span>{" "}
+                  members
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Get curated insights and career tips
+                </p>
+
+                {/* Brand & CTA */}
+                <div className="text-center">
+                  <a
+                    href="https://nairobidevops.substack.com/subscribe"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Subscribe Now (opens in a new tab)"
+                    className="inline-block text-lg px-8 py-4 font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 text-white bg-primary hover:bg-ndc-darkblue text-center"
+                  >
+                    Subscribe Now
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <hr className="border-gray-300 my-4" />

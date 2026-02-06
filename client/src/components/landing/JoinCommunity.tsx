@@ -14,7 +14,7 @@ export default function JoinCommunity() {
   });
 
   const handleJoinClick = () => {
-    navigate("/join");
+    navigate("/community");
   };
 
   const handleLinkedInClick = () => {
