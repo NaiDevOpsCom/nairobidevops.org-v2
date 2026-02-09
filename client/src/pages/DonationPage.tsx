@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -144,6 +144,7 @@ function ImpactImagesGrid() {
 
 export default function DonationPage() {
   const [location] = useLocation();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Handle hash scrolling on mount and location changes with whitelist
   useEffect(() => {
@@ -151,24 +152,23 @@ export default function DonationPage() {
     const allowedAnchors = new Set([`#${DONATION_CARD_ID}`]);
 
     const scrollToAllowedHash = () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
       const { hash } = window.location;
       if (!allowedAnchors.has(hash)) return;
-      const timer = setTimeout(() => {
+      timerRef.current = setTimeout(() => {
         const id = hash.slice(1);
         const element = document.getElementById(id);
         if (element) {
           element.scrollIntoView({ behavior: "smooth" });
         }
       }, 100);
-      // Clear any pending timer on next call
-      return () => clearTimeout(timer);
     };
 
-    const cleanup = scrollToAllowedHash();
+    scrollToAllowedHash();
     window.addEventListener("hashchange", scrollToAllowedHash);
     return () => {
       window.removeEventListener("hashchange", scrollToAllowedHash);
-      if (typeof cleanup === "function") cleanup();
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [location]);
 

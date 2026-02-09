@@ -26,10 +26,23 @@ jobs:
             const rawEnv = typeof environment === 'string' ? environment : '';
             const rawRef = typeof ref === 'string' ? ref : '';
             const deploymentRef = sha || rawRef;
-            const allowedStates = new Set(['success', 'failure', 'error']);
+
+            // Comprehensive list of states Vercel/GitHub might send
+            // We include all possible states to avoid blocking Vercel's 'Deployment Checks' pipeline
+            const allowedStates = new Set([
+              'pending', 
+              'in_progress', 
+              'queued', 
+              'success', 
+              'failure', 
+              'error', 
+              'waiting',
+              'inactive'
+            ]);
 
             if (!allowedStates.has(state)) {
-              throw new Error(`Unexpected deployment_status.state: ${String(state)}`);
+              console.log(`Skipping unexpected state: ${state}`);
+              return;
             }
 
             if (!target_url && state === 'success') {
@@ -95,6 +108,7 @@ jobs:
                 }
               }
 
+              // Build the status parameters
               const statusParams = {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -104,12 +118,26 @@ jobs:
                 description: `Managed ${managedEnv} deployment ${state}`
               };
 
+              // Safely validate and add target_url
               if (target_url) {
-                statusParams.environment_url = target_url;
+                let safeUrl = null;
+                try {
+                  const u = new URL(String(target_url));
+                  if (u.protocol === 'https:' || u.protocol === 'http:') {
+                    safeUrl = u.toString();
+                  }
+                } catch {
+                  // ignore invalid URL
+                }
+
+                if (!safeUrl) {
+                  core.warning(`Ignoring invalid target_url: ${String(target_url)}`);
+                } else {
+                  statusParams.environment_url = safeUrl;
+                }
               }
 
               await github.rest.repos.createDeploymentStatus(statusParams);
-
               console.log(`Successfully acknowledged ${managedEnv} deployment with status ${state}`);
             } catch (error) {
               core.setFailed(`Failed to manage deployment status: ${error.message}`);
