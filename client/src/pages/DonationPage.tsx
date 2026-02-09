@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowRight } from "lucide-react";
+import { useLocation } from "wouter";
 
+import { DONATION_CARD_ID } from "@/lib/constants";
 import { seededRandom } from "@/lib/random";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -141,7 +143,37 @@ function ImpactImagesGrid() {
 }
 
 export default function DonationPage() {
+  const [location] = useLocation();
+
+  // Handle hash scrolling on mount and location changes with whitelist
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const allowedAnchors = new Set([`#${DONATION_CARD_ID}`]);
+
+    const scrollToAllowedHash = () => {
+      const { hash } = window.location;
+      if (!allowedAnchors.has(hash)) return;
+      const timer = setTimeout(() => {
+        const id = hash.slice(1);
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+      // Clear any pending timer on next call
+      return () => clearTimeout(timer);
+    };
+
+    const cleanup = scrollToAllowedHash();
+    window.addEventListener("hashchange", scrollToAllowedHash);
+    return () => {
+      window.removeEventListener("hashchange", scrollToAllowedHash);
+      if (typeof cleanup === "function") cleanup();
+    };
+  }, [location]);
+
   // State for backgrounds using lazy initialization
+
   const [heroBackground] = useState(() => {
     if (!communityGallery?.length) return "";
     const pool = communityGallery.flatMap((img) => (img.priority ? [img, img] : [img]));
@@ -262,7 +294,7 @@ export default function DonationPage() {
       </section>
 
       {/* Donation Form CTA Section */}
-      <section className="py-24 bg-background relative overflow-hidden">
+      <section className="py-24 bg-background relative overflow-hidden" id={DONATION_CARD_ID}>
         {/* Background Image Effect for this section if needed, or just white/dark bg */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row gap-16 items-center">
