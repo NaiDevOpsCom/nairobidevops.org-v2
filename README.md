@@ -77,7 +77,7 @@ The `client/src/data/` directory contains static data used throughout the applic
 
 ### Prerequisites
 
-- Node.js (v20+ recommended)
+- Node.js (^20.19.0 or >=22.13.0 recommended)
 - npm or yarn
 
 ### Installation

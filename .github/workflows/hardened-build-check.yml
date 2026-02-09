@@ -17,7 +17,7 @@ concurrency:
 
 # Global environment variables for all jobs
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   CACHE_VERSION: "v1"
 
 on:
@@ -35,7 +35,7 @@ jobs:
     name: Security Scan
     uses: ./.github/workflows/security-validation.yml
     with:
-      node-version: "20"
+      node-version: "22"
       fail-level: "moderate"
     secrets: inherit
 
