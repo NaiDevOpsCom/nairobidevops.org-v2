@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js and Cache
         uses: ./.github/actions/cache-vite-npm
         with:
-          node-version: 20
+          node-version: 22.13.0
 
       # 3. Install dependencies and Build
       - name: Install and Build

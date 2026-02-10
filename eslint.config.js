@@ -13,6 +13,7 @@ import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import prettierConfig from "eslint-config-prettier";
 import vitest from "@vitest/eslint-plugin";
+import { fixupPluginRules } from "@eslint/compat";
 import globals from "globals";
 
 // Recreate __dirname for ESM context
@@ -22,11 +23,11 @@ export default [
   // 1. Ignore generated files
   {
     ignores: [
-      "node_modules",
-      "dist",
-      "build",
-      "coverage",
-      "**/.vite",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/.vite/**",
       "client/public/analytics.js",
       "**/*.min.js",
       "vercel.json",
@@ -52,7 +53,7 @@ export default [
 
   // 4. TypeScript rules
   {
-    plugins: { "@typescript-eslint": tsPlugin },
+    plugins: { "@typescript-eslint": fixupPluginRules(tsPlugin) },
     rules: {
       ...tsPlugin.configs.recommended.rules,
     },
@@ -60,25 +61,25 @@ export default [
 
   // 5. React recommended rules
   {
-    plugins: { react: reactPlugin },
+    plugins: { react: fixupPluginRules(reactPlugin) },
     rules: reactPlugin.configs.flat.recommended.rules,
   },
 
   // 6. React Hooks
   {
-    plugins: { "react-hooks": reactHooksPlugin },
+    plugins: { "react-hooks": fixupPluginRules(reactHooksPlugin) },
     rules: reactHooksPlugin.configs.recommended.rules,
   },
 
   // 7. Security plugin
   {
-    plugins: { security: securityPlugin },
+    plugins: { security: fixupPluginRules(securityPlugin) },
     rules: { ...securityPlugin.configs.recommended.rules },
   },
 
   // 8. JSX A11y
   {
-    plugins: { "jsx-a11y": jsxA11yPlugin },
+    plugins: { "jsx-a11y": fixupPluginRules(jsxA11yPlugin) },
     rules: { ...jsxA11yPlugin.configs.recommended.rules },
     languageOptions: {
       parserOptions: { ...jsxA11yPlugin.configs.recommended.parserOptions },
@@ -87,13 +88,13 @@ export default [
 
   // 9. Promise plugin
   {
-    plugins: { promise: promisePlugin },
+    plugins: { promise: fixupPluginRules(promisePlugin) },
     rules: { ...promisePlugin.configs.recommended.rules },
   },
 
   // 10. Import plugin
   {
-    plugins: { import: importPlugin },
+    plugins: { import: fixupPluginRules(importPlugin) },
     rules: {
       "import/order": [
         "error",
@@ -109,7 +110,7 @@ export default [
   {
     files: ["**/*.{ts,tsx}"],
     plugins: {
-      "unused-imports": unusedImportsPlugin,
+      "unused-imports": fixupPluginRules(unusedImportsPlugin),
     },
     languageOptions: {
       parser: tsParser,
@@ -179,7 +180,7 @@ export default [
   {
     files: ["**/__tests__/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"],
     plugins: {
-      vitest,
+      vitest: fixupPluginRules(vitest),
     },
     languageOptions: {
       globals: {

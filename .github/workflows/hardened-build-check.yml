@@ -17,7 +17,7 @@ concurrency:
 
 # Global environment variables for all jobs
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22.13.0"
   CACHE_VERSION: "v1"
 
 on:
@@ -35,7 +35,7 @@ jobs:
     name: Security Scan
     uses: ./.github/workflows/security-validation.yml
     with:
-      node-version: "20"
+      node-version: "22.13.0"
       fail-level: "moderate"
     secrets: inherit
 
@@ -87,7 +87,7 @@ jobs:
       - name: Hardened Build Unit Test (CI enforcement)
         env:
           CI_ENFORCE_HARDENING: "true"
-        run: npx vitest run src/utils/__tests__/hardenedBuildCheck.test.ts
+        run: npx vitest run client/src/utils/__tests__/hardenedBuildCheck.test.ts
 
       - name: Verify No Source Maps
         run: |

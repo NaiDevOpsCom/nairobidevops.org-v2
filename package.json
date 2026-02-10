@@ -13,6 +13,8 @@
     "build": "npm run security:generate && npm run check && vite build --mode production && node scripts/setup-cpanel.js",
     "build:staging": "npm run security:generate && vite build --mode staging && node scripts/setup-cpanel.js",
     "build:prod": "npm run security:generate && vite build --mode production && node scripts/setup-cpanel.js",
+    "build:ci": "npm run security:generate && vite build --mode production && node scripts/setup-cpanel.js",
+    "build:ci:staging": "npm run security:generate && vite build --mode staging && node scripts/setup-cpanel.js",
     "preview": "vite preview",
     "test": "vitest run --root client",
     "test:watch": "vitest",
@@ -23,6 +25,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:coverage": "vitest run --root client --coverage",
     "test:ui": "vitest --root client --ui"
+  },
+  "engines": {
+    "node": ">=20.19.0 <23.0.0"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -86,7 +91,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@eslint/compat": "^2.0.2",
+    "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.3",
