@@ -52,11 +52,8 @@ const isDevelopment = (): boolean => {
     typeof import.meta.env !== "undefined" &&
     typeof import.meta.env.MODE === "string"
       ? import.meta.env.MODE
-      : typeof process !== "undefined" &&
-          // eslint-disable-next-line no-undef
-          typeof process.env !== "undefined"
-        ? // eslint-disable-next-line no-undef
-          process.env.NODE_ENV
+      : typeof process !== "undefined" && typeof process.env !== "undefined"
+        ? process.env.NODE_ENV
         : undefined;
 
   return mode === "development";

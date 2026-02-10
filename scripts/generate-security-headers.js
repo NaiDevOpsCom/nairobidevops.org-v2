@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import prettier from "prettier";
+import { format } from "prettier";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -152,7 +152,7 @@ async function updateVercelConfig(policy) {
     vercelConfig.rewrites = Array.from(bySource.values());
   }
 
-  const formattedJson = await prettier.format(JSON.stringify(vercelConfig, null, 2), {
+  const formattedJson = await format(JSON.stringify(vercelConfig, null, 2), {
     parser: "json",
   });
   await fs.promises.writeFile(VERCEL_CONFIG_PATH, formattedJson);

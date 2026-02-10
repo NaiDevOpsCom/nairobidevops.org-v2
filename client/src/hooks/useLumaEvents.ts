@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 
-import { LumaEvent } from "@/lib/lumaCalendar";
-import { fetchLumaEvents } from "@/lib/lumaCalendar";
+import { LumaEvent, fetchLumaEvents } from "@/lib/lumaCalendar";
 
 /**
  * useLumaEvents

@@ -73,14 +73,17 @@ export async function fetchLumaEvents(): Promise<LumaEvent[]> {
 
         if (!response.ok) {
           throw new Error(
-            `Both proxied and direct fetch failed. Direct status: ${response.status}`
+            `Both proxied and direct fetch failed. Direct status: ${response.status}`,
+            { cause: error }
           );
         }
       } finally {
         clearTimeout(directTimeoutId);
       }
     } else {
-      throw new Error("Failed to fetch Luma events via proxy (direct fetch is blocked by CORS).");
+      throw new Error("Failed to fetch Luma events via proxy (direct fetch is blocked by CORS).", {
+        cause: error,
+      });
     }
   } finally {
     clearTimeout(proxyTimeoutId);
