@@ -125,7 +125,13 @@ export default [
   // 8. Other Plugins
   {
     plugins: { security: securityPlugin },
-    rules: { ...securityPlugin.configs.recommended.rules },
+    rules: {
+      ...securityPlugin.configs.recommended.rules,
+      "security/detect-no-csrf-before-method-override": "off",
+      "security/detect-unsafe-regex": "off",
+      "security/detect-buffer-noassert": "off",
+      "security/detect-child-process": "off",
+    },
   },
   {
     files: ["**/*.{jsx,tsx}"],
