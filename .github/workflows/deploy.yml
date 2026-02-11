@@ -164,7 +164,10 @@ jobs:
     steps:
       # Use the release timestamp from deploy job
       - name: Set Release Timestamp
-        run: echo "RELEASE_TIMESTAMP=${{ needs.deploy.outputs.release_timestamp }}" >> $GITHUB_ENV
+        run: |
+          TS="${{ needs.deploy.outputs.release_timestamp }}"
+          if [ -z "$TS" ]; then TS="${{ github.run_id }}"; fi
+          echo "RELEASE_TIMESTAMP=$TS" >> $GITHUB_ENV
 
       # Send Success Email
       - name: Send Success Email

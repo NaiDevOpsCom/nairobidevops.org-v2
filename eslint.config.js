@@ -45,7 +45,6 @@ export default [
       },
       globals: {
         ...globals.browser,
-        ...globals.node,
       },
     },
   },
@@ -131,6 +130,7 @@ export default [
       "security/detect-unsafe-regex": "off",
       "security/detect-buffer-noassert": "off",
       "security/detect-child-process": "off",
+      "security/detect-object-injection": "off",
     },
   },
   {
