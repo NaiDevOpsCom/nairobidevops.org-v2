@@ -4,7 +4,14 @@ import { MapPin, Phone, Mail, Wallet, X } from "lucide-react";
 import { Link } from "wouter";
 
 import SocialIconLink from "@/components/SocialIconLink";
-import { DONATION_CARD_ID, DONATION_DIALOG_ID } from "@/lib/constants";
+import { DONATION_CARD_ID, DONATION_DIALOG_ID, NDC_LOGO_URL } from "@/lib/constants";
+
+/** Smooth-scroll to top of page (used by footer nav links). */
+function scrollToTop() {
+  if (typeof window !== "undefined") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -18,11 +25,7 @@ export default function Footer() {
             {/* Logo & Affiliates */}
             <div>
               <div className="flex items-center gap-6 mb-6">
-                <img
-                  src="https://res.cloudinary.com/nairobidevops/image/upload/v1751295185/My%20Brand/devOpsLogo-EpoD6axe_wgwtya.png"
-                  alt="DevOps Logo"
-                  className="h-16 w-auto object-contain"
-                />
+                <img src={NDC_LOGO_URL} alt="DevOps Logo" className="h-16 w-auto object-contain" />
               </div>
               <div className="font-bold mb-1 mt-4 text-base">Our Affiliates</div>
               <div className="text-sm mb-2 text-gray-700 dark:text-gray-300">
@@ -104,7 +107,11 @@ export default function Footer() {
               <div className="font-bold mb-2">Contact Us</div>
               <div className="flex items-center text-sm mb-2">
                 <Phone className="h-4 w-4 text-primary mr-2" />
-                <a href="tel:+254796445130" className="hover:underline hover:text-primary">
+                <a
+                  href="tel:+254796445130"
+                  className="hover:underline hover:text-primary"
+                  aria-label="Call Nairobi DevOps at +254 796 445130"
+                >
                   +254 796 445130
                 </a>
               </div>
@@ -113,6 +120,7 @@ export default function Footer() {
                 <a
                   href="mailto:info@nairobidevops.org"
                   className="hover:underline hover:text-primary"
+                  aria-label="Email Nairobi DevOps at info@nairobidevops.org"
                 >
                   info@nairobidevops.org
                 </a>
@@ -175,33 +183,21 @@ export default function Footer() {
               <Link
                 href="/code-of-conduct"
                 className="hover:underline hover:text-primary transition-colors"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
-                }}
+                onClick={scrollToTop}
               >
                 Code of Conduct
               </Link>
               <Link
                 href="/terms"
                 className="hover:underline hover:text-primary transition-colors"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
-                }}
+                onClick={scrollToTop}
               >
                 Terms & Conditions
               </Link>
               <Link
                 href="/privacy"
                 className="hover:underline hover:text-primary transition-colors"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
-                }}
+                onClick={scrollToTop}
               >
                 Privacy Policy
               </Link>
@@ -232,6 +228,7 @@ export default function Footer() {
             */}
             <Dialog.Content
               id={DONATION_DIALOG_ID}
+              forceMount
               className={`absolute bottom-22 right-6 w-80 sm:w-96 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 transition-all duration-300 origin-bottom-right z-50 ${
                 isDonationCardOpen
                   ? "opacity-100 scale-100 translate-y-0"

@@ -3,6 +3,7 @@ import { Menu, X, Sun, Moon, Handshake } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 import { useTheme } from "@/contexts/ThemeContext";
+import { NDC_LOGO_URL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -93,7 +94,7 @@ export default function Navbar() {
             <div className="flex-shrink-0">
               <Link href="/">
                 <img
-                  src="https://res.cloudinary.com/nairobidevops/image/upload/v1751295185/My%20Brand/devOpsLogo-EpoD6axe_wgwtya.png"
+                  src={NDC_LOGO_URL}
                   alt="Nairobi DevOps"
                   className="w-36 object-contain cursor-pointer"
                 />

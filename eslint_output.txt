@@ -1,6 +1,0 @@
-
-C:\Users\jlc254\Music\ndc-redesign-website\client\src\App.tsx
-  34:5  error  Parsing error: Unexpected token <
-
-Γ£û 1 problem (1 error, 0 warnings)
-

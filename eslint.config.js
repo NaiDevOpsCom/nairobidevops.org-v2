@@ -64,9 +64,17 @@ export default [
   {
     files: ["**/*.{jsx,tsx}"],
     plugins: { "react-hooks": reactHooksPlugin },
+    settings: {
+      react: {
+        version: "18.3.1",
+      },
+    },
     rules: {
       ...reactHooksPlugin.configs.recommended.rules,
       "react/react-in-jsx-scope": "off",
+      // Disabled: eslint-plugin-react@7.37.5 crashes with ESLint 9 Flat Config
+      // due to using the deprecated getFilename() API in this rule.
+      "react/display-name": "off",
     },
   },
 
@@ -99,6 +107,7 @@ export default [
 
   // 7. Other Plugins
   {
+    files: ["**/*.{jsx,tsx}"],
     plugins: { "jsx-a11y": jsxA11yPlugin },
     rules: { ...jsxA11yPlugin.configs.recommended.rules },
   },

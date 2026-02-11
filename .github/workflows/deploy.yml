@@ -152,9 +152,19 @@ jobs:
 
             echo "Deployment successful."
 
-      # 8. Send Success Email
+  notify:
+    needs: [build, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      # Generate a release timestamp for reference in emails
+      - name: Generate Release Timestamp
+        run: echo "RELEASE_TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+
+      # Send Success Email
       - name: Send Success Email
-        if: ${{ always() && success() }}
+        if: ${{ needs.build.outcome == 'success' && needs.deploy.outcome == 'success' }}
         continue-on-error: true
         uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
         with:
@@ -187,9 +197,9 @@ jobs:
             ---
             This is an automated message from GitHub Actions (c) Nairobi DevOps.
 
-      # 9. Send Failure Email
+      # Send Failure Email
       - name: Send Failure Email
-        if: ${{ always() && failure() }}
+        if: ${{ needs.build.outcome != 'success' || needs.deploy.outcome != 'success' }}
         continue-on-error: true
         uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
         with:
@@ -208,6 +218,7 @@ jobs:
             Repository:    ${{ github.repository }}
             Branch:        ${{ github.ref_name }}
             Environment:   production
+            Release ID:    ${{ env.RELEASE_TIMESTAMP }}
             Commit SHA:    ${{ github.sha }}
             Triggered by:  ${{ github.actor }}
 
