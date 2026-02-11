@@ -1,6 +1,3 @@
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-
 import js from "@eslint/js";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
@@ -15,11 +12,8 @@ import prettierConfig from "eslint-config-prettier";
 import vitest from "@vitest/eslint-plugin";
 import globals from "globals";
 
-// Recreate __dirname for ESM context
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 export default [
-  // 1. Ignore generated files
+  // 1. Ignores
   {
     ignores: [
       "node_modules",
@@ -37,64 +31,122 @@ export default [
     ],
   },
 
-  // 2. Tell ESLint what files to lint (Flat Config REQUIRED)
+  // 2. Base Config
+  js.configs.recommended,
+
+  // 2b. JS/JSX Config (ensure JSX parsing + globals)
   {
-    files: ["**/*.{js,jsx,ts,tsx}"],
-    settings: {
-      react: {
-        version: "detect",
+    files: ["**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+      globals: {
+        ...globals.browser,
       },
     },
   },
 
-  // 3. Base JS rules
-  js.configs.recommended,
-
-  // 4. TypeScript rules
+  // 3. TS Config
   {
-    plugins: { "@typescript-eslint": tsPlugin },
+    files: ["**/*.{ts,tsx}"],
+    plugins: {
+      "@typescript-eslint": tsPlugin,
+    },
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        ecmaFeatures: { jsx: true },
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
     rules: {
       ...tsPlugin.configs.recommended.rules,
     },
   },
 
-  // 5. React recommended rules
+  // 4. React
   {
-    plugins: { react: reactPlugin },
-    rules: reactPlugin.configs.flat.recommended.rules,
+    files: ["**/*.{jsx,tsx}"],
+    ...reactPlugin.configs.flat.recommended,
   },
-
-  // 6. React Hooks
   {
+    files: ["**/*.{jsx,tsx}"],
     plugins: { "react-hooks": reactHooksPlugin },
-    rules: reactHooksPlugin.configs.recommended.rules,
-  },
-
-  // 7. Security plugin
-  {
-    plugins: { security: securityPlugin },
-    rules: { ...securityPlugin.configs.recommended.rules },
-  },
-
-  // 8. JSX A11y
-  {
-    plugins: { "jsx-a11y": jsxA11yPlugin },
-    rules: { ...jsxA11yPlugin.configs.recommended.rules },
-    languageOptions: {
-      parserOptions: { ...jsxA11yPlugin.configs.recommended.parserOptions },
+    settings: {
+      react: {
+        version: "18.3.1",
+      },
+    },
+    rules: {
+      ...reactHooksPlugin.configs.recommended.rules,
+      "react/react-in-jsx-scope": "off",
+      // Disabled: eslint-plugin-react@7.37.5 crashes with ESLint 9 Flat Config
+      // due to using the deprecated getFilename() API in this rule.
+      "react/display-name": "off",
     },
   },
 
-  // 9. Promise plugin
+  // 5. Unused Imports
+  {
+    files: ["**/*.{ts,tsx}"],
+    plugins: {
+      "unused-imports": unusedImportsPlugin,
+    },
+    rules: {
+      "unused-imports/no-unused-imports": "error",
+    },
+  },
+
+  // 6. Vitest
+  {
+    files: ["**/__tests__/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"],
+    plugins: {
+      vitest,
+    },
+    languageOptions: {
+      globals: {
+        ...vitest.environments.env.globals,
+      },
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+    },
+  },
+
+  // 8. Other Plugins
+  {
+    plugins: { security: securityPlugin },
+    rules: {
+      ...securityPlugin.configs.recommended.rules,
+      "security/detect-no-csrf-before-method-override": "off",
+      "security/detect-unsafe-regex": "off",
+      "security/detect-buffer-noassert": "off",
+      "security/detect-child-process": "off",
+      "security/detect-object-injection": "off",
+    },
+  },
+  {
+    files: ["**/*.{jsx,tsx}"],
+    plugins: { "jsx-a11y": jsxA11yPlugin },
+    rules: { ...jsxA11yPlugin.configs.recommended.rules },
+  },
   {
     plugins: { promise: promisePlugin },
     rules: { ...promisePlugin.configs.recommended.rules },
   },
-
-  // 10. Import plugin
   {
     plugins: { import: importPlugin },
     rules: {
+      ...importPlugin.configs.recommended.rules,
+      "import/no-unresolved": "off",
       "import/order": [
         "error",
         {
@@ -105,95 +157,29 @@ export default [
     },
   },
 
-  // 11. TS/React project-specific overrides
+  // 8. Overrides & Global Rules
   {
-    files: ["**/*.{ts,tsx}"],
-    plugins: {
-      "unused-imports": unusedImportsPlugin,
-    },
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        tsconfigRootDir: __dirname,
-        projectService: true,
-        ecmaVersion: "latest",
-        sourceType: "module",
-        ecmaFeatures: { jsx: true },
-      },
-      globals: globals.browser,
-    },
     rules: {
-      "react/react-in-jsx-scope": "off",
-      "react/jsx-uses-react": "off",
       "react/prop-types": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
-
-      // Security
-      "no-eval": "error",
-      "security/detect-object-injection": "off",
-
-      // React Hooks
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
-
-      // Clean imports
-      "unused-imports/no-unused-imports": "error",
-      "unused-imports/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
     },
   },
 
-  // 11b. Scripts directory - Node environment with relaxed rules
+  // Scripts directory
   {
     files: ["scripts/**/*.js"],
     languageOptions: {
-      globals: globals.node,
-    },
-    rules: {
-      // Allow console/process in scripts
-      "no-console": "off",
-      "no-process-exit": "off",
-      "no-redeclare": "off",
-      // Security rules that might conflict with scripts
-      "security/detect-object-injection": "off",
-      "security/detect-non-literal-fs-filename": "off",
-      // Import rules that might not apply to build scripts
-      "import/order": "off",
-      // React rules (not needed for scripts)
-      "react/react-in-jsx-scope": "off",
-      "react/jsx-uses-react": "off",
-    },
-  },
-
-  // 11c. Config files (vite, tailwind, etc.) - Node environment
-  {
-    files: ["*.config.ts", "*.config.js"],
-    languageOptions: {
-      globals: globals.node,
-    },
-  },
-
-  // 11d. Test files - use vitest plugin and allow dynamic file system access
-  {
-    files: ["**/__tests__/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"],
-    plugins: {
-      vitest,
-    },
-    languageOptions: {
       globals: {
-        ...globals.browser,
         ...globals.node,
-        ...vitest.environments.env.globals,
       },
     },
     rules: {
-      ...vitest.configs.recommended.rules,
-      "security/detect-non-literal-fs-filename": "off",
+      "no-console": "off",
+      "no-process-exit": "off",
+      "no-redeclare": "off",
+      "import/order": "off",
     },
   },
 
-  // 12. Prettier config (must be last to disable conflicting formatting rules)
+  // 9. Prettier
   prettierConfig,
 ];

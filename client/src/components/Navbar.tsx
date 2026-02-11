@@ -3,6 +3,7 @@ import { Menu, X, Sun, Moon, Handshake } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 import { useTheme } from "@/contexts/ThemeContext";
+import { NDC_LOGO_URL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -16,10 +17,12 @@ import {
 export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState(
-    () => window.location.pathname + window.location.hash
-  );
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const [currentLocation, setCurrentLocation] = useState(location);
+
+  useEffect(() => {
+    setCurrentLocation(location);
+  }, [location]);
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -36,8 +39,6 @@ export default function Navbar() {
     } else if (href.startsWith("/")) {
       // Client-side navigation via wouter router
       setLocation(href);
-      // Manually update current location for active link highlighting
-      setCurrentLocation(href);
     } else {
       const element = document.querySelector(href);
       if (element) {
@@ -47,7 +48,7 @@ export default function Navbar() {
         if (window.location.hash !== href) {
           // Update the hash without causing a page reload
           history.replaceState(null, "", href);
-          // replaceState does not emit a hashchange event; update state manually
+          // replaceState does not trigger wouter location updates, so update state manually
           setCurrentLocation(window.location.pathname + href);
         } else {
           // If the hash is the same, hashchange won't fire; update state manually
@@ -93,7 +94,7 @@ export default function Navbar() {
             <div className="flex-shrink-0">
               <Link href="/">
                 <img
-                  src="https://res.cloudinary.com/nairobidevops/image/upload/v1751295185/My%20Brand/devOpsLogo-EpoD6axe_wgwtya.png"
+                  src={NDC_LOGO_URL}
                   alt="Nairobi DevOps"
                   className="w-36 object-contain cursor-pointer"
                 />

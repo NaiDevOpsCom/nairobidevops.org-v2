@@ -142,14 +142,18 @@ function ImpactImagesGrid() {
   );
 }
 
+/** Anchors that are allowed to be scrolled to via hash navigation on this page. */
+const allowedAnchors = new Set([`#${DONATION_CARD_ID}`]);
+
 export default function DonationPage() {
   const [location] = useLocation();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Handle hash scrolling on mount and location changes with whitelist
+  // Scroll to a whitelisted hash anchor on mount and when the route changes.
+  // `location` is intentionally in the dependency array so that navigating
+  // back to this page (or re-clicking a link) re-triggers the scroll logic.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const allowedAnchors = new Set([`#${DONATION_CARD_ID}`]);
 
     const scrollToAllowedHash = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -166,6 +170,7 @@ export default function DonationPage() {
 
     scrollToAllowedHash();
     window.addEventListener("hashchange", scrollToAllowedHash);
+
     return () => {
       window.removeEventListener("hashchange", scrollToAllowedHash);
       if (timerRef.current) clearTimeout(timerRef.current);
