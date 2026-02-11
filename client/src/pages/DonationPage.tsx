@@ -153,6 +153,8 @@ export default function DonationPage() {
   // `location` is intentionally in the dependency array so that navigating
   // back to this page (or re-clicking a link) re-triggers the scroll logic.
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const scrollToAllowedHash = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       const { hash } = window.location;
@@ -168,6 +170,7 @@ export default function DonationPage() {
 
     scrollToAllowedHash();
     window.addEventListener("hashchange", scrollToAllowedHash);
+
     return () => {
       window.removeEventListener("hashchange", scrollToAllowedHash);
       if (timerRef.current) clearTimeout(timerRef.current);

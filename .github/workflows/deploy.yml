@@ -62,6 +62,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
 
+    outputs:
+      release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
+
     steps:
       # 1. Download Build Artifact
       - name: Download Build Artifact
@@ -72,7 +75,8 @@ jobs:
 
       # 2. Generate Release Timestamp
       - name: Generate Release Timestamp
-        run: echo "RELEASE_TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+        id: timestamp
+        run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
 
       # 3. Setup SSH
       - name: Setup SSH
@@ -91,7 +95,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
-            mkdir -p "/home/${{ secrets.REMOTE_USER }}/releases/${{ env.RELEASE_TIMESTAMP }}"
+            mkdir -p "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}"
 
       # 5. Package and Sync to Release
       - name: Package and Sync to Release
@@ -100,7 +104,7 @@ jobs:
           tar -czf release.tar.gz -C dist .
 
           # Upload the tarball using scp
-          scp -P ${{ secrets.REMOTE_PORT || 22 }} -o StrictHostKeyChecking=yes release.tar.gz ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/${{ secrets.REMOTE_USER }}/releases/${{ env.RELEASE_TIMESTAMP }}/
+          scp -P ${{ secrets.REMOTE_PORT || 22 }} -o StrictHostKeyChecking=yes release.tar.gz ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/
 
       # 6. Extract Release on Server
       - name: Extract Release on Server
@@ -111,7 +115,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
-            cd "/home/${{ secrets.REMOTE_USER }}/releases/${{ env.RELEASE_TIMESTAMP }}"
+            cd "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}"
             tar -xzf release.tar.gz
             rm release.tar.gz
 
@@ -127,11 +131,11 @@ jobs:
             set -euo pipefail
 
             # Paths
-            RELEASE_DIR="/home/${{ secrets.REMOTE_USER }}/releases/${{ env.RELEASE_TIMESTAMP }}"
+            RELEASE_DIR="/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}"
             TARGET_LINK="${{ secrets.REMOTE_PATH }}"
             TMP_LINK="${TARGET_LINK}.tmp"
 
-            echo "Deploying release: ${{ env.RELEASE_TIMESTAMP }}"
+            echo "Deploying release: ${{ steps.timestamp.outputs.timestamp }}"
 
             # 1. Safety Check: If target is a directory and not a link, abort with instructions
             if [ -d "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
@@ -158,13 +162,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Generate a release timestamp for reference in emails
-      - name: Generate Release Timestamp
-        run: echo "RELEASE_TIMESTAMP=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+      # Use the release timestamp from deploy job
+      - name: Set Release Timestamp
+        run: echo "RELEASE_TIMESTAMP=${{ needs.deploy.outputs.release_timestamp }}" >> $GITHUB_ENV
 
       # Send Success Email
       - name: Send Success Email
-        if: ${{ needs.build.outcome == 'success' && needs.deploy.outcome == 'success' }}
+        if: ${{ needs.build.result == 'success' && needs.deploy.result == 'success' }}
         continue-on-error: true
         uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
         with:
@@ -199,7 +203,7 @@ jobs:
 
       # Send Failure Email
       - name: Send Failure Email
-        if: ${{ needs.build.outcome != 'success' || needs.deploy.outcome != 'success' }}
+        if: ${{ needs.build.result != 'success' || needs.deploy.result != 'success' }}
         continue-on-error: true
         uses: dawidd6/action-send-mail@6063705cefe50cb915fc53bb06d4049cae2953b2 # v3.12.0
         with:

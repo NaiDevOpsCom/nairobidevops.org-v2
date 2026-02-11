@@ -17,9 +17,10 @@ import {
 export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState(
-    () => window.location.pathname + window.location.hash
-  );
+  const [currentLocation, setCurrentLocation] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.location.pathname + window.location.hash;
+  });
   const [, setLocation] = useLocation();
 
   const navLinks = [

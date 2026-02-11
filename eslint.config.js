@@ -3,6 +3,7 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
+import securityPlugin from "eslint-plugin-security";
 import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
 import promisePlugin from "eslint-plugin-promise";
 import importPlugin from "eslint-plugin-import";
@@ -32,6 +33,22 @@ export default [
 
   // 2. Base Config
   js.configs.recommended,
+
+  // 2b. JS/JSX Config (ensure JSX parsing + globals)
+  {
+    files: ["**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+  },
 
   // 3. TS Config
   {
@@ -105,7 +122,11 @@ export default [
     },
   },
 
-  // 7. Other Plugins
+  // 8. Other Plugins
+  {
+    plugins: { security: securityPlugin },
+    rules: { ...securityPlugin.configs.recommended.rules },
+  },
   {
     files: ["**/*.{jsx,tsx}"],
     plugins: { "jsx-a11y": jsxA11yPlugin },
