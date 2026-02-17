@@ -13,6 +13,8 @@ import { recordedSessions } from "@/data/communityPageData";
 import { getRandomItems } from "@/utils/getRandomItems";
 import { seededRandom } from "@/lib/random";
 import LumaEventsList from "@/components/events/LumaEventsList";
+import EventsTypeSection from "@/components/events/EventsTypeSection";
+import AfricaDevOpsSummitSection from "@/components/events/AfricaDevOpsSummitSection";
 
 // --- Main Page Component ---
 export default function Eventspage() {
@@ -118,8 +120,11 @@ export default function Eventspage() {
         </div>
       </section>
 
+      {/* Type of events */}
+      <EventsTypeSection />
+
       {/* Meetups */}
-      <section id="meetup" className="py-16 lg:py-24 dark:bg-accent">
+      <section id="meetup" className="py-16 lg:py-24 dark:bg-ndc-darkblue">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-2xl md:text-3xl font-bold mb-4">Events & Meetups</h2>
@@ -141,6 +146,9 @@ export default function Eventspage() {
           </div>
         </div>
       </section>
+
+      {/* Africa DevOps Summit */}
+      <AfricaDevOpsSummitSection />
 
       {/* Past Events Highlights */}
       <section className="py-16 lg:py-24 bg-primary-light-blue dark:bg-ndc-darkblue">
