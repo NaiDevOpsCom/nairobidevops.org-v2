@@ -97,7 +97,7 @@ export default function Eventspage() {
       <SEO
         title="Events & Workshops"
         description="Join Nairobi DevOps Community events, workshops, campus tours and meetups. Discover upcoming and past DevOps events across Kenya."
-                canonical="https://nairobidevops.org/events"
+        canonical="https://nairobidevops.org/events"
         ogImage="https://ik.imagekit.io/nairobidevops/ndc-assets/PXL_20240601_141554232.jpg?updatedAt=1755152981738"
         twitterSite="@NairobiDevOps"
         structuredData={[eventsPageSchema, EVENTS_FAQ_SCHEMA]}
@@ -257,8 +257,19 @@ export default function Eventspage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12">
-            <Button asChild size="lg" variant="outline" className="text-white bg-primary hover:bg-ndc-darkblue hover:text-white px-8 py-6 text-lg transition-all duration-300 shadow-lg dark:bg-white dark:text-primary dark:hover:bg-primary dark:hover:text-white">
-              <a href="https://www.youtube.com/@NairobiDevopsCommunity" target="_blank" rel="noopener noreferrer" aria-label="Visit Nairobi DevOps YouTube Channel Library (opens in new tab)" className="flex items-center gap-2">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="text-white bg-primary hover:bg-ndc-darkblue hover:text-white px-8 py-6 text-lg transition-all duration-300 shadow-lg dark:bg-white dark:text-primary dark:hover:bg-primary dark:hover:text-white"
+            >
+              <a
+                href="https://www.youtube.com/@NairobiDevopsCommunity"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Visit Nairobi DevOps YouTube Channel Library (opens in new tab)"
+                className="flex items-center gap-2"
+              >
                 <Youtube className="w-5 h-5" aria-hidden="true" />
                 <span>Visit Channel Library</span>
               </a>
