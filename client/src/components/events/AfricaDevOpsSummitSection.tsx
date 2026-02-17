@@ -6,7 +6,7 @@ export default function AfricaDevOpsSummitSection() {
   return (
     <section className="py-16 lg:py-24 bg-ndc-darkblue text-white relative overflow-hidden dark:bg-accent">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center">
-        <div className="w-full max-w-5xl bg-primary-light-blue backdrop-blur-sm rounded-3xl p-8 md:p-12 lg:p-16 text-center border border-white/10 shadow-2xl bg-blue-50 dark:bg-white/60">
+        <div className="w-full max-w-5xl bg-primary-light-blue backdrop-blur-sm rounded-3xl p-8 md:p-12 lg:p-16 text-center border border-white/10 shadow-2xl dark:bg-white/60">
           <div className="mb-6 flex justify-center">
             <img
               src="https://res.cloudinary.com/nairobidevops/image/upload/v1756885757/ads-logos-colors_l8bvoh.svg"
@@ -36,13 +36,9 @@ export default function AfricaDevOpsSummitSection() {
               size="lg"
               className="bg-primary hover:bg-ndc-darkblue text-white px-8 py-6 text-lg font-semibold shadow-lg transition-all duration-300 w-full sm:w-auto"
             >
-              <Link
-                href="https://www.devopssummit.africa/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href="https://www.devopssummit.africa/" target="_blank" rel="noopener noreferrer">
                 Explore the Summit
-              </Link>
+              </a>
             </Button>
 
             <Button

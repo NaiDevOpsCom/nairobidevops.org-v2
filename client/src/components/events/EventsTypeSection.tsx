@@ -14,7 +14,7 @@ const AdsLogo = (props: React.HTMLAttributes<HTMLImageElement>) => (
     src="https://res.cloudinary.com/nairobidevops/image/upload/v1756885757/ads-logos-colors_l8bvoh.svg"
     alt="Africa DevOps Summit"
     {...props}
-    className={`${props.className} object-contain`}
+    className={`${props.className || ""} object-contain`}
   />
 );
 
@@ -63,9 +63,9 @@ export default function EventsTypeSection() {
         </div>
 
         <div className="flex flex-wrap justify-center gap-6">
-          {eventTypes.map((event, index) => (
+          {eventTypes.map((event) => (
             <Card
-              key={index}
+              key={event.title}
               className="w-full md:w-[350px] lg:w-[30%] flex flex-col items-center text-center p-6 border-2 border-blue-200 dark:border-blue-900 bg-accent dark:bg-card hover:shadow-lg transition-shadow duration-300"
             >
               <CardHeader className="flex flex-col items-center pb-2">
