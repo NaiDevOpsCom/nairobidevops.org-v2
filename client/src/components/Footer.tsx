@@ -228,8 +228,7 @@ export default function Footer() {
             */}
             <Dialog.Content
               id={DONATION_DIALOG_ID}
-              forceMount
-              className={`absolute bottom-22 right-6 w-80 sm:w-96 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 transition-all duration-300 origin-bottom-right z-50 ${
+              className={`absolute bottom-24 right-6 w-80 sm:w-96 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 transition-all duration-300 origin-bottom-right z-50 ${
                 isDonationCardOpen
                   ? "opacity-100 scale-100 translate-y-0"
                   : "opacity-0 scale-95 translate-y-4 pointer-events-none"

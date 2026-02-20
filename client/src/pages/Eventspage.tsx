@@ -456,7 +456,7 @@ function FAQCarousel() {
             key={`${f.question}-${idx}`}
             role="tabpanel"
             id={`panel-${slideIdx}-${idx}`}
-            aria-labelledby={`tab-${slideIdx}-${idx}`}
+            aria-label={f.question}
             className="bg-primary-light-blue rounded-lg p-6"
           >
             <h3 className="font-semibold mb-3">{f.question}</h3>
