@@ -152,7 +152,7 @@ jobs:
             # 3. Cleanup: Keep only last 5 releases
             echo "Cleaning up old releases..."
             cd "/home/${{ secrets.REMOTE_USER }}/releases"
-            ls -1t | tail -n +6 | xargs rm -rf 2>/dev/null || true
+            ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
 
             echo "Deployment successful."
 

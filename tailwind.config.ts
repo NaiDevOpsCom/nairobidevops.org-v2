@@ -49,6 +49,7 @@ export default {
           "faq-bg": "hsla(209, 56%, 88%, 1)",
           "faq-text": "#000000",
           "dark-bg-secondary": "#898E99",
+          midnight: "#001E2B",
         },
         "black-overlay": "var(--black-overlay)",
         "black-overlay80": "var(--black-overlay80)",
