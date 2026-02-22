@@ -16,12 +16,12 @@ flowchart LR
 
 ## Architecture
 
-| File | Purpose |
-|------|---------|
+| File                          | Purpose                                         |
+| ----------------------------- | ----------------------------------------------- |
 | `scripts/generate-sitemap.ts` | Build-time generator — reads routes & blog data |
-| `scripts/validate-sitemap.ts` | Post-build XML/URL validation (CI gate) |
-| `scripts/deploy-sitemap.sh` | Ad-hoc scp upload to cPanel |
-| `client/public/robots.txt` | Crawl directives + Sitemap URL |
+| `scripts/validate-sitemap.ts` | Post-build XML/URL validation (CI gate)         |
+| `scripts/deploy-sitemap.sh`   | Ad-hoc scp upload to cPanel                     |
+| `client/public/robots.txt`    | Crawl directives + Sitemap URL                  |
 
 ## NPM Scripts
 
@@ -38,6 +38,7 @@ npm run sitemap:deploy     # Upload via scp (requires env vars)
 The Vite config includes a custom `sitemapPlugin` that runs `generateSitemap()` in the `closeBundle` hook. This happens automatically during `npm run build` for production/staging modes.
 
 The generator:
+
 - Reads **11 static routes** from a hardcoded route map (mirrors `App.tsx`)
 - Dynamically imports `blogData.ts` to resolve all `/blogs/:slug` URLs
 - Writes valid XML with `<lastmod>`, `<changefreq>`, and `<priority>` tags
@@ -46,6 +47,7 @@ The generator:
 ### 2. CI Validation
 
 The `deploy.yml` workflow runs `npm run sitemap:validate` after every build. This step:
+
 - Checks `sitemap.xml` exists and is non-empty
 - Validates XML declaration and namespace
 - Ensures all `<loc>` URLs are HTTPS
@@ -115,6 +117,7 @@ For sites with frequently changing content, set up a cron job in cPanel:
 ## CDN Cache Purging
 
 After deploying a new sitemap, purge the CDN cache for:
+
 - `/sitemap.xml`
 - `/robots.txt`
 
@@ -133,10 +136,10 @@ If using Cloudflare: **Caching → Purge Cache → Custom Purge** → enter the 
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| `sitemap.xml not found in dist/` | Run `npm run build` — the plugin only runs in production/staging mode |
-| Blog slugs not in sitemap | Check `blogData.ts` exports `blogPosts` array with `slug` properties |
-| Validation fails in CI | Check `npm run sitemap:validate` locally for detailed error messages |
-| `scp` permission denied | Verify SSH key matches server, check `authorized_keys` on cPanel |
-| Sitemap not updating after deploy | Purge CDN cache, check symlink target with `ls -la public_html` |
+| Issue                             | Solution                                                              |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `sitemap.xml not found in dist/`  | Run `npm run build` — the plugin only runs in production/staging mode |
+| Blog slugs not in sitemap         | Check `blogData.ts` exports `blogPosts` array with `slug` properties  |
+| Validation fails in CI            | Check `npm run sitemap:validate` locally for detailed error messages  |
+| `scp` permission denied           | Verify SSH key matches server, check `authorized_keys` on cPanel      |
+| Sitemap not updating after deploy | Purge CDN cache, check symlink target with `ls -la public_html`       |
