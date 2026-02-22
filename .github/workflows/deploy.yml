@@ -152,7 +152,7 @@ jobs:
             # 3. Cleanup: Keep only last 5 releases
             echo "Cleaning up old releases..."
             cd "/home/${{ secrets.REMOTE_USER }}/releases"
-            ls -1t | tail -n +6 | xargs rm -rf 2>/dev/null || true
+            ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
 
             echo "Deployment successful."
 
@@ -173,7 +173,7 @@ jobs:
       - name: Send Success Email
         if: ${{ needs.build.result == 'success' && needs.deploy.result == 'success' }}
         continue-on-error: true
-        uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+        uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
@@ -208,7 +208,7 @@ jobs:
       - name: Send Failure Email
         if: ${{ needs.build.result != 'success' || needs.deploy.result != 'success' }}
         continue-on-error: true
-        uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+        uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}

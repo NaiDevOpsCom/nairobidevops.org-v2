@@ -196,6 +196,7 @@ const WhatDefinesUsSection: React.FC = () => (
 // --- Empowering Community Section Component ---
 const EmpoweringCommunitySection: React.FC = () => (
   <section
+    id="empowering-community"
     className="py-12 sm:py-16 lg:py-20 xl:py-24 bg-[#C2C2C2] dark:bg-[#000000]"
     aria-labelledby="empowering-heading"
   >
@@ -799,8 +800,39 @@ const CollaborationCTASection: React.FC = () => {
 
 // --- Main Community Page Component ---
 export default function CommunityPage() {
+  const timerRef = React.useRef<ReturnType<typeof setTimeout>>();
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (window.location.hash) {
+        const id = window.location.hash.replace("#", "");
+        const element = document.getElementById(id);
+        if (element) {
+          // Clear any existing timeout before scheduling a new one
+          if (timerRef.current) clearTimeout(timerRef.current);
+
+          // Small timeout to ensure DOM is ready and layout is stable
+          timerRef.current = setTimeout(() => {
+            element.scrollIntoView({ behavior: "smooth" });
+          }, 100);
+        }
+      }
+    };
+
+    // Run on initial mount
+    handleScroll();
+
+    // Listen for hash changes in-page
+    window.addEventListener("hashchange", handleScroll);
+
+    return () => {
+      window.removeEventListener("hashchange", handleScroll);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-background font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-900">
       <Navbar />
       <HeroGallery />
       <WhatDefinesUsSection />

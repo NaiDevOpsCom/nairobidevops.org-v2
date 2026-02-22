@@ -33,29 +33,35 @@ export default function Navbar() {
   ];
 
   const handleNavClick = (href: string) => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const openExternal = (raw: string) => {
+      try {
+        const u = new URL(raw);
+        if (u.protocol !== "https:" && u.protocol !== "http:") return;
+        window.open(u.toString(), "_blank", "noopener,noreferrer");
+      } catch {
+        return;
+      }
+    };
+
     const isExternal = href.startsWith("http");
     if (isExternal) {
-      window.open(href, "_blank", "noopener,noreferrer");
+      openExternal(href);
     } else if (href.startsWith("/")) {
-      // Client-side navigation via wouter router
       setLocation(href);
     } else {
       const element = document.querySelector(href);
       if (element) {
-        // Smooth scroll into view
         element.scrollIntoView({ behavior: "smooth" });
-        // Ensure the URL hash (and our state) reflects in-page navigation so active state can update
+
         if (window.location.hash !== href) {
-          // Update the hash without causing a page reload
-          history.replaceState(null, "", href);
-          // replaceState does not trigger wouter location updates, so update state manually
-          setCurrentLocation(window.location.pathname + href);
-        } else {
-          // If the hash is the same, hashchange won't fire; update state manually
-          setCurrentLocation(window.location.pathname + href);
+          window.history.replaceState(null, "", href);
         }
+        setCurrentLocation(window.location.pathname + href);
       }
     }
+
     setIsOpen(false);
   };
 
