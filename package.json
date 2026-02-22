@@ -22,7 +22,10 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:coverage": "vitest run --root client --coverage",
-    "test:ui": "vitest --root client --ui"
+    "test:ui": "vitest --root client --ui",
+    "sitemap:generate": "tsx scripts/generate-sitemap.ts",
+    "sitemap:validate": "tsx scripts/validate-sitemap.ts",
+    "sitemap:deploy": "bash scripts/deploy-sitemap.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
