@@ -158,27 +158,20 @@ export async function generateSitemap(): Promise<void> {
 
   const allEntries = [...staticRoutes, ...blogEntries];
 
-  // Check for duplicate URLs
+  // Check for duplicate URLs (single pass)
   const seen = new Set<string>();
+  const uniqueEntries: SitemapEntry[] = [];
+
   for (const entry of allEntries) {
     if (seen.has(entry.loc)) {
       console.warn(`⚠  Duplicate route skipped: ${entry.loc}`);
       continue;
     }
     seen.add(entry.loc);
+    uniqueEntries.push(entry);
   }
 
-  const uniqueEntries = allEntries.filter((entry) => {
-    if (seen.has(entry.loc)) {
-      seen.delete(entry.loc); // keep first occurrence
-      return true;
-    }
-    return false;
-  });
-
-  const xml = buildSitemapXml(
-    uniqueEntries.length > 0 ? uniqueEntries : allEntries,
-  );
+  const xml = buildSitemapXml(uniqueEntries);
 
   // Ensure dist exists
   if (!fs.existsSync(DIST_DIR)) {
@@ -190,12 +183,19 @@ export async function generateSitemap(): Promise<void> {
 
   console.log(`✅ sitemap.xml written to ${outputPath}`);
   console.log(
-    `   ${staticRoutes.length} static + ${blogEntries.length} dynamic = ${allEntries.length} URLs`,
+    `   ${staticRoutes.length} static + ${blogEntries.length} dynamic = ${uniqueEntries.length} URLs`,
   );
+  if (allEntries.length > uniqueEntries.length) {
+    console.log(
+      `   (Removed ${allEntries.length - uniqueEntries.length} duplicate(s))`,
+    );
+  }
 }
 
-// Run directly when invoked via CLI
-generateSitemap().catch((err) => {
-  console.error("❌ Sitemap generation failed:", err);
-  process.exit(1);
-});
+// Run directly when invoked via CLI (ESM check)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  generateSitemap().catch((err) => {
+    console.error("❌ Sitemap generation failed:", err);
+    process.exit(1);
+  });
+}

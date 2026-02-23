@@ -119,8 +119,8 @@ function validateSitemap(): void {
     // Lastmod date validation
     if (lastmodMatch) {
       const dateStr = lastmodMatch[1];
-      // ISO 8601 date-only (YYYY-MM-DD) or full datetime
-      const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/;
+      // ISO 8601 date-only (YYYY-MM-DD) or full datetime with optional timezone offset
+      const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:\d{2}))?$/;
       if (!isoDatePattern.test(dateStr)) {
         fail(`Invalid <lastmod> date format: ${dateStr} in ${loc}`);
       }

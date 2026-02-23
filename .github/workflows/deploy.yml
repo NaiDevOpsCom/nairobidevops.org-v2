@@ -50,7 +50,7 @@ jobs:
           fi
 
       # 4. Validate Sitemap & Robots.txt
-      - name: Validate Sitemap
+      - name: Validate Sitemap & Robots.txt
         run: npm run sitemap:validate
 
       # 5. Upload Build Artifact

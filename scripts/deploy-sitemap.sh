@@ -9,6 +9,7 @@
 #   REMOTE_PATH       — Target path (e.g. /home/user/public_html)
 #   SSH_KEY_PATH      — Path to SSH private key (default: ~/.ssh/id_rsa)
 #   REMOTE_PORT       — SSH port (default: 22)
+#   SITE_DOMAIN       - Domain name for verification URL (optional, defaults to REMOTE_HOST)
 #
 # Usage:
 #   export REMOTE_HOST=example.com REMOTE_USER=deploy REMOTE_PATH=/home/deploy/public_html
@@ -93,4 +94,4 @@ done
 
 echo ""
 echo "🎉 Sitemap deployment complete!"
-echo "   Verify at: https://$(echo "$REMOTE_HOST" | sed 's/[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*/nairobidevops.org/')/sitemap.xml"
+echo "   Verify at: https://${SITE_DOMAIN:-$REMOTE_HOST}/sitemap.xml"

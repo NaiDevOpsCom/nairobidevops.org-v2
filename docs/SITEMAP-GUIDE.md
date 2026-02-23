@@ -35,7 +35,7 @@ npm run sitemap:deploy     # Upload via scp (requires env vars)
 
 ### 1. Build-Time Generation
 
-The Vite config includes a custom `sitemapPlugin` that runs `generateSitemap()` in the `closeBundle` hook. This happens automatically during `npm run build` for production/staging modes.
+The Vite config includes a custom `sitemapPlugin` that runs `generateSitemap()` in the `closeBundle` hook. This happens automatically during `npm run build` when `isHardened` is true (typically production/staging modes).
 
 The generator:
 
@@ -65,6 +65,7 @@ For ad-hoc updates (e.g., after a cron regeneration), use:
 export REMOTE_HOST=your-server.com
 export REMOTE_USER=your-user
 export REMOTE_PATH=/home/your-user/public_html
+# Note: SSH key authentication is required. See Security Best Practices below.
 bash scripts/deploy-sitemap.sh
 ```
 
@@ -82,6 +83,9 @@ When you add a new `<Route>` in `App.tsx`:
 
 ## cPanel Cron Job Setup
 
+> [!TIP]
+> For the current static blog data, a cron job is unnecessary — the sitemap is generated fresh with every deploy.
+
 For sites with frequently changing content, set up a cron job in cPanel:
 
 1. **SSH into your server** and create a regeneration script:
@@ -89,9 +93,28 @@ For sites with frequently changing content, set up a cron job in cPanel:
    ```bash
    #!/bin/bash
    # /home/user/scripts/regenerate-sitemap.sh
+   set -e
+
+   # Ensure required tools are available
+   if ! command -v npm &> /dev/null; then
+       echo "npm could not be found"
+       exit 1
+   fi
+
    cd /home/user/project
-   npx tsx scripts/generate-sitemap.ts
-   cp dist/sitemap.xml /home/user/public_html/sitemap.xml
+
+   # Pull latest code and build
+   git pull origin main
+   npm ci
+   npm run build
+
+   # Verify sitemap exists before copying
+   if [ -f "dist/sitemap.xml" ]; then
+       cp dist/sitemap.xml /home/user/public_html/sitemap.xml
+   else
+       echo "Error: dist/sitemap.xml not found"
+       exit 1
+   fi
    ```
 
 2. **In cPanel → Cron Jobs**, add:
@@ -101,9 +124,6 @@ For sites with frequently changing content, set up a cron job in cPanel:
    ```
 
    This runs daily at 3:00 AM.
-
-> [!TIP]
-> For the current static blog data, a cron job is unnecessary — the sitemap is generated fresh with every deploy.
 
 ## Google Search Console Submission
 
@@ -129,7 +149,8 @@ If using Cloudflare: **Caching → Purge Cache → Custom Purge** → enter the 
 > **SSH Keys Only.** The `deploy-sitemap.sh` script uses SSH key authentication exclusively. Never use password authentication for automated deployments.
 
 - **Never commit private keys** — use GitHub Secrets or environment variables
-- **Restrict key permissions**: `chmod 600 ~/.ssh/id_rsa`
+- **Prefer Ed25519 keys**: Generate with `ssh-keygen -t ed25519` for better security and performance.
+- **Restrict key permissions**: `chmod 600 ~/.ssh/id_ed25519`
 - **Use `StrictHostKeyChecking=yes`** (already configured in the script)
 - **Rotate SSH keys periodically** — especially if a team member leaves
 - **Limit the deploy key's server access** — use a dedicated deploy user with minimal permissions

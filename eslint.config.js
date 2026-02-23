@@ -21,7 +21,6 @@ export default [
       "build",
       "coverage",
       "**/coverage/**",
-      "client/coverage/**",
       "**/.vite",
       "client/public/analytics.js",
       "**/*.min.js",
@@ -148,6 +147,8 @@ export default [
     },
   },
   {
+    // Disabled import recommended rules due to ESLint 9 compatibility issues
+    // with eslint-plugin-import (e.g. context.getScope() usage).
     plugins: { import: importPlugin },
     rules: {
       "import/no-unresolved": "off",

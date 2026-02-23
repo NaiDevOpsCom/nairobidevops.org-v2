@@ -54,7 +54,7 @@ function setupCPanelStructure() {
   if (fs.existsSync(robotsPath)) {
     console.log("✓ robots.txt present in dist");
   } else {
-    console.warn("⚠ robots.txt not found in dist");
+    console.warn("⚠ robots.txt not found in dist — ensure client/public/robots.txt exists");
   }
 
   console.log("cPanel structure setup complete!");

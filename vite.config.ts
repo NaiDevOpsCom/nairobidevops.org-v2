@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 /**
  * Vite plugin that generates sitemap.xml after the build completes.
- * Only runs in production/staging modes — skipped during dev.
+ * Only runs when isHardened is true (typically production/staging modes).
  */
 function sitemapPlugin(enabled: boolean): Plugin {
   return {
