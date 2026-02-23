@@ -10,7 +10,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { routes } from "../shared/routes";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -22,8 +24,12 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 
-/** ISO 8601 date-only string for <lastmod> */
-const today = new Date().toISOString().split("T")[0]; // e.g. "2026-02-22"
+/** ISO 8601 date-only string for <lastmod> (deterministic via SOURCE_DATE_EPOCH when provided) */
+const today = (() => {
+  const epoch = process.env.SOURCE_DATE_EPOCH;
+  const d = epoch ? new Date(Number(epoch) * 1000) : new Date();
+  return d.toISOString().split("T")[0];
+})();
 
 // ---------------------------------------------------------------------------
 // Route definitions
@@ -32,29 +38,17 @@ const today = new Date().toISOString().split("T")[0]; // e.g. "2026-02-22"
 interface SitemapEntry {
   loc: string;
   changefreq: "daily" | "weekly" | "monthly" | "yearly";
-  priority: string; // "0.0" – "1.0"
+  priority: number;
   lastmod: string;
 }
 
-/** Static routes with SEO metadata (from App.tsx) */
-const staticRoutes: SitemapEntry[] = [
-  { loc: "/", changefreq: "weekly", priority: "1.0", lastmod: today },
-  { loc: "/about", changefreq: "monthly", priority: "0.8", lastmod: today },
-  { loc: "/events", changefreq: "weekly", priority: "0.8", lastmod: today },
-  { loc: "/faqpage", changefreq: "monthly", priority: "0.6", lastmod: today },
-  { loc: "/community", changefreq: "weekly", priority: "0.8", lastmod: today },
-  { loc: "/partners", changefreq: "monthly", priority: "0.7", lastmod: today },
-  { loc: "/blogs", changefreq: "daily", priority: "0.9", lastmod: today },
-  { loc: "/donate", changefreq: "monthly", priority: "0.7", lastmod: today },
-  {
-    loc: "/code-of-conduct",
-    changefreq: "yearly",
-    priority: "0.4",
+const staticRoutes: SitemapEntry[] = routes
+  .filter((route) => !route.dynamic)
+  .map((route) => ({
+    loc: route.path,
+    ...route.sitemap,
     lastmod: today,
-  },
-  { loc: "/terms", changefreq: "yearly", priority: "0.3", lastmod: today },
-  { loc: "/privacy", changefreq: "yearly", priority: "0.3", lastmod: today },
-];
+  }));
 
 // ---------------------------------------------------------------------------
 // Dynamic routes — blog posts
@@ -76,9 +70,8 @@ async function getBlogSlugs(): Promise<string[]> {
   }
 
   try {
-    // tsx handles TypeScript imports natively
     const { blogPosts } = (await import(
-      `file://${blogDataPath.replace(/\\/g, "/")}`
+      pathToFileURL(blogDataPath).href
     )) as {
       blogPosts: Array<{ slug: string }>;
     };
@@ -152,7 +145,7 @@ export async function generateSitemap(): Promise<void> {
   const blogEntries: SitemapEntry[] = slugs.map((slug) => ({
     loc: `/blogs/${slug}`,
     changefreq: "weekly" as const,
-    priority: "0.6",
+    priority: 0.6,
     lastmod: today,
   }));
 
@@ -182,9 +175,7 @@ export async function generateSitemap(): Promise<void> {
   fs.writeFileSync(outputPath, xml, "utf-8");
 
   console.log(`✅ sitemap.xml written to ${outputPath}`);
-  console.log(
-    `   ${staticRoutes.length} static + ${blogEntries.length} dynamic = ${uniqueEntries.length} URLs`,
-  );
+  console.log(`   ${staticRoutes.length} static + ${blogEntries.length} dynamic → ${uniqueEntries.length} URLs`);
   if (allEntries.length > uniqueEntries.length) {
     console.log(
       `   (Removed ${allEntries.length - uniqueEntries.length} duplicate(s))`,
@@ -193,7 +184,7 @@ export async function generateSitemap(): Promise<void> {
 }
 
 // Run directly when invoked via CLI (ESM check)
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").toString()) {
   generateSitemap().catch((err) => {
     console.error("❌ Sitemap generation failed:", err);
     process.exit(1);

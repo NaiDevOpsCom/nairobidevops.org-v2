@@ -120,7 +120,7 @@ function validateSitemap(): void {
     if (lastmodMatch) {
       const dateStr = lastmodMatch[1];
       // ISO 8601 date-only (YYYY-MM-DD) or full datetime with optional timezone offset
-      const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:\d{2}))?$/;
+      const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
       if (!isoDatePattern.test(dateStr)) {
         fail(`Invalid <lastmod> date format: ${dateStr} in ${loc}`);
       }
@@ -128,6 +128,21 @@ function validateSitemap(): void {
       const parsed = new Date(dateStr);
       if (isNaN(parsed.getTime())) {
         fail(`Unparseable <lastmod> date: ${dateStr} in ${loc}`);
+        continue;
+      }
+
+      // Strict calendar check: ensure parsed date matches input components
+      // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
+      const datePart = dateStr.split("T")[0];
+      const [y, m, d] = datePart.split("-").map(Number);
+      const isoYear = parsed.getFullYear();
+      const isoMonth = parsed.getMonth() + 1;
+      const isoDay = parsed.getDate();
+
+      if (y !== isoYear || m !== isoMonth || d !== isoDay) {
+        fail(
+          `Invalid calendar date: ${dateStr} in ${loc} (normalized to ${isoYear}-${String(isoMonth).padStart(2, "0")}-${String(isoDay).padStart(2, "0")})`,
+        );
       }
     }
   }
