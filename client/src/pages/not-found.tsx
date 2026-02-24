@@ -1,8 +1,8 @@
 import { Link } from "wouter";
 
+import Navbar from "@/components/Navbar";
 import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
-import Navbar from "@/components/Navbar";
 
 export default function NotFound() {
   return (

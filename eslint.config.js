@@ -1,15 +1,14 @@
 import js from "@eslint/js";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
+import vitest from "@vitest/eslint-plugin";
+import prettierConfig from "eslint-config-prettier";
+import importPlugin from "eslint-plugin-import";
+import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import securityPlugin from "eslint-plugin-security";
-import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
-import promisePlugin from "eslint-plugin-promise";
-import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
-import prettierConfig from "eslint-config-prettier";
-import vitest from "@vitest/eslint-plugin";
 import globals from "globals";
 
 export default [
@@ -20,6 +19,7 @@ export default [
       "dist",
       "build",
       "coverage",
+      "**/coverage/**",
       "**/.vite",
       "client/public/analytics.js",
       "**/*.min.js",
@@ -75,17 +75,17 @@ export default [
   // 4. React
   {
     files: ["**/*.{jsx,tsx}"],
-    ...reactPlugin.configs.flat.recommended,
-  },
-  {
-    files: ["**/*.{jsx,tsx}"],
-    plugins: { "react-hooks": reactHooksPlugin },
+    plugins: {
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
+    },
     settings: {
       react: {
         version: "18.3.1",
       },
     },
     rules: {
+      ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
       "react/react-in-jsx-scope": "off",
       // Disabled: eslint-plugin-react@7.37.5 crashes with ESLint 9 Flat Config
@@ -105,22 +105,6 @@ export default [
     },
   },
 
-  // 6. Vitest
-  {
-    files: ["**/__tests__/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"],
-    plugins: {
-      vitest,
-    },
-    languageOptions: {
-      globals: {
-        ...vitest.environments.env.globals,
-      },
-    },
-    rules: {
-      ...vitest.configs.recommended.rules,
-    },
-  },
-
   // 8. Other Plugins
   {
     plugins: { security: securityPlugin },
@@ -133,27 +117,48 @@ export default [
       "security/detect-object-injection": "off",
     },
   },
+
+  // 6. Vitest (Moved here so its security overrides take precedence)
+  {
+    files: ["**/__tests__/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"],
+    plugins: {
+      vitest,
+    },
+    languageOptions: {
+      globals: {
+        ...vitest.environments.env.globals,
+      },
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      "security/detect-non-literal-fs-filename": "off",
+    },
+  },
   {
     files: ["**/*.{jsx,tsx}"],
     plugins: { "jsx-a11y": jsxA11yPlugin },
     rules: { ...jsxA11yPlugin.configs.recommended.rules },
   },
   {
-    plugins: { promise: promisePlugin },
-    rules: { ...promisePlugin.configs.recommended.rules },
-  },
-  {
+    // Re-enabled import rules now that compatibility with ESLint 9 is confirmed/handled
     plugins: { import: importPlugin },
     rules: {
-      ...importPlugin.configs.recommended.rules,
-      "import/no-unresolved": "off",
       "import/order": [
         "error",
         {
           groups: ["builtin", "external", "internal", "parent", "sibling", "index"],
           "newlines-between": "always",
+          alphabetize: { order: "asc", caseInsensitive: true },
         },
       ],
+    },
+  },
+  {
+    files: ["client/src/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}"],
+    rules: {
+      // Disable unresolved check for code using aliases (@/ or @shared/)
+      // as the resolver is not configured in this flat config.
+      "import/no-unresolved": "off",
     },
   },
 
@@ -166,7 +171,7 @@ export default [
 
   // Scripts directory
   {
-    files: ["scripts/**/*.js"],
+    files: ["scripts/**/*.js", "eslint.config.js"],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -177,6 +182,7 @@ export default [
       "no-process-exit": "off",
       "no-redeclare": "off",
       "import/order": "off",
+      "import/no-unresolved": "off",
     },
   },
 

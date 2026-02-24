@@ -15,6 +15,7 @@ on:
     paths:
       - "client/src/**"
       - "client/public/**"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - "vite.config.ts"
@@ -48,7 +49,11 @@ jobs:
             exit 1
           fi
 
-      # 4. Upload Build Artifact
+      # 4. Validate Sitemap & Robots.txt
+      - name: Validate Sitemap & Robots.txt
+        run: npm run sitemap:validate
+
+      # 5. Upload Build Artifact
       - name: Upload Build Artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:

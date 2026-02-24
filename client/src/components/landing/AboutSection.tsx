@@ -4,8 +4,8 @@ import { useLocation } from "wouter";
 
 import StatisticCounter from "../ui/StatisticCounter";
 
-import { statisticsData } from "@/data/ndcData";
 import { Button } from "@/components/ui/button";
+import { statisticsData } from "@/data/ndcData";
 
 const iconMap: { [key: string]: React.ElementType } = {
   Users,

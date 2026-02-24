@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Image as UnpicImage } from "@unpic/react";
 import {
   Cloud,
   Wrench,
@@ -9,22 +9,22 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { Image as UnpicImage } from "@unpic/react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 
-import Navbar from "@/components/Navbar";
+import AfricaDevOpsSummitSection from "@/components/events/AfricaDevOpsSummitSection";
+import EventsTypeSection from "@/components/events/EventsTypeSection";
+import LumaEventsList from "@/components/events/LumaEventsList";
 import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
+import RecordedVideoCard from "@/components/RecordedVideoCard";
 import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
+import { recordedSessions } from "@/data/communityPageData";
 import { getFAQsByCategory } from "@/data/faqData";
 import { GalleryImage, communityGallery } from "@/data/galleryData";
-import RecordedVideoCard from "@/components/RecordedVideoCard";
-import { recordedSessions } from "@/data/communityPageData";
-import { getRandomItems } from "@/utils/getRandomItems";
 import { seededRandom } from "@/lib/random";
-import LumaEventsList from "@/components/events/LumaEventsList";
-import EventsTypeSection from "@/components/events/EventsTypeSection";
-import AfricaDevOpsSummitSection from "@/components/events/AfricaDevOpsSummitSection";
+import { getRandomItems } from "@/utils/getRandomItems";
 
 const REASONS = [
   { icon: Cloud, title: "Explore cloud and DevOps" },

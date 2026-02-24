@@ -1,5 +1,3 @@
-import React, { useMemo } from "react";
-import { Link } from "wouter";
 import {
   ClipboardList,
   FlaskConical,
@@ -15,7 +13,12 @@ import {
   Bell,
   Youtube,
 } from "lucide-react";
+import React, { useMemo } from "react";
+import { Link } from "wouter";
 
+import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
+import RecordedVideoCard from "@/components/RecordedVideoCard";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,14 +28,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import RecordedVideoCard from "@/components/RecordedVideoCard";
-import { communityGallery } from "@/data/galleryData";
-import { getWeightedRandomItem } from "@/utils/weightedRandom";
 import { LogoCloud } from "@/components/ui/ndcCampusLogos";
-import { getRandomItems } from "@/utils/getRandomItems";
-import { allData } from "@/data/whatWeDoData";
 import {
   events,
   projects,
@@ -40,6 +36,10 @@ import {
   CommunityEvent,
   CommunityProject,
 } from "@/data/communityPageData";
+import { communityGallery } from "@/data/galleryData";
+import { allData } from "@/data/whatWeDoData";
+import { getRandomItems } from "@/utils/getRandomItems";
+import { getWeightedRandomItem } from "@/utils/weightedRandom";
 
 // --- Component for "What We Offer" items ---
 interface OfferItemProps {
@@ -804,13 +804,16 @@ export default function CommunityPage() {
 
   React.useEffect(() => {
     const handleScroll = () => {
+      // Clear any existing timeout before scheduling a new one
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = undefined;
+      }
+
       if (window.location.hash) {
         const id = window.location.hash.replace("#", "");
         const element = document.getElementById(id);
         if (element) {
-          // Clear any existing timeout before scheduling a new one
-          if (timerRef.current) clearTimeout(timerRef.current);
-
           // Small timeout to ensure DOM is ready and layout is stable
           timerRef.current = setTimeout(() => {
             element.scrollIntoView({ behavior: "smooth" });

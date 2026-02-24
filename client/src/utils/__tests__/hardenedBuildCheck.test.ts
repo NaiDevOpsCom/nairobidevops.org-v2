@@ -39,6 +39,7 @@ const listJsFiles = (dir: string): string[] => {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const distDir = path.join(repoRoot, "dist");
+
 const distExists = existsSync(distDir) && statSync(distDir).isDirectory();
 
 if (process.env.CI_ENFORCE_HARDENING && !distExists) {

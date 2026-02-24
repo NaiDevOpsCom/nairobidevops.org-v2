@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
 import { PlusIcon } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
 
-import { cn } from "@/lib/utils";
-import { seededRandom, seededShuffle } from "@/lib/random";
 import { partnersData } from "@/data/partnersData";
+import { seededRandom, seededShuffle } from "@/lib/random";
+import { cn } from "@/lib/utils";
 
 // --- Types and Constants ---
 

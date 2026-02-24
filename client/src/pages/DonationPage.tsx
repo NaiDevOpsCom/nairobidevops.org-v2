@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from "react";
 import { ArrowRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 
-import { DONATION_CARD_ID } from "@/lib/constants";
-import { seededRandom } from "@/lib/random";
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
+import StatisticCounter from "@/components/ui/StatisticCounter";
 import { communityGallery } from "@/data/galleryData";
 import { statisticsData } from "@/data/ndcData";
-import StatisticCounter from "@/components/ui/StatisticCounter";
+import { DONATION_CARD_ID } from "@/lib/constants";
+import { seededRandom } from "@/lib/random";
 
 const supportOptions = [
   {

@@ -1,18 +1,18 @@
+import { Image as UnpicImage } from "@unpic/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Image as UnpicImage } from "@unpic/react";
 
-import { Button } from "@/components/ui/button";
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { teamData, statisticsData } from "@/data/ndcData";
+import Navbar from "@/components/Navbar";
+import SocialIconLink from "@/components/SocialIconLink";
+import TeamGallery from "@/components/TeamGallery";
+import { Button } from "@/components/ui/button";
 import StatisticCounter from "@/components/ui/StatisticCounter";
 import { communityGallery, teamGallery } from "@/data/galleryData";
-import TeamGallery from "@/components/TeamGallery";
-import { getRandomItems, getRandomFrom } from "@/utils/getRandomItems";
+import { teamData, statisticsData } from "@/data/ndcData";
 import { seededRandom } from "@/lib/random";
-import SocialIconLink from "@/components/SocialIconLink";
+import { getRandomItems, getRandomFrom } from "@/utils/getRandomItems";
 
 // Objectives data
 const objectivesData = [

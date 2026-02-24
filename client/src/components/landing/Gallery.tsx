@@ -1,5 +1,5 @@
-import { communityGallery } from "@/data/galleryData";
 import InteractiveImageBentoGallery from "@/components/ui/bento-gallery";
+import { communityGallery } from "@/data/galleryData";
 
 // Transform gallery data to match bento gallery format
 const bentoGalleryItems = communityGallery.map((image, index) => {

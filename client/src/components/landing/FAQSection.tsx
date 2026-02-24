@@ -2,10 +2,10 @@ import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
-import { Button } from "@/components/ui/button";
-import { seededRandom } from "@/lib/random";
 import faqImage from "@/assets/faq.png";
+import { Button } from "@/components/ui/button";
 import { faqDataByCategory } from "@/data/faqData";
+import { seededRandom } from "@/lib/random";
 
 export default function FAQSection() {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(() =>

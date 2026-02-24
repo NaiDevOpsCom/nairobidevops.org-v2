@@ -1,6 +1,4 @@
-import * as React from "react";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Award,
   Building2,
@@ -17,23 +15,25 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { useState } from "react";
+import * as React from "react";
+import { useForm } from "react-hook-form";
 import { Link } from "wouter";
-import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-import { seededRandom } from "@/lib/random";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { SponsorsCarousel } from "@/components/SponsorsCarousel";
-import StatisticCounter from "@/components/ui/StatisticCounter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import StatisticCounter from "@/components/ui/StatisticCounter";
 import { Textarea } from "@/components/ui/textarea";
 import { communityGallery } from "@/data/galleryData";
 import { statisticsData } from "@/data/ndcData";
 import { testimonialsData } from "@/data/testimonialsData";
+import { seededRandom } from "@/lib/random";
 
 // Default CTA background used as fallback
 const DEFAULT_CTA_BG =

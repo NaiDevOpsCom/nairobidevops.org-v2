@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
 import { Menu, X, Sun, Moon, Handshake } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 
-import { useTheme } from "@/contexts/ThemeContext";
-import { NDC_LOGO_URL } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,6 +11,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { useTheme } from "@/contexts/ThemeContext";
+import { NDC_LOGO_URL } from "@/lib/constants";
 
 export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
@@ -50,7 +50,7 @@ export default function Navbar() {
       openExternal(href);
     } else if (href.startsWith("/")) {
       setLocation(href);
-    } else {
+    } else if (href.startsWith("#")) {
       const element = document.querySelector(href);
       if (element) {
         element.scrollIntoView({ behavior: "smooth" });
@@ -61,6 +61,8 @@ export default function Navbar() {
         setCurrentLocation(window.location.pathname + href);
       }
     }
+    // mailto:, tel:, etc. are ignored or handled by default browser behavior if needed,
+    // but here we just no-op to prevent querySelector crashes.
 
     setIsOpen(false);
   };

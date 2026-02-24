@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 
-import { testimonialsData } from "@/data/testimonialsData";
 import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1";
+import { testimonialsData } from "@/data/testimonialsData";
 
 const formattedTestimonials = testimonialsData.community.map((testimonial) => ({
   text: testimonial.quote,

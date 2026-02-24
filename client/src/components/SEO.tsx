@@ -1,5 +1,5 @@
-import { Helmet } from "react-helmet-async";
 import { useEffect, useMemo } from "react";
+import { Helmet } from "react-helmet-async";
 
 interface SEOProps {
   title?: string;
@@ -26,6 +26,13 @@ export const SITE_NAME = import.meta.env.VITE_SITE_NAME || "Nairobi DevOps Commu
 export const DEFAULT_OG_IMAGE =
   import.meta.env.VITE_OG_IMAGE || "https://nairobidevops.org/og-default.jpg";
 export const DEFAULT_OG_IMAGE_ALT = import.meta.env.VITE_OG_IMAGE_ALT || "Nairobi DevOps Community";
+
+// Safe JSON serializer for embedding inside <script type="application/ld+json">
+const safeStringify = (obj: unknown) =>
+  JSON.stringify(obj)
+    .replace(/<\//g, "<\\/")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 
 const SEO = ({
   title,
@@ -91,13 +98,6 @@ const SEO = ({
   const resolvedOgUrl = ogUrl || canonical;
 
   const resolvedTwitterImage = twitterImage || resolvedOgImage;
-
-  // Safe JSON serializer for embedding inside <script type="application/ld+json">
-  const safeStringify = (obj: unknown) =>
-    JSON.stringify(obj)
-      .replace(/<\//g, "<\\/")
-      .replace(/\u2028/g, "\\u2028")
-      .replace(/\u2029/g, "\\u2029");
 
   /* -------------------------------------------------------------------------
    * Safe structured data rendering

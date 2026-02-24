@@ -167,12 +167,15 @@ function generateHtaccess(policy) {
 
   const headerRules = [
     "<IfModule mod_headers.c>",
-    `  Header always set Content-Security-Policy "${cspString.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+    `  Header always set Content-Security-Policy "${cspString
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/%/g, "%%")}"`,
      
-    ...Object.entries(policy.headers).map(
-      ([key, value]) =>
-        `  Header always set ${key} "${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
-    ),
+    ...Object.entries(policy.headers).map(([key, value]) => {
+      const escapedValue = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/%/g, "%%");
+      return `  Header always set ${key} "${escapedValue}"`;
+    }),
     "</IfModule>",
   ];
 
