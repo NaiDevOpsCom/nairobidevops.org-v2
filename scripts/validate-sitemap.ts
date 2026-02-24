@@ -131,18 +131,18 @@ function validateSitemap(): void {
         continue;
       }
 
-      // Strict calendar check: ensure parsed date matches input components
+      // Strict calendar check: ensure the date part represents a valid calendar day
       // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
       const datePart = dateStr.split("T")[0];
       const [y, m, d] = datePart.split("-").map(Number);
-      const isoYear = parsed.getUTCFullYear();
-      const isoMonth = parsed.getUTCMonth() + 1;
-      const isoDay = parsed.getUTCDate();
+      const testDate = new Date(Date.UTC(y, m - 1, d));
 
-      if (y !== isoYear || m !== isoMonth || d !== isoDay) {
-        fail(
-          `Invalid calendar date: ${dateStr} in ${loc} (normalized to ${isoYear}-${String(isoMonth).padStart(2, "0")}-${String(isoDay).padStart(2, "0")})`,
-        );
+      if (
+        testDate.getUTCFullYear() !== y ||
+        testDate.getUTCMonth() + 1 !== m ||
+        testDate.getUTCDate() !== d
+      ) {
+        fail(`Invalid calendar date: ${dateStr} in ${loc}`);
       }
     }
   }

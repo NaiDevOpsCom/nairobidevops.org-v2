@@ -142,12 +142,14 @@ export async function generateSitemap(): Promise<void> {
 
   // Collect blog slugs for dynamic routes
   const slugs = await getBlogSlugs();
-  const blogEntries: SitemapEntry[] = slugs.map((slug) => ({
-    loc: `/blogs/${slug}`,
-    changefreq: "weekly" as const,
-    priority: 0.6,
-    lastmod: today,
-  }));
+  const blogEntries: SitemapEntry[] = slugs
+    .filter((slug) => typeof slug === "string" && slug.trim().length > 0)
+    .map((slug) => ({
+      loc: `/blogs/${encodeURIComponent(slug)}`,
+      changefreq: "weekly" as const,
+      priority: 0.6,
+      lastmod: today,
+    }));
 
   const allEntries = [...staticRoutes, ...blogEntries];
 
