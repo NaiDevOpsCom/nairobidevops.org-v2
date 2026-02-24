@@ -44,11 +44,11 @@
 
 # 2.1 Immutable hashed assets (1 year)
 # Vite assets are hashed (e.g., assets/index-B7xP9a.js), so they are safe to cache forever.
-<FilesMatch "^assets/.*\.(js|css|webp|avif|jpg|jpeg|png|gif|svg|woff|woff2|otf|ttf|eot)$">
+<If "%{REQUEST_URI} =~ m#^/assets/.*\.(js|css|webp|avif|jpg|jpeg|png|gif|svg|woff|woff2|otf|ttf|eot)$#">
   <IfModule mod_headers.c>
     Header set Cache-Control "max-age=31536000, public, immutable"
   </IfModule>
-</FilesMatch>
+</If>
 
 # 2.2 Uncached files (HTML/Metadata)
 # HTML and metadata should never be cached to ensure users get the latest app version.

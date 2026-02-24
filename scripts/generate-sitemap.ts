@@ -184,6 +184,13 @@ export async function generateSitemap(): Promise<void> {
   const outputPath = path.join(DIST_DIR, "sitemap.xml");
   fs.writeFileSync(outputPath, xml, "utf-8");
 
+  // Copy robots.txt from public if it exists (ensures validation passes without full build)
+  const robotsSrc = path.join(ROOT_DIR, "client", "public", "robots.txt");
+  const robotsDest = path.join(DIST_DIR, "robots.txt");
+  if (fs.existsSync(robotsSrc)) {
+    fs.copyFileSync(robotsSrc, robotsDest);
+  }
+
   console.log(`✅ sitemap.xml written to ${outputPath}`);
   console.log(`   ${staticRoutes.length} static + ${blogEntries.length} dynamic → ${uniqueEntries.length} URLs`);
   if (allEntries.length > uniqueEntries.length) {

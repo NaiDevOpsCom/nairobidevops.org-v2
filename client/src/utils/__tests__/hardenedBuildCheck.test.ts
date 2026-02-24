@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-non-literal-fs-filename */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +8,6 @@ import { describe, it, expect } from "vitest";
 const CONSOLE_OR_DEBUGGER_RE = /\bconsole\.(?:log|warn|error|info|debug)\s*\(|\bdebugger\b/;
 
 const listJsFiles = (dir: string): string[] => {
-  /* eslint-disable-next-line security/detect-non-literal-fs-filename */
   const entries = readdirSync(dir, { withFileTypes: true });
   const files: string[] = [];
 
@@ -54,7 +52,6 @@ describe.skipIf(!distExists)("hardened build artifact checks", () => {
     const violations: string[] = [];
 
     for (const filePath of jsFiles) {
-      /* eslint-disable-next-line security/detect-non-literal-fs-filename */
       const contents = readFileSync(filePath, "utf8");
       if (CONSOLE_OR_DEBUGGER_RE.test(contents)) {
         violations.push(path.relative(repoRoot, filePath));

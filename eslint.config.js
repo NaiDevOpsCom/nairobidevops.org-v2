@@ -118,6 +118,7 @@ export default [
     },
     rules: {
       ...vitest.configs.recommended.rules,
+      "security/detect-non-literal-fs-filename": "off",
     },
   },
 

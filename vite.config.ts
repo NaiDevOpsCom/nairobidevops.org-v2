@@ -26,28 +26,6 @@ function sitemapPlugin(enabled: boolean): Plugin {
   };
 }
 
-/**
- * Vite plugin that generates sitemap.xml after the build completes.
- * Only runs when isHardened is true (typically production/staging modes).
- */
-function sitemapPlugin(enabled: boolean): Plugin {
-  return {
-    name: "generate-sitemap",
-    apply: "build",
-    async closeBundle() {
-      if (!enabled) return;
-      try {
-        const { generateSitemap } = await import("./scripts/generate-sitemap");
-        await generateSitemap();
-      } catch (err) {
-        console.error("⚠  Sitemap generation failed:", err);
-        // Non-fatal: build succeeds even if sitemap generation fails.
-        // The validate-sitemap script will catch this in CI.
-      }
-    },
-  };
-}
-
 export default defineConfig(({ mode }) => {
   const branch =
     process.env.GITHUB_BASE_REF ||
