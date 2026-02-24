@@ -135,9 +135,9 @@ function validateSitemap(): void {
       // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
       const datePart = dateStr.split("T")[0];
       const [y, m, d] = datePart.split("-").map(Number);
-      const isoYear = parsed.getFullYear();
-      const isoMonth = parsed.getMonth() + 1;
-      const isoDay = parsed.getDate();
+      const isoYear = parsed.getUTCFullYear();
+      const isoMonth = parsed.getUTCMonth() + 1;
+      const isoDay = parsed.getUTCDate();
 
       if (y !== isoYear || m !== isoMonth || d !== isoDay) {
         fail(

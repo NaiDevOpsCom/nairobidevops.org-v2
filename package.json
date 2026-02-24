@@ -25,7 +25,8 @@
     "test:ui": "vitest --root client --ui",
     "sitemap:generate": "tsx scripts/generate-sitemap.ts",
     "sitemap:validate": "tsx scripts/validate-sitemap.ts",
-    "sitemap:deploy": "bash scripts/deploy-sitemap.sh"
+    "sitemap:deploy": "bash scripts/deploy-sitemap.sh",
+    "sitemap:test": "tsx scripts/test-strict-validation.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

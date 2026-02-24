@@ -30,7 +30,7 @@ jobs:
 
     strategy:
       matrix:
-        check: [lint, types, tests, security, build, bundle]
+        check: [lint, types, tests, security, build, bundle, sitemap]
       # Don't cancel other jobs if one fails
       fail-fast: false
 
@@ -129,15 +129,16 @@ jobs:
         run: |
           echo "🛡️ Running security audit..."
 
-          # Run audit with JSON output for parsing
-          AUDIT_RESULT=$(npm audit --audit-level=moderate --json || true)
+          # 1) Gate on production dependencies only
+          # This avoids failing the pipeline on dev-only tooling issues.
+          AUDIT_RESULT=$(npm audit --audit-level=moderate --omit=dev --json || true)
 
           # Extract vulnerability counts
           CRITICAL_VULNS=$(echo "$AUDIT_RESULT" | jq -r '.metadata.vulnerabilities.critical // 0')
           HIGH_VULNS=$(echo "$AUDIT_RESULT" | jq -r '.metadata.vulnerabilities.high // 0')
           MODERATE_VULNS=$(echo "$AUDIT_RESULT" | jq -r '.metadata.vulnerabilities.moderate // 0')
 
-          echo "📊 Vulnerability Summary:"
+          echo "📊 Vulnerability Summary (prod deps only):"
           echo "  Critical: $CRITICAL_VULNS"
           echo "  High: $HIGH_VULNS"
           echo "  Moderate: $MODERATE_VULNS"
@@ -154,16 +155,25 @@ jobs:
           # This allows dev dependencies like ESLint to have moderate issues
           if [ $MODERATE_VULNS -gt 0 ]; then
             echo "security-status=warning" >> $GITHUB_ENV
-            echo "security-details=${MODERATE_VULNS} moderate vulnerabilities (dev dependencies allowed)" >> $GITHUB_ENV
-            echo "::warning::${MODERATE_VULNS} moderate vulnerabilities detected in dev dependencies - please review and update when possible"
+            echo "security-details=${MODERATE_VULNS} moderate vulnerabilities (prod deps)" >> $GITHUB_ENV
+            echo "::warning::${MODERATE_VULNS} moderate vulnerabilities detected in production dependencies - please review and update when possible"
             
             # Show details for tracking
             echo "📋 Moderate vulnerability details:"
-            npm audit --audit-level=moderate || true
+            npm audit --audit-level=moderate --omit=dev || true
           else
             echo "security-status=success" >> $GITHUB_ENV
             echo "security-details=No vulnerabilities found" >> $GITHUB_ENV
           fi
+
+          # 2) Optional visibility into dev dependency issues (do not fail the job)
+          echo ""
+          echo "🧰 Dev dependency audit (informational only)..."
+          npm audit --audit-level=moderate --json > audit-dev.json || true
+          DEV_CRITICAL=$(jq -r '.metadata.vulnerabilities.critical // 0' audit-dev.json)
+          DEV_HIGH=$(jq -r '.metadata.vulnerabilities.high // 0' audit-dev.json)
+          DEV_MODERATE=$(jq -r '.metadata.vulnerabilities.moderate // 0' audit-dev.json)
+          echo "Dev deps: Critical=$DEV_CRITICAL High=$DEV_HIGH Moderate=$DEV_MODERATE"
 
       - name: Build and Security Generation
         if: matrix.check == 'build'
@@ -253,6 +263,22 @@ jobs:
             echo "bundle-status=success" >> $GITHUB_ENV
             echo "bundle-details=${DIST_SIZE_MB}MB well within limits" >> $GITHUB_ENV
           fi
+
+      - name: Sitemap Validation
+        if: matrix.check == 'sitemap'
+        run: |
+          echo "🗺️ Validating sitemap and robots.txt..."
+
+          # 1. Generate sitemap
+          npm run sitemap:generate
+
+          # 2. Basic validation
+          npm run sitemap:validate
+
+          # 3. Strict validation tests
+          npm run sitemap:test
+
+          echo "sitemap-status=success" >> $GITHUB_ENV
 
       - name: Upload Check Results
         uses: actions/upload-artifact@v6
