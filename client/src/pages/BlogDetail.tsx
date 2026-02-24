@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
 import { useRoute, Link } from "wouter";
 
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
 import { blogPosts } from "@/data/blogData";
 
 export default function BlogDetail() {

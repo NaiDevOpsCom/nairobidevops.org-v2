@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Variants } from "motion/react";
-import { X } from "lucide-react";
+import React, { useState, useEffect } from "react";
 
-import { cn } from "@/lib/utils";
 import { seededRandom } from "@/lib/random";
+import { cn } from "@/lib/utils";
 
 type ImageItem = {
   id: number | string;

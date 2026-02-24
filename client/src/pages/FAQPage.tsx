@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
+import React, { useState, useEffect } from "react";
 
-import { Button } from "@/components/ui/button";
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
 import SEO from "@/components/SEO";
+import { Button } from "@/components/ui/button";
 import { faqDataByCategory } from "@/data/faqData";
 
 const CATEGORY_BACKGROUNDS = [

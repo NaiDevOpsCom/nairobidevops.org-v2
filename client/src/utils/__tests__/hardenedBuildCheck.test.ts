@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-non-literal-fs-filename */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,6 +39,7 @@ const listJsFiles = (dir: string): string[] => {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const distDir = path.join(repoRoot, "dist");
+
 const distExists = existsSync(distDir) && statSync(distDir).isDirectory();
 
 if (process.env.CI_ENFORCE_HARDENING && !distExists) {

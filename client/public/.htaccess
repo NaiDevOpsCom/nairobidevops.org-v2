@@ -31,7 +31,9 @@
   BrowserMatch ^Mozilla/4 gzip-only-text/html
   BrowserMatch ^Mozilla/4\.0[678] no-gzip
   BrowserMatch \bMSIE !no-gzip !gzip-only-text/html
-  Header append Vary User-Agent
+  <IfModule mod_headers.c>
+    Header append Vary User-Agent
+  </IfModule>
 </IfModule>
 
 # 2. Caching Strategy
@@ -41,12 +43,12 @@
 </IfModule>
 
 # 2.1 Immutable hashed assets (1 year)
-# Vite assets are hashed (e.g., index-B7xP9a.js), so they are safe to cache forever.
-<FilesMatch "\.(js|css|webp|avif|jpg|jpeg|png|gif|svg|woff|woff2|otf|ttf|eot)$">
+# Vite assets are hashed (e.g., assets/index-B7xP9a.js), so they are safe to cache forever.
+<If "%{REQUEST_URI} =~ m#^/assets/.*\.(js|css|webp|avif|jpg|jpeg|png|gif|svg|woff|woff2|otf|ttf|eot)$#">
   <IfModule mod_headers.c>
     Header set Cache-Control "max-age=31536000, public, immutable"
   </IfModule>
-</FilesMatch>
+</If>
 
 # 2.2 Uncached files (HTML/Metadata)
 # HTML and metadata should never be cached to ensure users get the latest app version.
@@ -93,10 +95,6 @@ Options -MultiViews
 
   # Stop processing if index.html is requested directly
   RewriteRule ^index\.html$ - [L]
-
-  # API Proxy - Explicitly forward to luma.php
-  # Use [L] to stop further processing if matched
-  RewriteRule ^api/luma/(.*)$ api/luma.php?path=$1 [QSA,L]
 
   # Custom proxies from security-policy.json
   # Proxy for /api/luma/:path*

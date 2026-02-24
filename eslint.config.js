@@ -1,15 +1,14 @@
 import js from "@eslint/js";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
+import vitest from "@vitest/eslint-plugin";
+import prettierConfig from "eslint-config-prettier";
+import importPlugin from "eslint-plugin-import";
+import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import securityPlugin from "eslint-plugin-security";
-import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
-import promisePlugin from "eslint-plugin-promise";
-import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
-import prettierConfig from "eslint-config-prettier";
-import vitest from "@vitest/eslint-plugin";
 import globals from "globals";
 
 export default [
@@ -119,6 +118,7 @@ export default [
     },
     rules: {
       ...vitest.configs.recommended.rules,
+      "security/detect-non-literal-fs-filename": "off",
     },
   },
 
@@ -140,19 +140,25 @@ export default [
     rules: { ...jsxA11yPlugin.configs.recommended.rules },
   },
   {
-    plugins: { promise: promisePlugin },
+    // Re-enabled import rules now that compatibility with ESLint 9 is confirmed/handled
+    plugins: { import: importPlugin },
     rules: {
-      // Disabled promise recommended rules because the v4.x plugin
-      // uses removed context.getAncestors() API in ESLint 10.
+      "import/order": [
+        "error",
+        {
+          groups: ["builtin", "external", "internal", "parent", "sibling", "index"],
+          "newlines-between": "always",
+          alphabetize: { order: "asc", caseInsensitive: true },
+        },
+      ],
     },
   },
   {
-    // Disabled import recommended rules due to ESLint 9 compatibility issues
-    // with eslint-plugin-import (e.g. context.getScope() usage).
-    plugins: { import: importPlugin },
+    files: ["client/src/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}"],
     rules: {
+      // Disable unresolved check for code using aliases (@/ or @shared/)
+      // as the resolver is not configured in this flat config.
       "import/no-unresolved": "off",
-      "import/order": "off",
     },
   },
 
@@ -165,7 +171,7 @@ export default [
 
   // Scripts directory
   {
-    files: ["scripts/**/*.js"],
+    files: ["scripts/**/*.js", "eslint.config.js"],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -176,6 +182,7 @@ export default [
       "no-process-exit": "off",
       "no-redeclare": "off",
       "import/order": "off",
+      "import/no-unresolved": "off",
     },
   },
 

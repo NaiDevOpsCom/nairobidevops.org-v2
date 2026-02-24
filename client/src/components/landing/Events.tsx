@@ -1,11 +1,11 @@
 import React from "react";
 import { useLocation } from "wouter";
 
-import { getRandomItems } from "@/utils/getRandomItems";
-import { Button } from "@/components/ui/button";
-import RecordedVideoCard from "@/components/RecordedVideoCard.tsx";
-import { recordedSessions } from "@/data/communityPageData.ts";
 import LumaEventsList from "@/components/events/LumaEventsList";
+import RecordedVideoCard from "@/components/RecordedVideoCard.tsx";
+import { Button } from "@/components/ui/button";
+import { recordedSessions } from "@/data/communityPageData.ts";
+import { getRandomItems } from "@/utils/getRandomItems";
 
 export default function Events() {
   const [, navigate] = useLocation();

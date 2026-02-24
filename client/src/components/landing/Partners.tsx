@@ -1,5 +1,5 @@
-import React from "react";
 import { Handshake } from "lucide-react";
+import React from "react";
 import { useLocation } from "wouter";
 
 import { SponsorsCarousel } from "../SponsorsCarousel";

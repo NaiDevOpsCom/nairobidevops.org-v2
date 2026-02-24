@@ -169,7 +169,7 @@ jobs:
           # 2) Optional visibility into dev dependency issues (do not fail the job)
           echo ""
           echo "🧰 Dev dependency audit (informational only)..."
-          npm audit --audit-level=moderate --json > audit-dev.json || true
+          npm audit --audit-level=moderate --omit=prod --json > audit-dev.json || true
           # Use default if file is missing or invalid
           DEV_CRITICAL=$(jq -r '.metadata.vulnerabilities.critical // 0' audit-dev.json 2>/dev/null || echo "0")
           DEV_HIGH=$(jq -r '.metadata.vulnerabilities.high // 0' audit-dev.json 2>/dev/null || echo "0")
@@ -269,6 +269,9 @@ jobs:
         if: matrix.check == 'sitemap'
         run: |
           echo "🗺️ Validating sitemap and robots.txt..."
+
+          # 0. Build project to populate dist/ without redundant checks
+          npx vite build --mode production && node scripts/setup-cpanel.js
 
           # 1. Generate sitemap
           npm run sitemap:generate

@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useEffect, useState, useRef } from "react";
 
-import { seededRandom } from "@/lib/random";
 import { teamGallery } from "@/data/galleryData";
+import { seededRandom } from "@/lib/random";
 
 const ANIMATION_VARIANTS = [
   {
