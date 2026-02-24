@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { useLocation } from "wouter";
 import { Users, Calendar, ArrowRight, Briefcase, Heart } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 
 import { Button } from "@/components/ui/button";
 import { HeroSlideData } from "@/data/heroSlidesData";

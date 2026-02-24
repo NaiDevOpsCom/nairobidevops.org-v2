@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useInView } from "react-intersection-observer";
 import CountUp from "react-countup";
+import { useInView } from "react-intersection-observer";
 
 interface StatisticCounterProps {
   endValue: string | number;

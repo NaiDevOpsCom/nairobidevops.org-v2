@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { PanInfo } from "motion/react";
+import { useState, useEffect, useRef, useCallback, KeyboardEvent } from "react";
 
 import HeroSlide from "./HeroSlide";
 

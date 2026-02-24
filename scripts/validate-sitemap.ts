@@ -24,10 +24,10 @@ const DIST_DIR = path.join(ROOT_DIR, "dist");
 
 let errors = 0;
 
-function fail(msg: string): void {
+let fail = (msg: string): void => {
   console.error(`  ❌ ${msg}`);
   errors++;
-}
+};
 
 function pass(msg: string): void {
   console.log(`  ✅ ${msg}`);
@@ -49,13 +49,14 @@ function validateSitemap(): void {
   }
 
   const content = fs.readFileSync(sitemapPath, "utf-8").trim();
+  const byteSize = Buffer.byteLength(content, "utf8");
 
   // 2. Non-empty check
-  if (content.length === 0) {
+  if (byteSize === 0) {
     fail("sitemap.xml is empty");
     return;
   }
-  pass(`sitemap.xml exists (${content.length} bytes)`);
+  pass(`sitemap.xml exists (${byteSize} bytes)`);
 
   // 3. XML declaration
   if (!content.startsWith('<?xml version="1.0"')) {
@@ -147,8 +148,19 @@ function validateSitemap(): void {
     }
   }
 
-  pass("All URL entries validated");
+  if (urlErrorCount === 0) {
+    pass("All URL entries validated");
+  }
 }
+
+// Track errors specifically for URLs vs other checks
+let urlErrorCount = 0;
+const originalFail = fail;
+// wrap fail to track URL specific errors
+fail = (msg: string) => {
+  urlErrorCount++;
+  originalFail(msg);
+};
 
 // ---------------------------------------------------------------------------
 // Robots.txt validation
@@ -170,7 +182,8 @@ function validateRobotsTxt(): void {
     fail("robots.txt is empty");
     return;
   }
-  pass(`robots.txt exists (${content.length} bytes)`);
+  const byteSize = Buffer.byteLength(content, "utf8");
+  pass(`robots.txt exists (${byteSize} bytes)`);
 
   // Check for Sitemap directive
   const sitemapDirective = /^Sitemap:\s*https?:\/\/.+\/sitemap\.xml$/m;

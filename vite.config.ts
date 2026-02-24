@@ -1,8 +1,8 @@
 import path from "path";
 
-import { defineConfig, type Plugin } from "vite";
-import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig, type Plugin } from "vite";
 
 /**
  * Vite plugin that generates sitemap.xml after the build completes.

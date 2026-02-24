@@ -73,11 +73,12 @@ bash scripts/deploy-sitemap.sh
 
 When you add a new `<Route>` in `App.tsx`:
 
-1. Open `scripts/generate-sitemap.ts`
-2. Add the route to the `staticRoutes` array:
+1. Open `shared/routes.ts`
+2. Add the route to the `routes` array with the new shape:
    ```typescript
-   { loc: "/new-page", changefreq: "monthly", priority: "0.7", lastmod: today },
+   { path: "/new-page", sitemap: { changefreq: "monthly", priority: 0.7 } },
    ```
+   _Note: staticRoutes is derived from this file._
 3. Rebuild: `npm run build`
 4. Blog routes (`/blogs/:slug`) are resolved automatically from `blogData.ts`
 
@@ -119,7 +120,7 @@ For sites with frequently changing content, set up a cron job in cPanel:
 
 2. **In cPanel → Cron Jobs**, add:
 
-   ```
+   ```bash
    0 3 * * * /bin/bash /home/user/scripts/regenerate-sitemap.sh >> /home/user/logs/sitemap-cron.log 2>&1
    ```
 

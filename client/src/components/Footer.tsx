@@ -1,6 +1,6 @@
-import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { MapPin, Phone, Mail, Wallet, X } from "lucide-react";
+import { useState } from "react";
 import { Link } from "wouter";
 
 import SocialIconLink from "@/components/SocialIconLink";

@@ -1,11 +1,10 @@
-import React from "react";
 import { format } from "date-fns";
-import { Calendar, Clock, MapPin, CalendarX } from "lucide-react";
 import Autoplay from "embla-carousel-autoplay";
+import { Calendar, Clock, MapPin, CalendarX } from "lucide-react";
+import React from "react";
 
-import { useLumaEvents } from "@/hooks/useLumaEvents";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Carousel,
@@ -14,6 +13,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { useLumaEvents } from "@/hooks/useLumaEvents";
 
 interface EventCardProps {
   event: {

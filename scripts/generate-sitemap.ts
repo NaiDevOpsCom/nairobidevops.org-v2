@@ -26,9 +26,17 @@ const DIST_DIR = path.join(ROOT_DIR, "dist");
 
 /** ISO 8601 date-only string for <lastmod> (deterministic via SOURCE_DATE_EPOCH when provided) */
 const today = (() => {
-  const epoch = process.env.SOURCE_DATE_EPOCH;
-  const d = epoch ? new Date(Number(epoch) * 1000) : new Date();
-  return d.toISOString().split("T")[0];
+  const rawEpoch = process.env.SOURCE_DATE_EPOCH;
+  if (rawEpoch) {
+    const epoch = Number(rawEpoch);
+    if (!isNaN(epoch) && isFinite(epoch)) {
+      const d = new Date(epoch * 1000);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split("T")[0];
+      }
+    }
+  }
+  return new Date().toISOString().split("T")[0];
 })();
 
 // ---------------------------------------------------------------------------

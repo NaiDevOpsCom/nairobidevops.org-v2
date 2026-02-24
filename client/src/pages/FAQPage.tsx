@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
+import React, { useState, useEffect } from "react";
 
-import { Button } from "@/components/ui/button";
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
 import SEO from "@/components/SEO";
+import { Button } from "@/components/ui/button";
 import { faqDataByCategory } from "@/data/faqData";
 
 const CATEGORY_BACKGROUNDS = [
@@ -59,7 +59,7 @@ export default function FAQPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--faq-bg)] text-[var(--faq-text)]">
+    <div className="min-h-screen bg-(--faq-bg) text-(--faq-text)">
       <SEO
         title="Frequently Asked Questions"
         description="Find answers to common questions about Nairobi DevOps Community — membership, events, partnerships, job opportunities, and sponsorship."
@@ -95,7 +95,7 @@ export default function FAQPage() {
               role="presentation"
               className="w-full h-full object-cover opacity-20"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-[var(--faq-bg)]/95 via-[var(--faq-bg)]/90 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-b from-(--faq-bg)/95 via-(--faq-bg)/90 to-transparent" />
           </div>
 
           <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 text-center">

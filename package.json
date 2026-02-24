@@ -119,7 +119,7 @@
     "lockfile-lint": "^5.0.0",
     "postcss": "^8.4.47",
     "prettier": "^3.8.1",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^4.2.1",
     "terser": "^5.46.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
