@@ -22,7 +22,11 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:coverage": "vitest run --root client --coverage",
-    "test:ui": "vitest --root client --ui"
+    "test:ui": "vitest --root client --ui",
+    "sitemap:generate": "tsx scripts/generate-sitemap.ts",
+    "sitemap:validate": "tsx scripts/validate-sitemap.ts",
+    "sitemap:deploy": "bash scripts/deploy-sitemap.sh",
+    "sitemap:test": "tsx scripts/test-strict-validation.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -94,7 +98,7 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
-    "@typescript-eslint/parser": "^8.54.0",
+    "@typescript-eslint/parser": "^8.56.0",
     "@vitejs/plugin-react": "^5.1.4",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/eslint-plugin": "^1.6.9",
