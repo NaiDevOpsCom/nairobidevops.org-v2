@@ -270,8 +270,8 @@ jobs:
         run: |
           echo "🗺️ Validating sitemap and robots.txt..."
 
-          # 0. Build project to populate dist/
-          npm run build
+          # 0. Build project to populate dist/ without redundant checks
+          npx vite build --mode production && node scripts/setup-cpanel.js
 
           # 1. Generate sitemap
           npm run sitemap:generate

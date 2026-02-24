@@ -40,6 +40,15 @@ function pass(msg: string): void {
 function validateSitemap(): void {
   console.log("\n🔍 Validating sitemap.xml...\n");
 
+  let urlErrorCount = 0;
+  const originalFail = fail;
+  // wrap fail to track URL specific errors
+  const urlFail = (msg: string) => {
+    urlErrorCount++;
+    originalFail(msg);
+  };
+  fail = urlFail;
+
   const sitemapPath = path.join(DIST_DIR, "sitemap.xml");
 
   // 1. Existence check
@@ -151,16 +160,11 @@ function validateSitemap(): void {
   if (urlErrorCount === 0) {
     pass("All URL entries validated");
   }
+
+  // Restore global fail
+  fail = originalFail;
 }
 
-// Track errors specifically for URLs vs other checks
-let urlErrorCount = 0;
-const originalFail = fail;
-// wrap fail to track URL specific errors
-fail = (msg: string) => {
-  urlErrorCount++;
-  originalFail(msg);
-};
 
 // ---------------------------------------------------------------------------
 // Robots.txt validation
