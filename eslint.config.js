@@ -105,7 +105,20 @@ export default [
     },
   },
 
-  // 6. Vitest
+  // 8. Other Plugins
+  {
+    plugins: { security: securityPlugin },
+    rules: {
+      ...securityPlugin.configs.recommended.rules,
+      "security/detect-no-csrf-before-method-override": "off",
+      "security/detect-unsafe-regex": "off",
+      "security/detect-buffer-noassert": "off",
+      "security/detect-child-process": "off",
+      "security/detect-object-injection": "off",
+    },
+  },
+
+  // 6. Vitest (Moved here so its security overrides take precedence)
   {
     files: ["**/__tests__/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"],
     plugins: {
@@ -119,19 +132,6 @@ export default [
     rules: {
       ...vitest.configs.recommended.rules,
       "security/detect-non-literal-fs-filename": "off",
-    },
-  },
-
-  // 8. Other Plugins
-  {
-    plugins: { security: securityPlugin },
-    rules: {
-      ...securityPlugin.configs.recommended.rules,
-      "security/detect-no-csrf-before-method-override": "off",
-      "security/detect-unsafe-regex": "off",
-      "security/detect-buffer-noassert": "off",
-      "security/detect-child-process": "off",
-      "security/detect-object-injection": "off",
     },
   },
   {
