@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Analytics } from "@vercel/analytics/react";
 import { HelmetProvider } from "react-helmet-async";
@@ -22,6 +22,30 @@ import BlogDetail from "@/pages/BlogDetail";
 import DonationPage from "@/pages/DonationPage";
 import PartnershipPage from "@/pages/PartnershipPage";
 import NotFound from "@/pages/not-found";
+import { routes, type RouteDefinition } from "../../shared/routes";
+
+type RoutePath = RouteDefinition["path"];
+
+const pathToComponent: Record<RoutePath, ComponentType> = {
+  "/": Home,
+  "/about": AboutUs,
+  "/events": Eventspage,
+  "/faqpage": FAQPage,
+  "/code-of-conduct": CodeOfConduct,
+  "/terms": TermsAndConditions,
+  "/privacy": PrivacyPolicy,
+  "/community": CommunityPage,
+  "/partners": PartnershipPage,
+  "/blogs": BlogPage,
+  "/blogs/:slug": BlogDetail,
+  "/donate": DonationPage,
+};
+
+for (const route of routes) {
+  if (!pathToComponent[route.path]) {
+    throw new Error(`Missing component mapping for route: ${route.path}`);
+  }
+}
 
 function Router() {
   const [location] = useLocation();
@@ -32,24 +56,13 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/" component={Home} />
-
-      <Route path="/about" component={AboutUs} />
-
-      <Route path="/events" component={Eventspage} />
-
-      <Route path="/faqpage" component={FAQPage} />
-
-      <Route path="/code-of-conduct" component={CodeOfConduct} />
-
-      <Route path="/terms" component={TermsAndConditions} />
-
-      <Route path="/privacy" component={PrivacyPolicy} />
-      <Route path="/community" component={CommunityPage} />
-      <Route path="/partners" component={PartnershipPage} />
-      <Route path="/blogs" component={BlogPage} />
-      <Route path="/blogs/:slug" component={BlogDetail} />
-      <Route path="/donate" component={DonationPage} />
+      {routes.map((route) => (
+        <Route
+          key={route.path}
+          path={route.path}
+          component={pathToComponent[route.path] || NotFound}
+        />
+      ))}
       <Route component={NotFound} />
     </Switch>
   );

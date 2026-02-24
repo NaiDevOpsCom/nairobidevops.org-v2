@@ -41,6 +41,22 @@ function setupCPanelStructure() {
     console.log("✓ Copied .htaccess to dist root");
   }
 
+  // Verify sitemap.xml exists in dist
+  const sitemapPath = path.join(DIST_DIR, "sitemap.xml");
+  if (fs.existsSync(sitemapPath)) {
+    console.log("✓ sitemap.xml present in dist");
+  } else {
+    console.warn("⚠ sitemap.xml not found in dist — run sitemap:generate if needed");
+  }
+
+  // Verify robots.txt exists in dist
+  const robotsPath = path.join(DIST_DIR, "robots.txt");
+  if (fs.existsSync(robotsPath)) {
+    console.log("✓ robots.txt present in dist");
+  } else {
+    console.warn("⚠ robots.txt not found in dist — ensure client/public/robots.txt exists");
+  }
+
   console.log("cPanel structure setup complete!");
   console.log("Files are ready for deployment to cPanel web root.");
 }

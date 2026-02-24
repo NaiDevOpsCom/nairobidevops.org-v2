@@ -20,6 +20,7 @@ export default [
       "dist",
       "build",
       "coverage",
+      "**/coverage/**",
       "**/.vite",
       "client/public/analytics.js",
       "**/*.min.js",
@@ -75,17 +76,17 @@ export default [
   // 4. React
   {
     files: ["**/*.{jsx,tsx}"],
-    ...reactPlugin.configs.flat.recommended,
-  },
-  {
-    files: ["**/*.{jsx,tsx}"],
-    plugins: { "react-hooks": reactHooksPlugin },
+    plugins: {
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
+    },
     settings: {
       react: {
         version: "18.3.1",
       },
     },
     rules: {
+      ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
       "react/react-in-jsx-scope": "off",
       // Disabled: eslint-plugin-react@7.37.5 crashes with ESLint 9 Flat Config
@@ -140,20 +141,18 @@ export default [
   },
   {
     plugins: { promise: promisePlugin },
-    rules: { ...promisePlugin.configs.recommended.rules },
+    rules: {
+      // Disabled promise recommended rules because the v4.x plugin
+      // uses removed context.getAncestors() API in ESLint 10.
+    },
   },
   {
+    // Disabled import recommended rules due to ESLint 9 compatibility issues
+    // with eslint-plugin-import (e.g. context.getScope() usage).
     plugins: { import: importPlugin },
     rules: {
-      ...importPlugin.configs.recommended.rules,
       "import/no-unresolved": "off",
-      "import/order": [
-        "error",
-        {
-          groups: ["builtin", "external", "internal", "parent", "sibling", "index"],
-          "newlines-between": "always",
-        },
-      ],
+      "import/order": "off",
     },
   },
 
