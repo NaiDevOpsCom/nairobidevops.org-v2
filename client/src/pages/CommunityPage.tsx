@@ -28,7 +28,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { LogoCloud } from "@/components/ui/ndcCampusLogos";
+import { NdcCampusLogos } from "@/components/ui/ndcCampusLogos";
 import {
   events,
   projects,
@@ -416,7 +416,7 @@ const CampusTourSection: React.FC = () => (
       </div>
 
       <div className="mt-16 text-center">
-        <LogoCloud />
+        <NdcCampusLogos />
       </div>
 
       <div className="mt-12 text-center">
