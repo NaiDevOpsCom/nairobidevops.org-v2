@@ -70,9 +70,13 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Restrict direct access to PHP files (e.g., limit by IP or require Auth in PHP)
+# Restrict direct access to PHP files by requiring an Authorization header
 <FilesMatch "\.php$">
-    # Example: Require local frontend IP or specific valid origins
+    # Example: Require the Authorization header to be present
+    SetEnvIf Authorization "^(Bearer .*)$" HAS_AUTH
+    Require env HAS_AUTH
+
+    # Or, if configuring IP whitelisting:
     # Require ip 192.168.1.100
 </FilesMatch>
 ```

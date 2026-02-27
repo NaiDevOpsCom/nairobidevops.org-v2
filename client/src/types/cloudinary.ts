@@ -6,12 +6,13 @@ export interface CloudinaryResource {
   width: number;
   height: number;
   format: string;
-  bytes: number;
   createdAt: string;
 }
 
 export interface CloudinaryResponse {
-  resources: CloudinaryResource[];
+  folder: CloudinaryFolder;
+  images: CloudinaryResource[];
   nextCursor?: string;
-  totalCount: number;
+  hasMore: boolean;
+  total: number;
 }

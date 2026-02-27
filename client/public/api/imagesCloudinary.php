@@ -6,20 +6,48 @@ header('Content-Type: application/json');
 header('X-Content-Type-Options: nosniff');
 
 $allowedOrigins = ['https://nairobidevops.org', 'https://www.nairobidevops.org'];
-$origin = $_SERVER['HTTP_ORIGIN'] ?? (apache_request_headers()['Origin'] ?? '');
+
+$headers = [];
+if (function_exists('getallheaders')) {
+    $headers = getallheaders();
+} elseif (function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+}
+
+// Normalize for case-insensitive access
+$headersLower = [];
+foreach ($headers as $k => $v) {
+    $headersLower[strtolower($k)] = $v;
+}
+
+$origin = $_SERVER['HTTP_ORIGIN'] ?? ($headersLower['origin'] ?? '');
 
 if (in_array($origin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Origin: ' . $origin);
 }
-header('Access-Control-Allow-Methods: GET');
-// If needed for auth payload: header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Authorization, Content-Type');
+header('Access-Control-Allow-Credentials: true');
+
+// ─── Handle Preflight OPTIONS Request ──────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
 
 // ─── Authentication ────────────────────────────────────────────────
-// Verify a stronger credential (e.g., an API key in the Authorization header)
-// For this example, we expect Bearer token or custom secret:
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? (apache_request_headers()['Authorization'] ?? '');
-if (empty($authHeader) || !str_starts_with($authHeader, 'Bearer ') /* replace with your real check */) {
-    // You should replace this empty/format check with your actual token validation logic.
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? ($headersLower['authorization'] ?? '');
+$expectedToken = getenv('PROXY_API_TOKEN');
+
+// Validate existence of token
+if (empty($expectedToken)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Server authentication configuration missing']);
+    exit;
+}
+
+// Verify the provided token safely to prevent timing attacks
+if (empty($authHeader) || !preg_match("/^Bearer\s+(.*)$/i", $authHeader, $matches) || !hash_equals($expectedToken, $matches[1])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;
@@ -53,13 +81,21 @@ if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=]+$/', $nextCursor)) {
     exit;
 }
 
-// ─── Credentials (from cPanel Environment Variables) ──────────────
-$cloudName = getenv('CLD_CLOUD_NAME');
-$apiKey    = getenv('CLD_API_KEY');
-$apiSecret = getenv('CLD_API_SECRET');
+// ─── Credentials (from .env.php generated at deploy time) ──────────────
+$envFile = __DIR__ . '/.env.php';
+if (file_exists($envFile)) {
+    require_once $envFile;
+}
+
+// Constants CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET are now defined.
+// Fallback to getenv() for local development if needed, but prefer .env.php
+$cloudName = defined('CLD_CLOUD_NAME') ? CLD_CLOUD_NAME : getenv('CLD_CLOUD_NAME');
+$apiKey    = defined('CLD_API_KEY') ? CLD_API_KEY : getenv('CLD_API_KEY');
+$apiSecret = defined('CLD_API_SECRET') ? CLD_API_SECRET : getenv('CLD_API_SECRET');
 
 if (!$cloudName || !$apiKey || !$apiSecret) {
     http_response_code(500);
+    error_log('imagesCloudinary.php: Cloudinary credentials are not configured.');
     echo json_encode(['error' => 'Server configuration error']);
     exit;
 }

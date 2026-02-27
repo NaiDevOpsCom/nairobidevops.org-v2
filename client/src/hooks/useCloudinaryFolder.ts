@@ -20,15 +20,25 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         }
         setError(null);
 
+        if (typeof window === "undefined") {
+          throw new Error("useCloudinaryFolder must run in a browser environment.");
+        }
+
         const url = new URL("/api/imagesCloudinary.php", window.location.origin);
         url.searchParams.append("folder", folder);
         if (cursor) {
           url.searchParams.append("next_cursor", cursor);
         }
 
+        const tokenMeta = document.querySelector(
+          'meta[name="api-bearer-token"]'
+        ) as HTMLMetaElement | null;
+        const token = tokenMeta?.content?.trim();
+
         const response = await fetch(url.toString(), {
           headers: {
             "X-Requested-With": "XMLHttpRequest",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           signal,
         });
@@ -39,19 +49,23 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
 
         const data: CloudinaryResponse = await response.json();
 
-        const fetchedResources = data?.resources ?? [];
+        if (signal?.aborted) return;
+
+        const fetchedResources = data?.images ?? [];
 
         setImages((prev) => (cursor ? [...prev, ...fetchedResources] : fetchedResources));
         setNextCursor(data.nextCursor);
-        setHasMore(!!data.nextCursor);
+        setHasMore(data.hasMore);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
         setError(err instanceof Error ? err.message : "An unknown error occurred");
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (!signal?.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [folder]
