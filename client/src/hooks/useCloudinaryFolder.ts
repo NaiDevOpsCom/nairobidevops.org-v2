@@ -1,0 +1,89 @@
+import { useState, useCallback, useEffect } from "react";
+
+import { CloudinaryFolder, CloudinaryResource, CloudinaryResponse } from "../types/cloudinary";
+
+export function useCloudinaryFolder(folder: CloudinaryFolder) {
+  const [images, setImages] = useState<CloudinaryResource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
+
+  const fetchImages = useCallback(
+    async (cursor?: string, signal?: AbortSignal) => {
+      try {
+        if (cursor) {
+          setLoadingMore(true);
+        } else {
+          setLoading(true);
+        }
+        setError(null);
+
+        const url = new URL("/api/imagesCloudinary.php", window.location.origin);
+        url.searchParams.append("folder", folder);
+        if (cursor) {
+          url.searchParams.append("next_cursor", cursor);
+        }
+
+        const response = await fetch(url.toString(), {
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch images: ${response.statusText}`);
+        }
+
+        const data: CloudinaryResponse = await response.json();
+        
+        const fetchedResources = data?.resources ?? [];
+
+        setImages((prev) => (cursor ? [...prev, ...fetchedResources] : fetchedResources));
+        setNextCursor(data.nextCursor);
+        setHasMore(!!data.nextCursor);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
+        setError(err instanceof Error ? err.message : "An unknown error occurred");
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [folder]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setImages([]);
+    setLoading(true);
+    fetchImages(undefined, controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [fetchImages, folder]);
+
+  const loadMore = useCallback(() => {
+    if (nextCursor && !loadingMore) {
+      fetchImages(nextCursor);
+    }
+  }, [nextCursor, loadingMore, fetchImages]);
+
+  const retry = useCallback(() => {
+    fetchImages();
+  }, [fetchImages]);
+
+  return {
+    images,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    loadMore,
+    retry,
+  };
+}

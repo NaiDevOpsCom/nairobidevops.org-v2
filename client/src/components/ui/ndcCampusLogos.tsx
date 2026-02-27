@@ -1,7 +1,10 @@
 import { PlusIcon } from "lucide-react";
 import React, { useState, useEffect, useMemo } from "react";
 
+import { Skeleton } from "./skeleton";
+
 import { partnersData } from "@/data/partnersData";
+import { useCloudinaryFolder } from "@/hooks/useCloudinaryFolder";
 import { seededRandom, seededShuffle } from "@/lib/random";
 import { cn } from "@/lib/utils";
 
@@ -14,18 +17,28 @@ type Logo = {
   height?: number;
 };
 
-// Filter and map logos from the campusTour category, ensuring no empty logos are included.
-const allLogos: Logo[] = partnersData.campusTour
-  .filter((p) => p.logo) // Validate that the logo field is not empty
-  .map((p) => ({ src: p.logo, alt: p.name }));
+// --- Main Component: NdcCampusLogos ---
 
-// --- Main Component: LogoCloud ---
+type NdcCampusLogosProps = React.ComponentProps<"div">;
 
-type LogoCloudProps = React.ComponentProps<"div">;
+export function NdcCampusLogos({ className, ...props }: NdcCampusLogosProps) {
+  const { images, loading } = useCloudinaryFolder("ndcCampusTour");
 
-export function LogoCloud({ className, ...props }: LogoCloudProps) {
+  // Map Cloudinary images to the Logo type, or use hardcoded data as fallback
+  const allLogos: Logo[] = useMemo(() => {
+    if (images.length > 0) {
+      return images.map((img) => ({
+        src: img.secureUrl,
+        alt: img.publicId.split("/").pop() || "Campus Logo",
+        width: img.width,
+        height: img.height,
+      }));
+    }
+    // Fallback data
+    return partnersData.campusTour.filter((p) => p.logo).map((p) => ({ src: p.logo!, alt: p.name }));
+  }, [images]);
+
   // Prepare a shuffled list of unique logos for initial display
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const initialLogos = useMemo(() => {
     const logos = [...allLogos];
     const shuffled: Logo[] = [];
@@ -40,10 +53,38 @@ export function LogoCloud({ className, ...props }: LogoCloudProps) {
 
     // Shuffle the pool using a fixed seed for consistent initial rendering
     return seededShuffle(shuffled, 12345);
-  }, []);
+  }, [allLogos]);
+
+  // Loading state with Skeletons
+  if (loading && images.length === 0) {
+    return (
+      <div
+        className={cn("relative grid grid-cols-2 border-x md:grid-cols-4", className)}
+        {...props}
+      >
+        <div className="-translate-x-1/2 -top-px pointer-events-none absolute left-1/2 w-screen border-t" />
+        {[...Array(8)].map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              "flex items-center justify-center bg-background px-4 py-8 md:p-8 border-r border-b",
+              (i === 0 || i === 7) && "bg-ndc-primary-light-blue dark:bg-secondary/30",
+              (i === 2 || i === 5) && "md:bg-ndc-primary-light-blue dark:md:bg-secondary/30",
+              (i === 3 || i === 4) && "bg-ndc-primary-light-blue md:bg-background dark:bg-secondary/30 md:dark:bg-background",
+              i >= 4 && "md:border-b-0",
+              i % 4 === 3 && "border-r-0"
+            )}
+          >
+            <Skeleton className="h-20 w-32 md:h-24 md:w-40" />
+          </div>
+        ))}
+        <div className="-translate-x-1/2 -bottom-px pointer-events-none absolute left-1/2 w-screen border-b" />
+      </div>
+    );
+  }
 
   if (allLogos.length === 0) {
-    return null; // Don't render anything if there are no logos to display
+    return null;
   }
 
   return (
