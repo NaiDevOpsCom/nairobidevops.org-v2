@@ -223,7 +223,7 @@ function LogoCard({ initialLogo, allLogos, className, children, ...props }: Logo
     >
       <img
         alt={currentLogo.alt}
-        className="pointer-events-none h-20 select-none md:h-24 dark:brightness-0 dark:invert"
+        className="pointer-events-none h-20 select-none md:h-24"
         height={currentLogo.height}
         src={currentLogo.src}
         width={currentLogo.width}
