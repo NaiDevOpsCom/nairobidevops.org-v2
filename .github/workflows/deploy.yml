@@ -14,7 +14,9 @@ on:
       - main # Set this to your default branch (master or main)
     paths:
       - "client/src/**"
-      - "client/public/**"
+      - "client/public/**" # Covers: api/imagesCloudinary.php, api/luma.php,
+        # .htaccess, analytics.js, robots.txt — any change
+        # in client/public/ triggers a deploy
       - "scripts/**"
       - "package.json"
       - "package-lock.json"
@@ -38,6 +40,18 @@ jobs:
           node-version: 20
 
       # 3. Install dependencies and Build
+      #
+      # Vite automatically copies everything in client/public/ into dist/ verbatim.
+      # This means these files land in dist/ as part of the build — no separate
+      # upload step needed for them:
+      #   client/public/api/imagesCloudinary.php  →  dist/api/imagesCloudinary.php
+      #   client/public/api/luma.php              →  dist/api/luma.php
+      #   client/public/.htaccess                 →  dist/.htaccess
+      #   client/public/analytics.js              →  dist/analytics.js
+      #   client/public/robots.txt                →  dist/robots.txt
+      #
+      # ⚠️  NEVER place .env.php inside client/public/api/ — it must only
+      #     ever exist on the server, written by the SSH inject step below.
       - name: Install and Build
         run: |
           npm ci
@@ -46,6 +60,16 @@ jobs:
           # Validate build output
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
             echo "Error: dist/ directory is missing or empty"
+            exit 1
+          fi
+          # Confirm PHP proxy files made it into the build.
+          # Catches accidental removal or path renames before they reach production.
+          if [ ! -f "dist/api/imagesCloudinary.php" ]; then
+            echo "Error: dist/api/imagesCloudinary.php is missing from build output"
+            exit 1
+          fi
+          if [ ! -f "dist/api/luma.php" ]; then
+            echo "Error: dist/api/luma.php is missing from build output"
             exit 1
           fi
 
@@ -60,7 +84,7 @@ jobs:
           name: dist
           path: dist
           retention-days: 1
-          include-hidden-files: true
+          include-hidden-files: true # Required — ensures .htaccess is included in artifact
 
   deploy:
     needs: build
@@ -100,16 +124,29 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
-            mkdir -p "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}"
+            # Create the release dir and api/ subfolder upfront.
+            # The tarball extraction (step 6) will also create api/ — this is
+            # a safety measure to guarantee it exists before the inject step.
+            mkdir -p "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/api"
 
       # 5. Package and Sync to Release
       - name: Package and Sync to Release
         run: |
-          # Create a tarball of the dist directory to preserve all files (including .htaccess)
+          # Tarball the full dist/ output.
+          # Already contains (copied by Vite from client/public/):
+          #   ./index.html
+          #   ./assets/
+          #   ./.htaccess                     ← SPA routing rules
+          #   ./api/imagesCloudinary.php      ← Cloudinary proxy (no secrets)
+          #   ./api/luma.php                  ← Luma proxy (no secrets)
+          #   ./analytics.js
+          #   ./robots.txt
           tar -czf release.tar.gz -C dist .
 
-          # Upload the tarball using scp
-          scp -P ${{ secrets.REMOTE_PORT || 22 }} -o StrictHostKeyChecking=yes release.tar.gz ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/
+          scp -P ${{ secrets.REMOTE_PORT || 22 }} \
+            -o StrictHostKeyChecking=yes \
+            release.tar.gz \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/
 
       # 6. Extract Release on Server
       - name: Extract Release on Server
@@ -124,7 +161,97 @@ jobs:
             tar -xzf release.tar.gz
             rm release.tar.gz
 
-      # 7. Atomically Switch Symlink
+      # 7. Inject Cloudinary Credentials onto Server
+      #
+      # WHY: Both imagesCloudinary.php and luma.php need Cloudinary credentials
+      # to sign API requests. Credentials must never be in the repo or dist/.
+      #
+      # HOW: A PHP constants file (.env.php) is written directly onto the server
+      # via SSH using the three values stored in GitHub Secrets:
+      #   CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET
+      #
+      # The file:
+      #   - Lives at api/.env.php alongside both PHP proxy files
+      #   - Is NEVER in the repo or in dist/ — server only
+      #   - Is recreated fresh on every deploy (credential rotation = update secret + redeploy)
+      #   - Is chmod 600 so only the server process owner can read it
+      #   - Is blocked from HTTP access by the <Files> rule in api/.htaccess
+      #
+      # Both PHP files load it with: require_once __DIR__ . '/.env.php';
+      - name: Inject Cloudinary Credentials onto Server
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          CLD_CLOUD_NAME: ${{ secrets.CLD_CLOUD_NAME }}
+          CLD_API_KEY: ${{ secrets.CLD_API_KEY }}
+          CLD_API_SECRET: ${{ secrets.CLD_API_SECRET }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: CLD_CLOUD_NAME,CLD_API_KEY,CLD_API_SECRET
+          script: |
+            ENV_FILE="/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/api/.env.php"
+
+            # Step A: Properly escape only PHP single-quote content (escape \ and ') before writing
+            SAFE_CLOUD_NAME="${CLD_CLOUD_NAME//\\/\\\\}"
+            SAFE_CLOUD_NAME="${SAFE_CLOUD_NAME//\'/\\\'}"
+
+            SAFE_API_KEY="${CLD_API_KEY//\\/\\\\}"
+            SAFE_API_KEY="${SAFE_API_KEY//\'/\\\'}"
+
+            SAFE_API_SECRET="${CLD_API_SECRET//\\/\\\\}"
+            SAFE_API_SECRET="${SAFE_API_SECRET//\'/\\\'}"
+
+            # Step B: Generate the file atomically with a single write that inserts the three secrets
+            cat > "$ENV_FILE" << EOF
+            <?php
+            // ---------------------------------------------------------------
+            // Auto-generated by GitHub Actions at deploy time.
+            // DO NOT edit manually — overwritten on every deploy.
+            // To update credentials: change the GitHub Secret → redeploy.
+            // ---------------------------------------------------------------
+            define('CLD_CLOUD_NAME', '${SAFE_CLOUD_NAME}');
+            define('CLD_API_KEY',    '${SAFE_API_KEY}');
+            define('CLD_API_SECRET', '${SAFE_API_SECRET}');
+            EOF
+
+            # Step C: Lock down file permissions.
+            # 600 = owner read+write only. No group. No world.
+            chmod 600 "$ENV_FILE"
+
+            # Step D: Confirm file exists (no secret values logged).
+            if [ -f "$ENV_FILE" ]; then
+              echo "✅ .env.php written and secured at api/.env.php"
+            else
+              echo "❌ ERROR: .env.php was not created — aborting deploy"
+              exit 1
+            fi
+
+            # Step E: Validation to ensure no placeholder tokens remain
+            if grep -q "PLACEHOLDER_" "$ENV_FILE"; then
+              echo "❌ ERROR: Placeholder values remain in .env.php — aborting deploy"
+              grep -oE "PLACEHOLDER_[A-Z_]+" "$ENV_FILE" | uniq
+              exit 1
+            fi
+
+      # 8. Atomically Switch Symlink
+      #
+      # At this point the release directory is fully assembled before going live:
+      #   releases/TIMESTAMP/
+      #   ├── index.html
+      #   ├── assets/
+      #   ├── .htaccess                   ← SPA routing (from client/public/)
+      #   ├── analytics.js
+      #   ├── robots.txt
+      #   └── api/
+      #       ├── imagesCloudinary.php    ← Cloudinary proxy (from client/public/api/)
+      #       ├── luma.php                ← Luma proxy (from client/public/api/)
+      #       ├── .htaccess               ← blocks HTTP access to .env.php (from client/public/api/)
+      #       └── .env.php                ← credentials only, chmod 600, server only
+      #
+      # The symlink swap is always the final step — the site only goes live
+      # once credentials are confirmed present. No window of broken state.
       - name: Atomically Switch Symlink
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
@@ -142,7 +269,7 @@ jobs:
 
             echo "Deploying release: ${{ steps.timestamp.outputs.timestamp }}"
 
-            # 1. Safety Check: If target is a directory and not a link, abort with instructions
+            # 1. Safety Check: If target is a directory and not a symlink, abort
             if [ -d "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
               echo "CRITICAL ERROR: $TARGET_LINK is a physical directory."
               echo "Atomic deployment requires this path to be a symbolic link."
@@ -159,7 +286,7 @@ jobs:
             cd "/home/${{ secrets.REMOTE_USER }}/releases"
             ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
 
-            echo "Deployment successful."
+            echo "✅ Deployment successful."
 
   notify:
     needs: [build, deploy]

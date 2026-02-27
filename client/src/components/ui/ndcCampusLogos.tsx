@@ -35,7 +35,9 @@ export function NdcCampusLogos({ className, ...props }: NdcCampusLogosProps) {
       }));
     }
     // Fallback data
-    return partnersData.campusTour.filter((p) => p.logo).map((p) => ({ src: p.logo!, alt: p.name }));
+    return partnersData.campusTour
+      .filter((p) => p.logo)
+      .map((p) => ({ src: p.logo!, alt: p.name }));
   }, [images]);
 
   // Prepare a shuffled list of unique logos for initial display
@@ -70,7 +72,8 @@ export function NdcCampusLogos({ className, ...props }: NdcCampusLogosProps) {
               "flex items-center justify-center bg-background px-4 py-8 md:p-8 border-r border-b",
               (i === 0 || i === 7) && "bg-ndc-primary-light-blue dark:bg-secondary/30",
               (i === 2 || i === 5) && "md:bg-ndc-primary-light-blue dark:md:bg-secondary/30",
-              (i === 3 || i === 4) && "bg-ndc-primary-light-blue md:bg-background dark:bg-secondary/30 md:dark:bg-background",
+              (i === 3 || i === 4) &&
+                "bg-ndc-primary-light-blue md:bg-background dark:bg-secondary/30 md:dark:bg-background",
               i >= 4 && "md:border-b-0",
               i % 4 === 3 && "border-r-0"
             )}

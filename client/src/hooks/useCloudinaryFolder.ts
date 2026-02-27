@@ -38,7 +38,7 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         }
 
         const data: CloudinaryResponse = await response.json();
-        
+
         const fetchedResources = data?.resources ?? [];
 
         setImages((prev) => (cursor ? [...prev, ...fetchedResources] : fetchedResources));

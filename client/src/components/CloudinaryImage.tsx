@@ -6,7 +6,9 @@ import React, { useMemo } from "react";
 const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 
 if (!cloudName || cloudName.trim() === "") {
-  throw new Error("Missing VITE_CLOUDINARY_CLOUD_NAME environment variable. Check your .env setup.");
+  throw new Error(
+    "Missing VITE_CLOUDINARY_CLOUD_NAME environment variable. Check your .env setup."
+  );
 }
 
 const cld = new Cloudinary({
@@ -39,12 +41,5 @@ export function CloudinaryImage({ publicId, alt, className, width, height }: Clo
 
   const plugins = useMemo(() => [lazyload(), responsive(), placeholder()], []);
 
-  return (
-    <AdvancedImage
-      cldImg={myImage}
-      alt={alt}
-      className={className}
-      plugins={plugins}
-    />
-  );
+  return <AdvancedImage cldImg={myImage} alt={alt} className={className} plugins={plugins} />;
 }
