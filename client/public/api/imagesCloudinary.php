@@ -35,9 +35,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// ─── Credentials (from .env.php generated at deploy time) ──────────────
+$envFile = __DIR__ . '/.env.php';
+if (file_exists($envFile)) {
+    require_once $envFile;
+}
+
 // ─── Authentication ────────────────────────────────────────────────
 $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? ($headersLower['authorization'] ?? '');
-$expectedToken = getenv('PROXY_API_TOKEN');
+$expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
 // Validate existence of token
 if (empty($expectedToken)) {
@@ -79,12 +85,6 @@ if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=]+$/', $nextCursor)) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid cursor']);
     exit;
-}
-
-// ─── Credentials (from .env.php generated at deploy time) ──────────────
-$envFile = __DIR__ . '/.env.php';
-if (file_exists($envFile)) {
-    require_once $envFile;
 }
 
 // Constants CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET are now defined.

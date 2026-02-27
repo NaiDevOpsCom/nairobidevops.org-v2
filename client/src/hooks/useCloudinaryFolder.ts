@@ -20,11 +20,8 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         }
         setError(null);
 
-        if (typeof window === "undefined") {
-          throw new Error("useCloudinaryFolder must run in a browser environment.");
-        }
-
-        const url = new URL("/api/imagesCloudinary.php", window.location.origin);
+        const baseOrigin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+        const url = new URL("/api/imagesCloudinary.php", baseOrigin);
         url.searchParams.append("folder", folder);
         if (cursor) {
           url.searchParams.append("next_cursor", cursor);

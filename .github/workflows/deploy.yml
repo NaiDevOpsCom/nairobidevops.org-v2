@@ -184,12 +184,13 @@ jobs:
           CLD_CLOUD_NAME: ${{ secrets.CLD_CLOUD_NAME }}
           CLD_API_KEY: ${{ secrets.CLD_API_KEY }}
           CLD_API_SECRET: ${{ secrets.CLD_API_SECRET }}
+          PROXY_API_TOKEN: ${{ secrets.PROXY_API_TOKEN }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.REMOTE_PORT || 22 }}
-          envs: CLD_CLOUD_NAME,CLD_API_KEY,CLD_API_SECRET
+          envs: CLD_CLOUD_NAME,CLD_API_KEY,CLD_API_SECRET,PROXY_API_TOKEN
           script: |
             set -euo pipefail
 
@@ -205,6 +206,9 @@ jobs:
             SAFE_API_SECRET="${CLD_API_SECRET//\\/\\\\}"
             SAFE_API_SECRET="${SAFE_API_SECRET//\'/\\\'}"
 
+            SAFE_PROXY_TOKEN="${PROXY_API_TOKEN//\\/\\\\}"
+            SAFE_PROXY_TOKEN="${SAFE_PROXY_TOKEN//\'/\\\'}"
+
             # Step B: Generate the file atomically with a single write that inserts the three secrets
             cat > "$ENV_FILE" <<-EOF
             <?php
@@ -216,6 +220,7 @@ jobs:
             define('CLD_CLOUD_NAME', '${SAFE_CLOUD_NAME}');
             define('CLD_API_KEY',    '${SAFE_API_KEY}');
             define('CLD_API_SECRET', '${SAFE_API_SECRET}');
+            define('PROXY_API_TOKEN', '${SAFE_PROXY_TOKEN}');
             EOF
 
             # Step C: Lock down file permissions.
