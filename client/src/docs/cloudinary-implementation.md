@@ -72,9 +72,9 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Restrict direct access to PHP files by requiring an Authorization header
 <FilesMatch "\.php$">
-    # NOTE: This only checks if the header EXISTS. 
+    # NOTE: This only checks if the header EXISTS.
     # Actual token verification must be done securely within the PHP scripts using environment variables.
-    
+
     # Example: Require the Authorization header to be present
     SetEnvIf Authorization "^(Bearer .*)$" HAS_AUTH
     Require env HAS_AUTH

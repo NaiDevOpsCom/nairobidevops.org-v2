@@ -20,7 +20,8 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         }
         setError(null);
 
-        const baseOrigin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+        const baseOrigin =
+          typeof window === "undefined" ? "http://localhost" : window.location.origin;
         const url = new URL("/api/imagesCloudinary.php", baseOrigin);
         url.searchParams.append("folder", folder);
         if (cursor) {
