@@ -86,33 +86,44 @@ export function SponsorsCarousel() {
   // Fetch sponsor logos from the ndcPartners folder in Cloudinary.
   const { images, loading, error } = useCloudinaryFolder("ndcPartners");
 
-  // Resolve the active partner list:
-  //   1. Use Cloudinary data if fetch succeeded and returned results.
-  //   2. Fall back to hardcoded communityPartners silently on error or empty response.
-  //
   // Cloudinary images are mapped to the Partner shape so CarouselRow
   // and SponsorCard work without any changes.
   const activePartners: Partner[] = useMemo(() => {
-    const hasCloudinaryData = !error && images.length > 0;
-
-    if (hasCloudinaryData) {
-      return images.map((image, index) => ({
-        // Stable synthetic id based on publicId — avoids key collisions
-        id: image.publicId,
-        // Use the last segment of publicId as the name
-        // e.g. "ndcPartners/safaricom-logo" → "safaricom-logo"
-        name: image.publicId.split("/").pop() ?? `partner-${index}`,
-        // secureUrl is the full Cloudinary CDN URL — used directly as img src
-        logo: image.secureUrl,
-      }));
-    }
-
-    // Silent fallback — no error UI shown, carousel still works with local data
-    // If we're loading and have no data yet, return empty so we can show skeletons
+    // 1. If loading and we have no images yet, return an empty array to show skeletons.
     if (loading && images.length === 0) {
       return [];
     }
 
+    // 2. If the fetch was successful and returned images, map them to the Partner shape.
+    const hasCloudinaryData = !error && images.length > 0;
+
+    if (hasCloudinaryData) {
+      const isAllowedCloudinaryUrl = (raw: string): boolean => {
+        try {
+          const u = new URL(raw);
+          if (u.protocol !== "https:") return false;
+          // Adjust allowlist to your Cloudinary delivery host(s)
+          return u.hostname.endsWith("cloudinary.com");
+        } catch {
+          return false;
+        }
+      };
+
+      return images
+        .filter((image) => isAllowedCloudinaryUrl(image.secureUrl))
+        .map((image, index) => ({
+          // Stable synthetic id based on publicId — avoids key collisions
+          id: image.publicId,
+          // Use the last segment of publicId as the name
+          // e.g. "ndcPartners/safaricom-logo" → "safaricom-logo"
+          name: image.publicId.split("/").pop() || `partner-${index}`,
+          // secureUrl is the full Cloudinary CDN URL — used directly as img src
+          logo: image.secureUrl,
+        }));
+    }
+
+    // 3. Otherwise, fall back to the hardcoded local data.
+    // This covers fetch errors, empty folders, or initial state before loading.
     return partnersData.communityPartners as Partner[];
   }, [images, loading, error]);
 

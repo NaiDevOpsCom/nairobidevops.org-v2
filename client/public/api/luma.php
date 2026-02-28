@@ -22,7 +22,33 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "OPTIONS") {
     exit;
 }
 
-// 2. Prepare the destination URL
+// 2. Credentials (from .env.php generated at deploy time)
+$envFile = __DIR__ . '/.env.php';
+if (file_exists($envFile)) {
+    require_once $envFile;
+}
+
+// 3. Authentication
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
+
+// Validate existence of token
+if (empty($expectedToken)) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Server authentication configuration missing']);
+    exit;
+}
+
+// Verify the provided token safely to prevent timing attacks
+if (empty($authHeader) || !preg_match("/^Bearer\s+(.*)$/i", $authHeader, $matches) || !hash_equals($expectedToken, $matches[1])) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+// 4. Prepare the destination URL
 $base_url = 'https://api.luma.com';
 
 // Get the path after /api/luma
