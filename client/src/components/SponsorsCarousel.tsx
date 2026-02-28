@@ -36,6 +36,8 @@ function SponsorCard({ partner }: SponsorCardProps) {
 
 // ── CarouselRow ────────────────────────────────────────────────────────────────
 function CarouselRow({ partners, direction = "left", duration = 40 }: CarouselRowProps) {
+  if (partners.length === 0) return null;
+
   const duplicatedPartners = [...partners, ...partners];
 
   return (
@@ -51,8 +53,8 @@ function CarouselRow({ partners, direction = "left", duration = 40 }: CarouselRo
           ease: "linear",
         }}
       >
-        {duplicatedPartners.map((partner, index) => (
-          <SponsorCard key={`${partner.id}-${index}`} partner={partner} />
+        {duplicatedPartners.map((partner, i) => (
+          <SponsorCard key={`${partner.id}-${i}`} partner={partner} />
         ))}
       </motion.div>
     </div>
@@ -109,7 +111,7 @@ export function SponsorsCarousel() {
         }
       };
 
-      return images
+      const mapped = images
         .filter((image) => isAllowedCloudinaryUrl(image.secureUrl))
         .map((image, index) => ({
           // Stable synthetic id based on publicId — avoids key collisions
@@ -120,6 +122,12 @@ export function SponsorsCarousel() {
           // secureUrl is the full Cloudinary CDN URL — used directly as img src
           logo: image.secureUrl,
         }));
+
+      // Only return Cloudinary data if we actually have valid images after filtering.
+      // Otherwise, fall through to the hardcoded local data.
+      if (mapped.length > 0) {
+        return mapped;
+      }
     }
 
     // 3. Otherwise, fall back to the hardcoded local data.

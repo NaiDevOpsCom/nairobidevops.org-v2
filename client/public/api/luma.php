@@ -29,7 +29,7 @@ if (file_exists($envFile)) {
 }
 
 // 3. Authentication
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? ($headersLower['x-proxy-token'] ?? '');
 $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
 // Validate existence of token
@@ -41,7 +41,7 @@ if (empty($expectedToken)) {
 }
 
 // Verify the provided token safely to prevent timing attacks
-if (empty($authHeader) || !preg_match("/^Bearer\s+(.*)$/i", $authHeader, $matches) || !hash_equals($expectedToken, $matches[1])) {
+if (empty($authHeader) || !hash_equals($expectedToken, $authHeader)) {
     http_response_code(401);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Unauthorized']);
