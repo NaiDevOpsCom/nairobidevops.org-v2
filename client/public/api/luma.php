@@ -52,14 +52,21 @@ if (empty($authHeader) || !hash_equals($expectedToken, $authHeader)) {
 $base_url = 'https://api.luma.com';
 
 // Get the path after /api/luma
-$path = isset($_GET['path']) ? $_GET['path'] : '';
+$path = isset($_GET['path']) ? (string)$_GET['path'] : '';
 
-// Validate path to prevent traversal and SSRF
-if (!$path || preg_match('#(\\.\\.|//)#', $path) || !preg_match('#^[a-zA-Z0-9/_\\-\\.\?=&]+$#', $path)) {
+// Normalize + validate path to avoid absolute URLs / traversal
+$path = '/' . ltrim($path, '/');
+
+if (
+    $path === '/' ||
+    str_contains($path, '://') ||
+    str_starts_with($path, '//') ||
+    str_contains($path, '..') ||
+    !preg_match('#^/[a-zA-Z0-9/_\.\-]*$#', $path)
+) {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');
-    header('X-Content-Type-Options: nosniff');
-    echo json_encode(['error' => 'Invalid or missing path'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    echo json_encode(['error' => 'Invalid path']);
     exit;
 }
 

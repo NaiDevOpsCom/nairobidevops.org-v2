@@ -104,8 +104,10 @@ export function SponsorsCarousel() {
         try {
           const u = new URL(raw);
           if (u.protocol !== "https:") return false;
-          // Adjust allowlist to your Cloudinary delivery host(s)
-          return u.hostname.endsWith("cloudinary.com");
+
+          // Only allow Cloudinary delivery hosts (prevent lookalike domains like "evilcloudinary.com")
+          const host = u.hostname.toLowerCase();
+          return host === "res.cloudinary.com" || host.endsWith(".cloudinary.com");
         } catch {
           return false;
         }
