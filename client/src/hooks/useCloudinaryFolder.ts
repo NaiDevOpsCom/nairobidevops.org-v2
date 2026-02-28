@@ -36,7 +36,7 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         const response = await fetch(url.toString(), {
           headers: {
             "X-Requested-With": "XMLHttpRequest",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(token ? { "X-Proxy-Token": token } : {}),
           },
           signal,
         });

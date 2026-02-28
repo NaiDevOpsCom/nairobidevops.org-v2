@@ -24,10 +24,11 @@ $origin = $_SERVER['HTTP_ORIGIN'] ?? ($headersLower['origin'] ?? '');
 
 if (in_array($origin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Origin: ' . $origin);
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token');
+    header('Access-Control-Allow-Credentials: true');
+    header('Vary: Origin');
 }
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Authorization, Content-Type');
-header('Access-Control-Allow-Credentials: true');
 
 // ─── Handle Preflight OPTIONS Request ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -42,7 +43,7 @@ if (file_exists($envFile)) {
 }
 
 // ─── Authentication ────────────────────────────────────────────────
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? ($headersLower['authorization'] ?? '');
+$authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? ($headersLower['x-proxy-token'] ?? '');
 $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
 // Validate existence of token
@@ -53,7 +54,7 @@ if (empty($expectedToken)) {
 }
 
 // Verify the provided token safely to prevent timing attacks
-if (empty($authHeader) || !preg_match("/^Bearer\s+(.*)$/i", $authHeader, $matches) || !hash_equals($expectedToken, $matches[1])) {
+if (empty($authHeader) || !hash_equals($expectedToken, $authHeader)) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;
@@ -64,14 +65,12 @@ if (empty($authHeader) || !preg_match("/^Bearer\s+(.*)$/i", $authHeader, $matche
 $allowedFolders = [
     'ndcCampusTour',
     'ndcPartners',
-    // 'community',
-    // 'partners',
     // Add more folder names here as you create them in Cloudinary
 ];
 
 $folder      = isset($_GET['folder']) ? trim($_GET['folder']) : '';
 $nextCursor  = isset($_GET['next_cursor']) ? trim($_GET['next_cursor']) : '';
-$maxResults  = 12; // Images per page — adjust to match your grid layout
+$maxResults  = 12;
 
 // Reject unknown folders — prevents probing your Cloudinary structure
 if (!in_array($folder, $allowedFolders, true)) {
@@ -88,7 +87,6 @@ if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=]+$/', $nextCursor)) {
 }
 
 // Constants CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET are now defined.
-// Fallback to getenv() for local development if needed, but prefer .env.php
 $cloudName = defined('CLD_CLOUD_NAME') ? CLD_CLOUD_NAME : getenv('CLD_CLOUD_NAME');
 $apiKey    = defined('CLD_API_KEY') ? CLD_API_KEY : getenv('CLD_API_KEY');
 $apiSecret = defined('CLD_API_SECRET') ? CLD_API_SECRET : getenv('CLD_API_SECRET');

@@ -55,7 +55,6 @@ jobs:
       - name: Install and Build
         run: |
           npm ci
-          npm run security:generate
           npm run build
           # Validate build output
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
@@ -73,9 +72,11 @@ jobs:
             exit 1
           fi
 
-      # 4. Validate Sitemap & Robots.txt
-      - name: Validate Sitemap & Robots.txt
-        run: npm run sitemap:validate
+      # 4. Generate and Validate Sitemap & Robots.txt
+      - name: Generate and Validate Sitemap & Robots.txt
+        run: |
+          npm run sitemap:generate
+          npm run sitemap:validate
 
       # 5. Upload Build Artifact
       - name: Upload Build Artifact
