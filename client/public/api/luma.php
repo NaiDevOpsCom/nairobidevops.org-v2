@@ -37,7 +37,7 @@ $headers = getallheaders();
 $headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
 
 // 3. Authentication
-$authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? ($headersLower['x-proxy-token'] ?? '');
+$authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? '';
 $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
 // Validate existence of token

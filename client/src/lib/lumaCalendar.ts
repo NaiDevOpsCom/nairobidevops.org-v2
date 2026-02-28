@@ -58,10 +58,14 @@ export async function fetchLumaEvents(): Promise<LumaEvent[]> {
     ) as HTMLMetaElement | null;
     const token = tokenMeta?.content?.trim();
 
+    if (!token) {
+      throw new Error("Missing proxy token");
+    }
+
     response = await fetch(proxiedUrl, {
       headers: {
         "X-Requested-With": "XMLHttpRequest",
-        ...(token ? { "X-Proxy-Token": token } : {}),
+        "X-Proxy-Token": token,
       },
       signal: proxyController.signal,
     });
