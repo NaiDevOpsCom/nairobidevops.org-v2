@@ -15,9 +15,13 @@ if (in_array($origin, $allowed_origins, true)) {
 
 // Handle preflight requests
 if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "OPTIONS") {
-    header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization");
-    header("Access-Control-Max-Age: 86400"); // 24 hours
+    if (in_array($origin, $allowed_origins, true)) {
+        header("Access-Control-Allow-Origin: " . $origin);
+        header("Access-Control-Allow-Methods: GET, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token");
+        header("Access-Control-Max-Age: 86400"); // 24 hours
+        header("Vary: Origin");
+    }
     http_response_code(204);
     exit;
 }
@@ -27,6 +31,10 @@ $envFile = __DIR__ . '/.env.php';
 if (file_exists($envFile)) {
     require_once $envFile;
 }
+
+// 2. Load headers
+$headers = getallheaders();
+$headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
 
 // 3. Authentication
 $authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? ($headersLower['x-proxy-token'] ?? '');

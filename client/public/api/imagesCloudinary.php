@@ -24,10 +24,11 @@ $origin = $_SERVER['HTTP_ORIGIN'] ?? ($headersLower['origin'] ?? '');
 
 if (in_array($origin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Origin: ' . $origin);
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token');
+    header('Access-Control-Allow-Credentials: true');
+    header('Vary: Origin');
 }
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Authorization, Content-Type');
-header('Access-Control-Allow-Credentials: true');
 
 // ─── Handle Preflight OPTIONS Request ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
