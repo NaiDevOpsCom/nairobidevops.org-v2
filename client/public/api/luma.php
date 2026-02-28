@@ -15,25 +15,66 @@ if (in_array($origin, $allowed_origins, true)) {
 
 // Handle preflight requests
 if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "OPTIONS") {
-    header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization");
-    header("Access-Control-Max-Age: 86400"); // 24 hours
+    if (in_array($origin, $allowed_origins, true)) {
+        header("Access-Control-Allow-Origin: " . $origin);
+        header("Access-Control-Allow-Methods: GET, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token");
+        header("Access-Control-Max-Age: 86400"); // 24 hours
+        header("Vary: Origin");
+    }
     http_response_code(204);
     exit;
 }
 
-// 2. Prepare the destination URL
+// 2. Credentials (from .env.php generated at deploy time)
+$envFile = __DIR__ . '/.env.php';
+if (file_exists($envFile)) {
+    require_once $envFile;
+}
+
+// 2. Load headers
+$headers = getallheaders();
+$headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
+
+// 3. Authentication
+$authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? '';
+$expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
+
+// Validate existence of token
+if (empty($expectedToken)) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Server authentication configuration missing']);
+    exit;
+}
+
+// Verify the provided token safely to prevent timing attacks
+if (empty($authHeader) || !hash_equals($expectedToken, $authHeader)) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+// 4. Prepare the destination URL
 $base_url = 'https://api.luma.com';
 
 // Get the path after /api/luma
-$path = isset($_GET['path']) ? $_GET['path'] : '';
+$path = isset($_GET['path']) ? (string)$_GET['path'] : '';
 
-// Validate path to prevent traversal and SSRF
-if (!$path || preg_match('#(\\.\\.|//)#', $path) || !preg_match('#^[a-zA-Z0-9/_\\-\\.\?=&]+$#', $path)) {
+// Normalize + validate path to avoid absolute URLs / traversal
+$path = '/' . ltrim($path, '/');
+
+if (
+    $path === '/' ||
+    str_contains($path, '://') ||
+    str_starts_with($path, '//') ||
+    str_contains($path, '..') ||
+    !preg_match('#^/[a-zA-Z0-9/_\.\-]*$#', $path)
+) {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');
-    header('X-Content-Type-Options: nosniff');
-    echo json_encode(['error' => 'Invalid or missing path'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    echo json_encode(['error' => 'Invalid path']);
     exit;
 }
 
