@@ -64,14 +64,12 @@ if (empty($authHeader) || !preg_match("/^Bearer\s+(.*)$/i", $authHeader, $matche
 $allowedFolders = [
     'ndcCampusTour',
     'ndcPartners',
-    // 'community',
-    // 'partners',
     // Add more folder names here as you create them in Cloudinary
 ];
 
 $folder      = isset($_GET['folder']) ? trim($_GET['folder']) : '';
 $nextCursor  = isset($_GET['next_cursor']) ? trim($_GET['next_cursor']) : '';
-$maxResults  = 12; // Images per page — adjust to match your grid layout
+$maxResults  = 12;
 
 // Reject unknown folders — prevents probing your Cloudinary structure
 if (!in_array($folder, $allowedFolders, true)) {
@@ -88,7 +86,6 @@ if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=]+$/', $nextCursor)) {
 }
 
 // Constants CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET are now defined.
-// Fallback to getenv() for local development if needed, but prefer .env.php
 $cloudName = defined('CLD_CLOUD_NAME') ? CLD_CLOUD_NAME : getenv('CLD_CLOUD_NAME');
 $apiKey    = defined('CLD_API_KEY') ? CLD_API_KEY : getenv('CLD_API_KEY');
 $apiSecret = defined('CLD_API_SECRET') ? CLD_API_SECRET : getenv('CLD_API_SECRET');

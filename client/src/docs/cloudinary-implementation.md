@@ -33,14 +33,52 @@ A wrapper around `@cloudinary/react`'s `AdvancedImage`.
 - **Optimization**: Uses lazy loading (`lazyload()`), responsive scaling (`responsive()`), and placeholders (`placeholder()`).
 - **Transformations**: Supports manual width/height scaling using `@cloudinary/url-gen`.
 
-### 3. Usage Example: `NdcCampusLogos`
+### 3. Usage Examples
 
-The `NdcCampusLogos` component demonstrates a robust implementation:
+#### `NdcCampusLogos`
 
-1. Fetches data with `useCloudinaryFolder("ndcCampusTour")`.
-2. Displays a **Skeleton loading state** while the initial fetch is in progress.
-3. Automatically **falls back** to local data (`partnersData.ts`) if the fetch fails or the folder is empty.
-4. Maintains high performance with cached images and optimized transformations.
+- **Folder**: `ndcCampusTour`
+- **Features**: Skeleton loading, automatic fallback to local data (`partnersData.ts`).
+
+#### `SponsorsCarousel`
+
+- **Folder**: `ndcPartners`
+- **Implementation**: Uses `useCloudinaryFolder("ndcPartners")` to dynamically fetch partner logos.
+- **Mapping**: Resources are mapped to the `Partner` interface. Note that the `website` property in `Partner` is now optional to accommodate logos directly fetched from Cloudinary.
+- **Looping**: The fetched list is duplicated in the UI to ensure a seamless infinite scroll.
+- **Fallback**: Gracefully switch to static `communityPartners` if the fetch fails or the folder is empty.
+
+## Adding a New Cloudinary Folder
+
+To add a new image folder for fetching on the frontend, follow these three steps:
+
+### 1. Update the PHP Proxy
+
+Add the new folder name to the `$allowedFolders` whitelist in `client/public/api/imagesCloudinary.php`:
+
+```php
+$allowedFolders = [
+    'ndcCampusTour',
+    'ndcPartners',
+    'yourNewFolderName', // Add here
+];
+```
+
+### 2. Update Frontend Types
+
+Add the folder name to the `CloudinaryFolder` union type in `client/src/types/cloudinary.ts`:
+
+```typescript
+export type CloudinaryFolder = "ndcCampusTour" | "ndcPartners" | "yourNewFolderName";
+```
+
+### 3. Implement in Component
+
+Use the `useCloudinaryFolder` hook in your component:
+
+```tsx
+const { images, loading, error } = useCloudinaryFolder("yourNewFolderName");
+```
 
 ## Configuration Requirements
 
