@@ -3,19 +3,25 @@ import { Cloudinary } from "@cloudinary/url-gen";
 import { scale } from "@cloudinary/url-gen/actions/resize";
 import React, { useMemo } from "react";
 
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? "";
 
-if (!cloudName || cloudName.trim() === "") {
-  throw new Error(
-    "Missing VITE_CLOUDINARY_CLOUD_NAME environment variable. Check your .env setup."
-  );
+let cldInstance: Cloudinary | null = null;
+
+function getCloudinaryClient(): Cloudinary | null {
+  if (cldInstance) return cldInstance;
+  if (!cloudName.trim()) {
+    console.warn(
+      "CloudinaryImage: Missing VITE_CLOUDINARY_CLOUD_NAME. Cloudinary images will not render. Check your .env setup."
+    );
+    return null;
+  }
+  cldInstance = new Cloudinary({
+    cloud: {
+      cloudName,
+    },
+  });
+  return cldInstance;
 }
-
-const cld = new Cloudinary({
-  cloud: {
-    cloudName,
-  },
-});
 
 interface CloudinaryImageProps {
   publicId: string;
@@ -26,7 +32,10 @@ interface CloudinaryImageProps {
 }
 
 export function CloudinaryImage({ publicId, alt, className, width, height }: CloudinaryImageProps) {
+  const cld = getCloudinaryClient();
+
   const myImage = useMemo(() => {
+    if (typeof window === "undefined" || !cld) return null;
     const img = cld.image(publicId);
 
     // Apply transformations if needed
@@ -37,9 +46,25 @@ export function CloudinaryImage({ publicId, alt, className, width, height }: Clo
       img.resize(scaleAction);
     }
     return img;
-  }, [publicId, width, height]);
+  }, [cld, publicId, width, height]);
 
   const plugins = useMemo(() => [lazyload(), responsive(), placeholder()], []);
+
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (!myImage) {
+    // Return a placeholder or empty div if Cloudinary is misconfigured
+    return (
+      <div
+        className={`${className} bg-gray-200 animate-pulse rounded flex items-center justify-center`}
+        style={{ width, height }}
+      >
+        <span className="text-gray-400 text-xs">Image unavailable</span>
+      </div>
+    );
+  }
 
   return <AdvancedImage cldImg={myImage} alt={alt} className={className} plugins={plugins} />;
 }

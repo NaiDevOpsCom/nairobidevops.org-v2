@@ -54,7 +54,12 @@ To add a new image folder for fetching on the frontend, follow these three steps
 
 ### 1. Update the PHP Proxy
 
-Add the new folder name to the `$allowedFolders` whitelist in `client/public/api/imagesCloudinary.php`:
+Add the new folder name to the `$allowedFolders` whitelist in the Cloudinary proxy file:
+
+- **Source path**: `client/public/api/imagesCloudinary.php` (edit this first)
+- **Deployed path**: `public_html/api/imagesCloudinary.php` (where the file exists on the server)
+
+Locate the `$allowedFolders` variable in `imagesCloudinary.php` and add your new folder:
 
 ```php
 $allowedFolders = [

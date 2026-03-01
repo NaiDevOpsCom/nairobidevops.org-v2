@@ -7,20 +7,31 @@ $allowed_origins = [
     "https://www.nairobidevops.org",
 ];
 
-$origin = $_SERVER["HTTP_ORIGIN"] ?? "";
-if (in_array($origin, $allowed_origins, true)) {
+// Determine the origin from both $_SERVER and headers for broad compatibility
+$headers = [];
+if (function_exists('getallheaders')) {
+    $headers = getallheaders();
+} elseif (function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+}
+$headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
+
+$origin = $_SERVER["HTTP_ORIGIN"] ?? ($headersLower['origin'] ?? "");
+$isTrustedOrigin = in_array($origin, $allowed_origins, true);
+
+if ($isTrustedOrigin) {
     header("Access-Control-Allow-Origin: " . $origin);
     header("Vary: Origin");
 }
 
+$allowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
+
 // Handle preflight requests
 if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "OPTIONS") {
-    if (in_array($origin, $allowed_origins, true)) {
-        header("Access-Control-Allow-Origin: " . $origin);
-        header("Access-Control-Allow-Methods: GET, OPTIONS");
+    if ($isTrustedOrigin) {
+        header("Access-Control-Allow-Methods: " . implode(", ", $allowedMethods));
         header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token");
         header("Access-Control-Max-Age: 86400"); // 24 hours
-        header("Vary: Origin");
     }
     http_response_code(204);
     exit;
@@ -32,15 +43,11 @@ if (file_exists($envFile)) {
     require_once $envFile;
 }
 
-// 2. Load headers
-$headers = getallheaders();
-$headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
-
 // 3. Authentication
-$authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? '';
+$authHeaderToken = $headersLower['x-proxy-token'] ?? ($headersLower['authorization'] ?? '');
 $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
-// Validate existence of token
+// Validate existence of backend secret
 if (empty($expectedToken)) {
     http_response_code(500);
     header('Content-Type: application/json; charset=utf-8');
@@ -48,8 +55,12 @@ if (empty($expectedToken)) {
     exit;
 }
 
-// Verify the provided token safely to prevent timing attacks
-if (empty($authHeader) || !hash_equals($expectedToken, $authHeader)) {
+// Keep proxy auth on the server:
+// Allow requests without a token IF they are AJAX calls from our trusted origin.
+$isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
+$isAuthenticated = !empty($authHeaderToken) && hash_equals($expectedToken, $authHeaderToken);
+
+if (!$isAuthenticated && !($isTrustedOrigin && $isAjax)) {
     http_response_code(401);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Unauthorized']);
@@ -90,7 +101,6 @@ if ($queryString) {
 
 // 3. Forward the request
 $method = $_SERVER['REQUEST_METHOD'];
-$allowedMethods = ['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'];
 if (!in_array($method, $allowedMethods, true)) {
     http_response_code(405);
     header('Allow: ' . implode(', ', $allowedMethods));
@@ -125,9 +135,9 @@ function sanitizeHeader($value) {
 
 // Forward selected headers (Authorization, Content-Type)
 $forwardHeaders = [];
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-if ($authHeader) {
-    $forwardHeaders[] = 'Authorization: ' . sanitizeHeader($authHeader);
+$forwardAuthHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+if ($forwardAuthHeader) {
+    $forwardHeaders[] = 'Authorization: ' . sanitizeHeader($forwardAuthHeader);
 }
 if (isset($_SERVER['CONTENT_TYPE'])) {
     $forwardHeaders[] = 'Content-Type: ' . sanitizeHeader($_SERVER['CONTENT_TYPE']);

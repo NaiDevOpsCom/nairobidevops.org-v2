@@ -1,5 +1,4 @@
 <?php
-// public_html/api/images.php
 
 // ─── Security Headers ────────────────────────────────────────────
 header('Content-Type: application/json');
@@ -42,24 +41,6 @@ if (file_exists($envFile)) {
     require_once $envFile;
 }
 
-// ─── Authentication ────────────────────────────────────────────────
-$authHeader = $_SERVER['HTTP_X_PROXY_TOKEN'] ?? ($headersLower['x-proxy-token'] ?? '');
-$expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
-
-// Validate existence of token
-if (empty($expectedToken)) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Server authentication configuration missing']);
-    exit;
-}
-
-// Verify the provided token safely to prevent timing attacks
-if (empty($authHeader) || !hash_equals($expectedToken, $authHeader)) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-
 // ─── Input Validation ─────────────────────────────────────────────
 // Whitelist of valid Cloudinary folder names — update this as you add folders
 $allowedFolders = [
@@ -79,8 +60,8 @@ if (!in_array($folder, $allowedFolders, true)) {
     exit;
 }
 
-// Validate next_cursor format (Cloudinary cursors are alphanumeric strings)
-if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=]+$/', $nextCursor)) {
+// Validate next_cursor format (Cloudinary cursors are base64-like strings)
+if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=+]+$/', $nextCursor)) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid cursor']);
     exit;
@@ -129,39 +110,50 @@ if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
     }
 }
 
-// ─── Build Signed Cloudinary API Request ─────────────────────────
-$timestamp = time();
+// ─── Authentication ────────────────────────────────────────────────
+$authHeaderToken = $headersLower['x-proxy-token'] ?? ($headersLower['authorization'] ?? '');
+$expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
-// Parameters must be sorted alphabetically for signature
-$sigParams = [
+// Validate existence of backend secret
+if (empty($expectedToken)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Server authentication configuration missing']);
+    exit;
+}
+
+// Keep proxy auth on the server:
+// Allow requests without a token IF they are AJAX calls from our trusted origin.
+$isTrustedOrigin = in_array($origin, $allowedOrigins, true);
+$isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
+$isAuthenticated = !empty($authHeaderToken) && hash_equals($expectedToken, $authHeaderToken);
+
+if (!$isAuthenticated && !($isTrustedOrigin && $isAjax)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+// ─── Build Cloudinary Admin API Request ──────────────────────────
+// The Admin API requires HTTP Basic Authentication: Authorization: Basic base64(api_key:api_secret)
+$auth = base64_encode($apiKey . ':' . $apiSecret);
+
+$queryParams = [
     'max_results' => $maxResults,
     'prefix'      => $folder . '/',
-    'timestamp'   => $timestamp,
-    'type'        => 'upload',
+    'type'        => 'upload', // Only list resources in the 'upload' type (standard)
 ];
 
 if ($nextCursor) {
-    $sigParams['next_cursor'] = $nextCursor;
+    $queryParams['next_cursor'] = $nextCursor;
 }
 
-ksort($sigParams); // Critical: Cloudinary requires alphabetical sort for signing
-
-// Build the signature string: key1=val1&key2=val2 + secret appended at end
-$sigString = urldecode(http_build_query($sigParams)) . $apiSecret;
-$signature = sha1($sigString);
-
-// Build the final query with api_key and signature added (not part of sig string)
-$queryParams = array_merge($sigParams, [
-    'api_key'   => $apiKey,
-    'signature' => $signature,
-]);
-
-$apiUrl = "https://api.cloudinary.com/v1_1/{$cloudName}/resources/image?"
-        . http_build_query($queryParams);
+$apiUrl = "https://api.cloudinary.com/v1_1/{$cloudName}/resources/image?" . http_build_query($queryParams);
 
 // ─── Execute Request ──────────────────────────────────────────────
 $context = stream_context_create([
     'http' => [
+        'method' => 'GET',
+        'header' => "Authorization: Basic $auth\r\n",
         'timeout' => 10,
         'ignore_errors' => true,
     ],
@@ -204,6 +196,11 @@ foreach ($resources as $r) {
             'format'     => $r['format'],
             'createdAt'  => $r['created_at'],
         ];
+    } else {
+        error_log(sprintf(
+            "imagesCloudinary.php: Skipping resource %s from folder %s - missing required fields",
+            $r['public_id'] ?? 'unknown', $folder
+        ));
     }
 }
 
@@ -212,7 +209,8 @@ $shaped = [
     'images'      => $shapedResources,
     'nextCursor'  => $data['next_cursor'] ?? null,
     'hasMore'     => !empty($data['next_cursor']),
-    'total'       => count($shapedResources),
+    'returned'    => count($shapedResources),
+    'folderTotal' => $data['total_count'] ?? count($shapedResources),
 ];
 
 // ─── Cache and Return ─────────────────────────────────────────────

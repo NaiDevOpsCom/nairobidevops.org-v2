@@ -24,7 +24,6 @@ import { recordedSessions } from "@/data/communityPageData";
 import { getFAQsByCategory } from "@/data/faqData";
 import { GalleryImage, communityGallery } from "@/data/galleryData";
 import { seededRandom } from "@/lib/random";
-import { getRandomItems } from "@/utils/getRandomItems";
 
 const REASONS = [
   { icon: Cloud, title: "Explore cloud and DevOps" },
@@ -81,7 +80,9 @@ const EVENTS_FAQ_SCHEMA = generateEventsFaqSchema();
 export default function Eventspage() {
   // Random background image for "Why Our Events Matter"
   const [matterBgImage] = useState<GalleryImage | null>(() => {
-    return getRandomItems(communityGallery, 1)[0] || null;
+    return communityGallery.length > 0
+      ? communityGallery[Math.floor(seededRandom() * communityGallery.length)]
+      : null;
   });
 
   // Random CTA background image from galleryData (weighted by priority)

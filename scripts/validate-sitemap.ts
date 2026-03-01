@@ -49,120 +49,122 @@ function validateSitemap(): void {
   };
   fail = urlFail;
 
-  const sitemapPath = path.join(DIST_DIR, "sitemap.xml");
+  try {
+    const sitemapPath = path.join(DIST_DIR, "sitemap.xml");
 
-  // 1. Existence check
-  if (!fs.existsSync(sitemapPath)) {
-    fail("sitemap.xml not found in dist/");
-    return;
-  }
-
-  const content = fs.readFileSync(sitemapPath, "utf-8").trim();
-  const byteSize = Buffer.byteLength(content, "utf8");
-
-  // 2. Non-empty check
-  if (byteSize === 0) {
-    fail("sitemap.xml is empty");
-    return;
-  }
-  pass(`sitemap.xml exists (${byteSize} bytes)`);
-
-  // 3. XML declaration
-  if (!content.startsWith('<?xml version="1.0"')) {
-    fail('Missing or malformed XML declaration (expected <?xml version="1.0"...?>)');
-  } else {
-    pass("Valid XML declaration present");
-  }
-
-  // 4. Namespace check
-  const namespacePattern = /xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9"/;
-  if (!namespacePattern.test(content)) {
-    fail(
-      "Missing required sitemap namespace: xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"",
-    );
-  } else {
-    pass("Correct sitemap namespace");
-  }
-
-  // 5. Extract and validate <url> entries
-  const urlBlocks = content.match(/<url>[\s\S]*?<\/url>/g);
-  if (!urlBlocks || urlBlocks.length === 0) {
-    fail("No <url> entries found in sitemap");
-    return;
-  }
-  pass(`Found ${urlBlocks.length} URL entries`);
-
-  // 6. Validate each URL entry
-  const locPattern = /<loc>(.*?)<\/loc>/;
-  const lastmodPattern = /<lastmod>(.*?)<\/lastmod>/;
-  const seenUrls = new Set<string>();
-
-  for (const block of urlBlocks) {
-    const locMatch = block.match(locPattern);
-    const lastmodMatch = block.match(lastmodPattern);
-
-    if (!locMatch) {
-      fail("URL entry missing <loc> element");
-      continue;
+    // 1. Existence check
+    if (!fs.existsSync(sitemapPath)) {
+      fail("sitemap.xml not found in dist/");
+      return;
     }
 
-    const loc = locMatch[1];
+    const content = fs.readFileSync(sitemapPath, "utf-8").trim();
+    const byteSize = Buffer.byteLength(content, "utf8");
 
-    // HTTPS check
-    if (!loc.startsWith("https://")) {
-      fail(`URL is not HTTPS: ${loc}`);
+    // 2. Non-empty check
+    if (byteSize === 0) {
+      fail("sitemap.xml is empty");
+      return;
+    }
+    pass(`sitemap.xml exists (${byteSize} bytes)`);
+
+    // 3. XML declaration
+    if (!content.startsWith('<?xml version="1.0"')) {
+      fail('Missing or malformed XML declaration (expected <?xml version="1.0"...?>)');
+    } else {
+      pass("Valid XML declaration present");
     }
 
-    // Well-formed URL check
-    try {
-      new URL(loc);
-    } catch {
-      fail(`Malformed URL: ${loc}`);
+    // 4. Namespace check
+    const namespacePattern = /xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9"/;
+    if (!namespacePattern.test(content)) {
+      fail(
+        "Missing required sitemap namespace: xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"",
+      );
+    } else {
+      pass("Correct sitemap namespace");
     }
 
-    // Duplicate check
-    if (seenUrls.has(loc)) {
-      fail(`Duplicate URL: ${loc}`);
+    // 5. Extract and validate <url> entries
+    const urlBlocks = content.match(/<url>[\s\S]*?<\/url>/g);
+    if (!urlBlocks || urlBlocks.length === 0) {
+      fail("No <url> entries found in sitemap");
+      return;
     }
-    seenUrls.add(loc);
+    pass(`Found ${urlBlocks.length} URL entries`);
 
-    // Lastmod date validation
-    if (lastmodMatch) {
-      const dateStr = lastmodMatch[1];
-      // ISO 8601 date-only (YYYY-MM-DD) or full datetime with optional timezone offset
-      const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
-      if (!isoDatePattern.test(dateStr)) {
-        fail(`Invalid <lastmod> date format: ${dateStr} in ${loc}`);
-      }
-      // Validate actual date value
-      const parsed = new Date(dateStr);
-      if (isNaN(parsed.getTime())) {
-        fail(`Unparseable <lastmod> date: ${dateStr} in ${loc}`);
+    // 6. Validate each URL entry
+    const locPattern = /<loc>(.*?)<\/loc>/;
+    const lastmodPattern = /<lastmod>(.*?)<\/lastmod>/;
+    const seenUrls = new Set<string>();
+
+    for (const block of urlBlocks) {
+      const locMatch = block.match(locPattern);
+      const lastmodMatch = block.match(lastmodPattern);
+
+      if (!locMatch) {
+        fail("URL entry missing <loc> element");
         continue;
       }
 
-      // Strict calendar check: ensure the date part represents a valid calendar day
-      // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
-      const datePart = dateStr.split("T")[0];
-      const [y, m, d] = datePart.split("-").map(Number);
-      const testDate = new Date(Date.UTC(y, m - 1, d));
+      const loc = locMatch[1];
 
-      if (
-        testDate.getUTCFullYear() !== y ||
-        testDate.getUTCMonth() + 1 !== m ||
-        testDate.getUTCDate() !== d
-      ) {
-        fail(`Invalid calendar date: ${dateStr} in ${loc}`);
+      // HTTPS check
+      if (!loc.startsWith("https://")) {
+        fail(`URL is not HTTPS: ${loc}`);
+      }
+
+      // Well-formed URL check
+      try {
+        new URL(loc);
+      } catch {
+        fail(`Malformed URL: ${loc}`);
+      }
+
+      // Duplicate check
+      if (seenUrls.has(loc)) {
+        fail(`Duplicate URL: ${loc}`);
+      }
+      seenUrls.add(loc);
+
+      // Lastmod date validation
+      if (lastmodMatch) {
+        const dateStr = lastmodMatch[1];
+        // ISO 8601 date-only (YYYY-MM-DD) or full datetime with optional timezone offset
+        const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
+        if (!isoDatePattern.test(dateStr)) {
+          fail(`Invalid <lastmod> date format: ${dateStr} in ${loc}`);
+        }
+        // Validate actual date value
+        const parsed = new Date(dateStr);
+        if (isNaN(parsed.getTime())) {
+          fail(`Unparseable <lastmod> date: ${dateStr} in ${loc}`);
+          continue;
+        }
+
+        // Strict calendar check: ensure the date part represents a valid calendar day
+        // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
+        const datePart = dateStr.split("T")[0];
+        const [y, m, d] = datePart.split("-").map(Number);
+        const testDate = new Date(Date.UTC(y, m - 1, d));
+
+        if (
+          testDate.getUTCFullYear() !== y ||
+          testDate.getUTCMonth() + 1 !== m ||
+          testDate.getUTCDate() !== d
+        ) {
+          fail(`Invalid calendar date: ${dateStr} in ${loc}`);
+        }
       }
     }
-  }
 
-  if (urlErrorCount === 0) {
-    pass("All URL entries validated");
+    if (urlErrorCount === 0) {
+      pass("All URL entries validated");
+    }
+  } finally {
+    // Restore global fail
+    fail = originalFail;
   }
-
-  // Restore global fail
-  fail = originalFail;
 }
 
 

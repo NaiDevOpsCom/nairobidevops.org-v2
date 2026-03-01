@@ -11,12 +11,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main # Set this to your default branch (master or main)
+      - main 
     paths:
       - "client/src/**"
-      - "client/public/**" # Covers: api/imagesCloudinary.php, api/luma.php,
-        # .htaccess, analytics.js, robots.txt — any change
-        # in client/public/ triggers a deploy
+      - "client/public/**" 
       - "scripts/**"
       - "package.json"
       - "package-lock.json"
@@ -50,8 +48,6 @@ jobs:
       #   client/public/analytics.js              →  dist/analytics.js
       #   client/public/robots.txt                →  dist/robots.txt
       #
-      # ⚠️  NEVER place .env.php inside client/public/api/ — it must only
-      #     ever exist on the server, written by the SSH inject step below.
       - name: Install and Build
         run: |
           npm ci
@@ -168,8 +164,8 @@ jobs:
       # to sign API requests. Credentials must never be in the repo or dist/.
       #
       # HOW: A PHP constants file (.env.php) is written directly onto the server
-      # via SSH using the three values stored in GitHub Secrets:
-      #   CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET
+      # via SSH using the four values stored in GitHub Secrets:
+      #   CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET, PROXY_API_TOKEN
       #
       # The file:
       #   - Lives at api/.env.php alongside both PHP proxy files
@@ -196,6 +192,16 @@ jobs:
             set -euo pipefail
 
             ENV_FILE="/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/api/.env.php"
+
+            # Step 0: Validate secrets for control characters, newlines, or null bytes
+            # Guard against injection that could break the PHP syntax or bypass security.
+            for var in CLD_CLOUD_NAME CLD_API_KEY CLD_API_SECRET PROXY_API_TOKEN; do
+              val="${!var}"
+              if [[ "$val" =~ [$'\n'$'\r'$'\0'] ]]; then
+                echo "❌ ERROR: Secret $var contains forbidden control characters (newline/null/CR) — aborting deploy"
+                exit 1
+              fi
+            done
 
             # Step A: Properly escape only PHP single-quote content (escape \ and ') before writing
             SAFE_CLOUD_NAME="${CLD_CLOUD_NAME//\\/\\\\}"
@@ -244,22 +250,6 @@ jobs:
             fi
 
       # 8. Atomically Switch Symlink
-      #
-      # At this point the release directory is fully assembled before going live:
-      #   releases/TIMESTAMP/
-      #   ├── index.html
-      #   ├── assets/
-      #   ├── .htaccess                   ← SPA routing (from client/public/)
-      #   ├── analytics.js
-      #   ├── robots.txt
-      #   └── api/
-      #       ├── imagesCloudinary.php    ← Cloudinary proxy (from client/public/api/)
-      #       ├── luma.php                ← Luma proxy (from client/public/api/)
-      #       ├── .htaccess               ← blocks HTTP access to .env.php (from client/public/api/)
-      #       └── .env.php                ← credentials only, chmod 600, server only
-      #
-      # The symlink swap is always the final step — the site only goes live
-      # once credentials are confirmed present. No window of broken state.
       - name: Atomically Switch Symlink
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:

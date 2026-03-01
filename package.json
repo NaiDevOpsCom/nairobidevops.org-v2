@@ -13,6 +13,8 @@
     "build": "npm run security:generate && npm run check && vite build --mode production && node scripts/setup-cpanel.js",
     "build:staging": "npm run security:generate && vite build --mode staging && node scripts/setup-cpanel.js",
     "build:prod": "npm run security:generate && vite build --mode production && node scripts/setup-cpanel.js",
+    "build:ci": "npm run security:generate && vite build --mode production && node scripts/setup-cpanel.js",
+    "build:ci:staging": "npm run security:generate && vite build --mode staging && node scripts/setup-cpanel.js",
     "preview": "vite preview",
     "test": "vitest run --root client",
     "test:watch": "vitest",

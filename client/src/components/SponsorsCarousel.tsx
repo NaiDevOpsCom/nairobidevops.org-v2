@@ -107,7 +107,7 @@ export function SponsorsCarousel() {
 
           // Only allow Cloudinary delivery hosts (prevent lookalike domains like "evilcloudinary.com")
           const host = u.hostname.toLowerCase();
-          return host === "res.cloudinary.com" || host.endsWith(".cloudinary.com");
+          return host === "res.cloudinary.com" || host.endsWith(".res.cloudinary.com");
         } catch {
           return false;
         }

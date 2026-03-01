@@ -184,12 +184,12 @@ function LogoCard({ initialLogo, allLogos, className, children, ...props }: Logo
       timeoutId = setTimeout(() => {
         setCurrentLogo((prevLogo) => {
           if (allLogos.length > 1) {
-            let newLogo: Logo;
-            do {
-              const idx = Math.floor(seededRandom() * allLogos.length);
-              newLogo = allLogos[idx];
-            } while (newLogo.src === prevLogo.src);
-            return newLogo;
+            // Ensure we have at least one logo with a different source to avoid infinite loop
+            const otherLogos = allLogos.filter((l) => l.src !== prevLogo.src);
+            if (otherLogos.length > 0) {
+              const idx = Math.floor(seededRandom() * otherLogos.length);
+              return otherLogos[idx];
+            }
           }
           return prevLogo;
         });

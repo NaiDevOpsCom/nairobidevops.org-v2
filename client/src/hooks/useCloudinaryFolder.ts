@@ -71,8 +71,13 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
 
   useEffect(() => {
     const controller = new AbortController();
+    // Reset all state when folder changes
     setImages([]);
     setLoading(true);
+    setNextCursor(undefined);
+    setHasMore(false);
+    setLoadingMore(false);
+
     fetchImages(undefined, controller.signal);
     return () => {
       controller.abort();
