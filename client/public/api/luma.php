@@ -17,7 +17,8 @@ if (function_exists('getallheaders')) {
 $headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
 
 $origin = $_SERVER["HTTP_ORIGIN"] ?? ($headersLower['origin'] ?? "");
-$isTrustedOrigin = in_array($origin, $allowed_origins, true);
+$isSameOrigin = ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'same-origin';
+$isTrustedOrigin = in_array($origin, $allowed_origins, true) || $isSameOrigin;
 
 if ($isTrustedOrigin) {
     header("Access-Control-Allow-Origin: " . $origin);
@@ -81,7 +82,7 @@ if (
     str_contains($path, '://') ||
     str_starts_with($path, '//') ||
     str_contains($path, '..') ||
-    !preg_match('#^/[a-zA-Z0-9/_\.\-]*$#', $path)
+    !preg_match('#^/[a-zA-Z0-9/_\.\-\?=&]*$#', $path)
 ) {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');

@@ -11,10 +11,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main 
+      - main
     paths:
       - "client/src/**"
-      - "client/public/**" 
+      - "client/public/**"
       - "scripts/**"
       - "package.json"
       - "package-lock.json"
@@ -216,7 +216,7 @@ jobs:
             SAFE_PROXY_TOKEN="${PROXY_API_TOKEN//\\/\\\\}"
             SAFE_PROXY_TOKEN="${SAFE_PROXY_TOKEN//\'/\\\'}"
 
-            # Step B: Generate the file atomically with a single write that inserts the three secrets
+            # Step B: Generate the file atomically with a single write that inserts the four secrets
             cat > "$ENV_FILE" <<-EOF
             <?php
             // ---------------------------------------------------------------

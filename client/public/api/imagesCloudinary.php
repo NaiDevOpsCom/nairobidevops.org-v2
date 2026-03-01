@@ -100,7 +100,7 @@ if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
         // Validate JSON
         json_decode($cachedData);
         if (json_last_error() === JSON_ERROR_NONE) {
-            echo $cachedData;
+            echo htmlentities($cachedData);
             exit;
         } else {
             error_log("imagesCloudinary.php: Invalid JSON in cache file $cacheFile");
@@ -123,7 +123,8 @@ if (empty($expectedToken)) {
 
 // Keep proxy auth on the server:
 // Allow requests without a token IF they are AJAX calls from our trusted origin.
-$isTrustedOrigin = in_array($origin, $allowedOrigins, true);
+$isSameOrigin = ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'same-origin';
+$isTrustedOrigin = in_array($origin, $allowedOrigins, true) || $isSameOrigin;
 $isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
 $isAuthenticated = !empty($authHeaderToken) && hash_equals($expectedToken, $authHeaderToken);
 
@@ -228,4 +229,4 @@ if ($json) {
     }
 }
 
-echo $json;
+echo htmlentities($json);

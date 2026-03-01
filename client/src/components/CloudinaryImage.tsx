@@ -3,7 +3,8 @@ import { Cloudinary } from "@cloudinary/url-gen";
 import { scale } from "@cloudinary/url-gen/actions/resize";
 import React, { useMemo } from "react";
 
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? "";
+const cloudName =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_CLOUDINARY_CLOUD_NAME) || "";
 
 let cldInstance: Cloudinary | null = null;
 

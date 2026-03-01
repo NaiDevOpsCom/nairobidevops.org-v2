@@ -28,9 +28,10 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
           url.searchParams.append("next_cursor", cursor);
         }
 
-        const tokenMeta = document.querySelector(
-          'meta[name="api-bearer-token"]'
-        ) as HTMLMetaElement | null;
+        const tokenMeta =
+          typeof document !== "undefined"
+            ? (document.querySelector('meta[name="api-bearer-token"]') as HTMLMetaElement | null)
+            : null;
         const token = tokenMeta?.content?.trim();
 
         const response = await fetch(url.toString(), {

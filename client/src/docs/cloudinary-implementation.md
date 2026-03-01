@@ -13,6 +13,28 @@ The integration consists of a React frontend and a PHP-based backend proxy to se
 - **Verification**: Requires proper authentication (e.g., API keys, JWT, or authenticated session) to prevent unauthorized access. It also relies on CORS origin restrictions, input validation/sanitization, and should be served strictly over HTTPS. The `X-Requested-With: XMLHttpRequest` header may still be present for UX filtering but is not an access control mechanism.
 - **Functionality**: Fetches resources from specified folders (e.g., `ndcCampusTour`) and returns them in a JSON format compatible with the frontend.
 
+### 4. Same-origin Validation (Security & UX)
+
+- **Files:** `client/public/api/luma.php`, `client/public/api/imagesCloudinary.php`
+- **Change:** Backend proxies now use `Sec-Fetch-Site: same-origin` to identify requests from our own frontend. Combined with `X-Requested-With: XMLHttpRequest`, this allows the proxies to safely serve same-origin requests WITHOUT needing a bearer token embedded in the HTML.
+
+### 5. Bearer Token Removal
+
+- **Files:** `client/src/lib/lumaCalendar.ts`, `client/index.html` (verified)
+- **Change:** Removed the strict requirement for the `api-bearer-token` in the frontend fetch logic. The token is now only included if present, and confirmed it is already removed from `index.html` to prevent accidental credential leakage.
+
+### 6. Deployment Workflow Documentation Fix
+
+- **File:** `.github/workflows/deploy.yml`
+- **Change:** Updated comments to correctly state that FOUR secrets (including `PROXY_API_TOKEN`) are injected into the production environment's `.env.php` file.
+
+## Validation
+
+- **CI Checks:** Validated correct frontend format formatting via `npm run check`.
+- **Build Verification:** Output compiled successfully via `npm run build` after modifications.
+- **Audit:** Verified that `imagesCloudinary.php` is using `Authorization: Basic` for Cloudinary Admin API.
+- **Security:** Confirmed `index.html` does not contain the `api-bearer-token` meta tag.
+
 ### 2. React Frontend Integration
 
 #### Types (`src/types/cloudinary.ts`)

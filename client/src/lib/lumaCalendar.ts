@@ -58,17 +58,10 @@ export async function fetchLumaEvents(): Promise<LumaEvent[]> {
     ) as HTMLMetaElement | null;
     const token = tokenMeta?.content?.trim();
 
-    if (!token) {
-      console.warn(
-        "Luma proxy call aborted: Missing proxy token. If you are in local development, ensure VITE_PROXY_API_TOKEN is set in your .env file."
-      );
-      return [];
-    }
-
     response = await fetch(proxiedUrl, {
       headers: {
         "X-Requested-With": "XMLHttpRequest",
-        "X-Proxy-Token": token,
+        ...(token ? { "X-Proxy-Token": token } : {}),
       },
       signal: proxyController.signal,
     });
