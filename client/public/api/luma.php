@@ -64,6 +64,7 @@ if (empty($expectedToken)) {
 
 // Keep proxy auth on the server:
 // Allow requests without a token ONLY if they are from our trusted origin AND are AJAX.
+$isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
 $isAuthenticated = !empty($authHeaderToken) && hash_equals($expectedToken, $authHeaderToken);
 
 if (!$isAuthenticated && !($isTrustedOrigin && $isAjax)) {
