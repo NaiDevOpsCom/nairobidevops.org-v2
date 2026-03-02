@@ -17,8 +17,7 @@ if (function_exists('getallheaders')) {
 $headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
 
 $origin = $_SERVER["HTTP_ORIGIN"] ?? ($headersLower['origin'] ?? "");
-$isSameOrigin = ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'same-origin';
-$isTrustedOrigin = in_array($origin, $allowed_origins, true) || $isSameOrigin;
+$isTrustedOrigin = !empty($origin) && in_array($origin, $allowed_origins, true);
 
 if ($isTrustedOrigin) {
     header("Access-Control-Allow-Origin: " . $origin);
@@ -45,7 +44,14 @@ if (file_exists($envFile)) {
 }
 
 // 3. Authentication
-$authHeaderToken = $headersLower['x-proxy-token'] ?? ($headersLower['authorization'] ?? '');
+$authHeaderToken = $headersLower['x-proxy-token'] ?? '';
+
+// Handle "Bearer <token>" scheme if token is passed in X-Proxy-Token
+// This allows uniform handling if the client prefers Bearer format
+if (preg_match('/Bearer\s+(.*)$/i', $authHeaderToken, $matches)) {
+    $authHeaderToken = trim($matches[1]);
+}
+
 $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
 // Validate existence of backend secret
@@ -57,8 +63,7 @@ if (empty($expectedToken)) {
 }
 
 // Keep proxy auth on the server:
-// Allow requests without a token IF they are AJAX calls from our trusted origin.
-$isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
+// Allow requests without a token ONLY if they are from our trusted origin AND are AJAX.
 $isAuthenticated = !empty($authHeaderToken) && hash_equals($expectedToken, $authHeaderToken);
 
 if (!$isAuthenticated && !($isTrustedOrigin && $isAjax)) {

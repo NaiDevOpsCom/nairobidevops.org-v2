@@ -49,7 +49,7 @@ export function CloudinaryImage({ publicId, alt, className, width, height }: Clo
     return img;
   }, [cld, publicId, width, height]);
 
-  const plugins = useMemo(() => [lazyload(), responsive(), placeholder()], []);
+  const plugins = useMemo(() => [lazyload(), responsive(), placeholder({ mode: "blur" })], []);
 
   if (typeof window === "undefined") {
     return null;

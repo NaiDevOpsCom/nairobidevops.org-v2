@@ -197,8 +197,8 @@ jobs:
             # Guard against injection that could break the PHP syntax or bypass security.
             for var in CLD_CLOUD_NAME CLD_API_KEY CLD_API_SECRET PROXY_API_TOKEN; do
               val="${!var}"
-              if [[ "$val" =~ [$'\n'$'\r'$'\0'] ]]; then
-                echo "❌ ERROR: Secret $var contains forbidden control characters (newline/null/CR) — aborting deploy"
+              if [[ -z "${val}" || "${val}" =~ [$'\n'$'\r'$'\0'] ]]; then
+                echo "❌ ERROR: Secret $var is empty or contains forbidden control characters — aborting deploy"
                 exit 1
               fi
             done
@@ -267,11 +267,11 @@ jobs:
 
             echo "Deploying release: ${{ steps.timestamp.outputs.timestamp }}"
 
-            # 1. Safety Check: If target is a directory and not a symlink, abort
-            if [ -d "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
-              echo "CRITICAL ERROR: $TARGET_LINK is a physical directory."
+            # 1. Safety Check: If target exists and is not a symlink, abort
+            if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
+              echo "CRITICAL ERROR: $TARGET_LINK exists and is not a symbolic link."
               echo "Atomic deployment requires this path to be a symbolic link."
-              echo "Please manually rename the existing directory: mv $TARGET_LINK ${TARGET_LINK}_old"
+              echo "Please manually rename or remove the existing entry: mv $TARGET_LINK ${TARGET_LINK}_old"
               exit 1
             fi
 

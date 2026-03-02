@@ -100,7 +100,7 @@ if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
         // Validate JSON
         json_decode($cachedData);
         if (json_last_error() === JSON_ERROR_NONE) {
-            echo htmlentities($cachedData);
+            echo $cachedData;
             exit;
         } else {
             error_log("imagesCloudinary.php: Invalid JSON in cache file $cacheFile");
@@ -111,7 +111,13 @@ if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
 }
 
 // ─── Authentication ────────────────────────────────────────────────
-$authHeaderToken = $headersLower['x-proxy-token'] ?? ($headersLower['authorization'] ?? '');
+$authHeaderToken = $headersLower['x-proxy-token'] ?? '';
+
+// Handle "Bearer <token>" scheme
+if (preg_match('/Bearer\s+(.*)$/i', $authHeaderToken, $matches)) {
+    $authHeaderToken = trim($matches[1]);
+}
+
 $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
 
 // Validate existence of backend secret
@@ -122,9 +128,8 @@ if (empty($expectedToken)) {
 }
 
 // Keep proxy auth on the server:
-// Allow requests without a token IF they are AJAX calls from our trusted origin.
-$isSameOrigin = ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === 'same-origin';
-$isTrustedOrigin = in_array($origin, $allowedOrigins, true) || $isSameOrigin;
+// Allow requests without a token ONLY if they are from our trusted origin AND are AJAX.
+$isTrustedOrigin = !empty($origin) && in_array($origin, $allowedOrigins, true);
 $isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
 $isAuthenticated = !empty($authHeaderToken) && hash_equals($expectedToken, $authHeaderToken);
 
@@ -217,16 +222,21 @@ $shaped = [
 // ─── Cache and Return ─────────────────────────────────────────────
 $json = json_encode($shaped);
 
-if ($json) {
-    $writeResult = file_put_contents($cacheFile, $json);
-    if ($writeResult === false) {
-        $phpError = error_get_last();
-        $errorMsg = $phpError ? $phpError['message'] : 'Unknown error';
-        error_log(sprintf(
-            "imagesCloudinary.php: Failed to write %d bytes to cache limit. File: %s. Error: %s",
-            strlen($json), $cacheFile, $errorMsg
-        ));
-    }
+if ($json === false) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Internal Server Error: Failed to encode response']);
+    error_log('imagesCloudinary.php: json_encode failed: ' . json_last_error_msg());
+    exit;
 }
 
-echo htmlentities($json);
+$writeResult = file_put_contents($cacheFile, $json, LOCK_EX);
+if ($writeResult === false) {
+    $phpError = error_get_last();
+    $errorMsg = $phpError ? $phpError['message'] : 'Unknown error';
+    error_log(sprintf(
+        "imagesCloudinary.php: Failed to write %d bytes to cache file. File: %s. Error: %s",
+        strlen($json), $cacheFile, $errorMsg
+    ));
+}
+
+echo $json;

@@ -27,12 +27,25 @@ export function NdcCampusLogos({ className, ...props }: NdcCampusLogosProps) {
   // Map Cloudinary images to the Logo type, or use hardcoded data as fallback
   const allLogos: Logo[] = useMemo(() => {
     if (images.length > 0) {
-      return images.map((img) => ({
-        src: img.secureUrl,
-        alt: img.publicId.split("/").pop() || "Campus Logo",
-        width: img.width,
-        height: img.height,
-      }));
+      const isAllowedCloudinaryUrl = (raw: string): boolean => {
+        try {
+          const u = new URL(raw);
+          if (u.protocol !== "https:") return false;
+          const host = u.hostname.toLowerCase();
+          return host === "res.cloudinary.com" || host.endsWith(".res.cloudinary.com");
+        } catch {
+          return false;
+        }
+      };
+
+      return images
+        .filter((img) => isAllowedCloudinaryUrl(img.secureUrl))
+        .map((img) => ({
+          src: img.secureUrl,
+          alt: img.publicId.split("/").pop() || "Campus Logo",
+          width: img.width,
+          height: img.height,
+        }));
     }
     // Fallback data
     return partnersData.campusTour

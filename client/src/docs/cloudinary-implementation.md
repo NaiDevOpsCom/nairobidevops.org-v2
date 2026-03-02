@@ -13,10 +13,11 @@ The integration consists of a React frontend and a PHP-based backend proxy to se
 - **Verification**: Requires proper authentication (e.g., API keys, JWT, or authenticated session) to prevent unauthorized access. It also relies on CORS origin restrictions, input validation/sanitization, and should be served strictly over HTTPS. The `X-Requested-With: XMLHttpRequest` header may still be present for UX filtering but is not an access control mechanism.
 - **Functionality**: Fetches resources from specified folders (e.g., `ndcCampusTour`) and returns them in a JSON format compatible with the frontend.
 
-### 4. Same-origin Validation (Security & UX)
+### 4. Same-origin Validation (Security & UX Heuristics)
 
 - **Files:** `client/public/api/luma.php`, `client/public/api/imagesCloudinary.php`
-- **Change:** Backend proxies now use `Sec-Fetch-Site: same-origin` to identify requests from our own frontend. Combined with `X-Requested-With: XMLHttpRequest`, this allows the proxies to safely serve same-origin requests WITHOUT needing a bearer token embedded in the HTML.
+- **Change:** Backend proxies use `X-Requested-With: XMLHttpRequest` as a request-context hint to filter non-AJAX traffic. Note that headers like `Sec-Fetch-Site` or `X-Requested-With` can be spoofed and are **NOT** as a substitute for proper authentication.
+- **Requirement**: Always require proper authentication (e.g., proxy tokens, server-side session checks, or signed requests) for any endpoint serving sensitive data or performing privileged actions. Heuristic headers should only be used as additional context or for non-security filtering.
 
 ### 5. Bearer Token Removal
 

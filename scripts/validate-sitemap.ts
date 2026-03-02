@@ -191,8 +191,8 @@ function validateRobotsTxt(): void {
   const byteSize = Buffer.byteLength(content, "utf8");
   pass(`robots.txt exists (${byteSize} bytes)`);
 
-  // Check for Sitemap directive
-  const sitemapDirective = /^Sitemap:\s*https?:\/\/.+\/sitemap\.xml$/m;
+  // Check for Sitemap directive (case-insensitive)
+  const sitemapDirective = /^sitemap:\s*https?:\/\/.+\/sitemap\.xml$/im;
   if (!sitemapDirective.test(content)) {
     fail("robots.txt missing valid 'Sitemap:' directive");
   } else {
@@ -200,7 +200,7 @@ function validateRobotsTxt(): void {
   }
 
   // Check Sitemap URL is HTTPS
-  const sitemapUrlMatch = content.match(/^Sitemap:\s*(.+)$/m);
+  const sitemapUrlMatch = content.match(/^sitemap:\s*(.+)$/im);
   if (sitemapUrlMatch) {
     const sitemapUrl = sitemapUrlMatch[1].trim();
     if (!sitemapUrl.startsWith("https://")) {
