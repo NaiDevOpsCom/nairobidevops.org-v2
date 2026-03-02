@@ -53,7 +53,18 @@ export async function fetchLumaEvents(): Promise<LumaEvent[]> {
   const proxyTimeoutId = setTimeout(() => proxyController.abort(), 10000); // 10s timeout
 
   try {
-    response = await fetch(proxiedUrl, { signal: proxyController.signal });
+    const tokenMeta = document.querySelector(
+      'meta[name="api-bearer-token"]'
+    ) as HTMLMetaElement | null;
+    const token = tokenMeta?.content?.trim();
+
+    response = await fetch(proxiedUrl, {
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        ...(token ? { "X-Proxy-Token": token } : {}),
+      },
+      signal: proxyController.signal,
+    });
 
     if (!response.ok) {
       throw new Error(`Proxy failed with status: ${response.status}`);

@@ -85,8 +85,8 @@ async function getBlogSlugs(): Promise<string[]> {
     };
     return blogPosts.map((p) => p.slug);
   } catch (error) {
-    console.error("⚠  Failed to import blogData.ts:", error);
-    return [];
+    console.error("❌ Failed to import blogData.ts:", error);
+    throw new Error(`Failed to import blogData.ts from ${blogDataPath}: ${error}`);
   }
 }
 
@@ -152,12 +152,15 @@ export async function generateSitemap(): Promise<void> {
   const slugs = await getBlogSlugs();
   const blogEntries: SitemapEntry[] = slugs
     .filter((slug) => typeof slug === "string" && slug.trim().length > 0)
-    .map((slug) => ({
-      loc: `/blogs/${encodeURIComponent(slug)}`,
-      changefreq: "weekly" as const,
-      priority: 0.6,
-      lastmod: today,
-    }));
+    .map((slug) => {
+      const trimmedSlug = slug.trim();
+      return {
+        loc: `/blogs/${encodeURIComponent(trimmedSlug)}`,
+        changefreq: "weekly" as const,
+        priority: 0.6,
+        lastmod: today,
+      };
+    });
 
   const allEntries = [...staticRoutes, ...blogEntries];
 

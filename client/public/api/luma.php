@@ -7,33 +7,92 @@ $allowed_origins = [
     "https://www.nairobidevops.org",
 ];
 
-$origin = $_SERVER["HTTP_ORIGIN"] ?? "";
-if (in_array($origin, $allowed_origins, true)) {
+// Determine the origin from both $_SERVER and headers for broad compatibility
+$headers = [];
+if (function_exists('getallheaders')) {
+    $headers = getallheaders();
+} elseif (function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+}
+$headersLower = array_change_key_case($headers ?: [], CASE_LOWER);
+
+$origin = $_SERVER["HTTP_ORIGIN"] ?? ($headersLower['origin'] ?? "");
+$isTrustedOrigin = !empty($origin) && in_array($origin, $allowed_origins, true);
+
+if ($isTrustedOrigin) {
     header("Access-Control-Allow-Origin: " . $origin);
     header("Vary: Origin");
 }
 
+$allowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
+
 // Handle preflight requests
 if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "OPTIONS") {
-    header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization");
-    header("Access-Control-Max-Age: 86400"); // 24 hours
+    if ($isTrustedOrigin) {
+        header("Access-Control-Allow-Methods: " . implode(", ", $allowedMethods));
+        header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token");
+        header("Access-Control-Max-Age: 86400"); // 24 hours
+    }
     http_response_code(204);
     exit;
 }
 
-// 2. Prepare the destination URL
+// 2. Credentials (from .env.php generated at deploy time)
+$envFile = __DIR__ . '/.env.php';
+if (file_exists($envFile)) {
+    require_once $envFile;
+}
+
+// 3. Authentication
+$authHeaderToken = $headersLower['x-proxy-token'] ?? '';
+
+// Handle "Bearer <token>" scheme if token is passed in X-Proxy-Token
+// This allows uniform handling if the client prefers Bearer format
+if (preg_match('/Bearer\s+(.*)$/i', $authHeaderToken, $matches)) {
+    $authHeaderToken = trim($matches[1]);
+}
+
+$expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
+
+// Validate existence of backend secret
+if (empty($expectedToken)) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Server authentication configuration missing']);
+    exit;
+}
+
+// Keep proxy auth on the server:
+// Allow requests without a token ONLY if they are from our trusted origin AND are AJAX.
+$isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
+$isAuthenticated = !empty($authHeaderToken) && hash_equals($expectedToken, $authHeaderToken);
+
+if (!$isAuthenticated && !($isTrustedOrigin && $isAjax)) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+// 4. Prepare the destination URL
 $base_url = 'https://api.luma.com';
 
 // Get the path after /api/luma
-$path = isset($_GET['path']) ? $_GET['path'] : '';
+$path = isset($_GET['path']) ? (string)$_GET['path'] : '';
 
-// Validate path to prevent traversal and SSRF
-if (!$path || preg_match('#(\\.\\.|//)#', $path) || !preg_match('#^[a-zA-Z0-9/_\\-\\.\?=&]+$#', $path)) {
+// Normalize + validate path to avoid absolute URLs / traversal
+$path = '/' . ltrim($path, '/');
+
+if (
+    $path === '/' ||
+    str_contains($path, '://') ||
+    str_starts_with($path, '//') ||
+    str_contains($path, '..') ||
+    !preg_match('#^/[a-zA-Z0-9/_\.\-\?=&]*$#', $path)
+) {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');
-    header('X-Content-Type-Options: nosniff');
-    echo json_encode(['error' => 'Invalid or missing path'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    echo json_encode(['error' => 'Invalid path']);
     exit;
 }
 
@@ -49,7 +108,6 @@ if ($queryString) {
 
 // 3. Forward the request
 $method = $_SERVER['REQUEST_METHOD'];
-$allowedMethods = ['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'];
 if (!in_array($method, $allowedMethods, true)) {
     http_response_code(405);
     header('Allow: ' . implode(', ', $allowedMethods));
@@ -84,9 +142,9 @@ function sanitizeHeader($value) {
 
 // Forward selected headers (Authorization, Content-Type)
 $forwardHeaders = [];
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-if ($authHeader) {
-    $forwardHeaders[] = 'Authorization: ' . sanitizeHeader($authHeader);
+$forwardAuthHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+if ($forwardAuthHeader) {
+    $forwardHeaders[] = 'Authorization: ' . sanitizeHeader($forwardAuthHeader);
 }
 if (isset($_SERVER['CONTENT_TYPE'])) {
     $forwardHeaders[] = 'Content-Type: ' . sanitizeHeader($_SERVER['CONTENT_TYPE']);

@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main # Set this to your default branch (master or main)
+      - main
     paths:
       - "client/src/**"
       - "client/public/**"
@@ -38,20 +38,41 @@ jobs:
           node-version: 20
 
       # 3. Install dependencies and Build
+      #
+      # Vite automatically copies everything in client/public/ into dist/ verbatim.
+      # This means these files land in dist/ as part of the build — no separate
+      # upload step needed for them:
+      #   client/public/api/imagesCloudinary.php  →  dist/api/imagesCloudinary.php
+      #   client/public/api/luma.php              →  dist/api/luma.php
+      #   client/public/.htaccess                 →  dist/.htaccess
+      #   client/public/analytics.js              →  dist/analytics.js
+      #   client/public/robots.txt                →  dist/robots.txt
+      #
       - name: Install and Build
         run: |
           npm ci
-          npm run security:generate
           npm run build
           # Validate build output
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
             echo "Error: dist/ directory is missing or empty"
             exit 1
           fi
+          # Confirm PHP proxy files made it into the build.
+          # Catches accidental removal or path renames before they reach production.
+          if [ ! -f "dist/api/imagesCloudinary.php" ]; then
+            echo "Error: dist/api/imagesCloudinary.php is missing from build output"
+            exit 1
+          fi
+          if [ ! -f "dist/api/luma.php" ]; then
+            echo "Error: dist/api/luma.php is missing from build output"
+            exit 1
+          fi
 
-      # 4. Validate Sitemap & Robots.txt
-      - name: Validate Sitemap & Robots.txt
-        run: npm run sitemap:validate
+      # 4. Generate and Validate Sitemap & Robots.txt
+      - name: Generate and Validate Sitemap & Robots.txt
+        run: |
+          npm run sitemap:generate
+          npm run sitemap:validate
 
       # 5. Upload Build Artifact
       - name: Upload Build Artifact
@@ -60,7 +81,7 @@ jobs:
           name: dist
           path: dist
           retention-days: 1
-          include-hidden-files: true
+          include-hidden-files: true # Required — ensures .htaccess is included in artifact
 
   deploy:
     needs: build
@@ -100,16 +121,29 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
-            mkdir -p "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}"
+            # Create the release dir and api/ subfolder upfront.
+            # The tarball extraction (step 6) will also create api/ — this is
+            # a safety measure to guarantee it exists before the inject step.
+            mkdir -p "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/api"
 
       # 5. Package and Sync to Release
       - name: Package and Sync to Release
         run: |
-          # Create a tarball of the dist directory to preserve all files (including .htaccess)
+          # Tarball the full dist/ output.
+          # Already contains (copied by Vite from client/public/):
+          #   ./index.html
+          #   ./assets/
+          #   ./.htaccess                     ← SPA routing rules
+          #   ./api/imagesCloudinary.php      ← Cloudinary proxy (no secrets)
+          #   ./api/luma.php                  ← Luma proxy (no secrets)
+          #   ./analytics.js
+          #   ./robots.txt
           tar -czf release.tar.gz -C dist .
 
-          # Upload the tarball using scp
-          scp -P ${{ secrets.REMOTE_PORT || 22 }} -o StrictHostKeyChecking=yes release.tar.gz ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/
+          scp -P ${{ secrets.REMOTE_PORT || 22 }} \
+            -o StrictHostKeyChecking=yes \
+            release.tar.gz \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/
 
       # 6. Extract Release on Server
       - name: Extract Release on Server
@@ -124,7 +158,98 @@ jobs:
             tar -xzf release.tar.gz
             rm release.tar.gz
 
-      # 7. Atomically Switch Symlink
+      # 7. Inject Cloudinary Credentials onto Server
+      #
+      # WHY: Both imagesCloudinary.php and luma.php need Cloudinary credentials
+      # to sign API requests. Credentials must never be in the repo or dist/.
+      #
+      # HOW: A PHP constants file (.env.php) is written directly onto the server
+      # via SSH using the four values stored in GitHub Secrets:
+      #   CLD_CLOUD_NAME, CLD_API_KEY, CLD_API_SECRET, PROXY_API_TOKEN
+      #
+      # The file:
+      #   - Lives at api/.env.php alongside both PHP proxy files
+      #   - Is NEVER in the repo or in dist/ — server only
+      #   - Is recreated fresh on every deploy (credential rotation = update secret + redeploy)
+      #   - Is chmod 600 so only the server process owner can read it
+      #   - Is blocked from HTTP access by the <Files> rule in api/.htaccess
+      #
+      # Both PHP files load it with: require_once __DIR__ . '/.env.php';
+      - name: Inject Cloudinary Credentials onto Server
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          CLD_CLOUD_NAME: ${{ secrets.CLD_CLOUD_NAME }}
+          CLD_API_KEY: ${{ secrets.CLD_API_KEY }}
+          CLD_API_SECRET: ${{ secrets.CLD_API_SECRET }}
+          PROXY_API_TOKEN: ${{ secrets.PROXY_API_TOKEN }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: CLD_CLOUD_NAME,CLD_API_KEY,CLD_API_SECRET,PROXY_API_TOKEN
+          script: |
+            set -euo pipefail
+
+            ENV_FILE="/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/api/.env.php"
+
+            # Step 0: Validate secrets for control characters, newlines, or null bytes
+            # Guard against injection that could break the PHP syntax or bypass security.
+            for var in CLD_CLOUD_NAME CLD_API_KEY CLD_API_SECRET PROXY_API_TOKEN; do
+              val="${!var}"
+              if [[ -z "${val}" || "${val}" =~ [$'\n'$'\r'$'\0'] ]]; then
+                echo "❌ ERROR: Secret $var is empty or contains forbidden control characters — aborting deploy"
+                exit 1
+              fi
+            done
+
+            # Step A: Properly escape only PHP single-quote content (escape \ and ') before writing
+            SAFE_CLOUD_NAME="${CLD_CLOUD_NAME//\\/\\\\}"
+            SAFE_CLOUD_NAME="${SAFE_CLOUD_NAME//\'/\\\'}"
+
+            SAFE_API_KEY="${CLD_API_KEY//\\/\\\\}"
+            SAFE_API_KEY="${SAFE_API_KEY//\'/\\\'}"
+
+            SAFE_API_SECRET="${CLD_API_SECRET//\\/\\\\}"
+            SAFE_API_SECRET="${SAFE_API_SECRET//\'/\\\'}"
+
+            SAFE_PROXY_TOKEN="${PROXY_API_TOKEN//\\/\\\\}"
+            SAFE_PROXY_TOKEN="${SAFE_PROXY_TOKEN//\'/\\\'}"
+
+            # Step B: Generate the file atomically with a single write that inserts the four secrets
+            cat > "$ENV_FILE" <<-EOF
+            <?php
+            // ---------------------------------------------------------------
+            // Auto-generated by GitHub Actions at deploy time.
+            // DO NOT edit manually — overwritten on every deploy.
+            // To update credentials: change the GitHub Secret → redeploy.
+            // ---------------------------------------------------------------
+            define('CLD_CLOUD_NAME', '${SAFE_CLOUD_NAME}');
+            define('CLD_API_KEY',    '${SAFE_API_KEY}');
+            define('CLD_API_SECRET', '${SAFE_API_SECRET}');
+            define('PROXY_API_TOKEN', '${SAFE_PROXY_TOKEN}');
+            EOF
+
+            # Step C: Lock down file permissions.
+            # 600 = owner read+write only. No group. No world.
+            chmod 600 "$ENV_FILE"
+
+            # Step D: Confirm file exists (no secret values logged).
+            if [ -f "$ENV_FILE" ]; then
+              echo "✅ .env.php written and secured at api/.env.php"
+            else
+              echo "❌ ERROR: .env.php was not created — aborting deploy"
+              exit 1
+            fi
+
+            # Step E: Validation to ensure no placeholder tokens remain
+            if grep -q "PLACEHOLDER_" "$ENV_FILE"; then
+              echo "❌ ERROR: Placeholder values remain in .env.php — aborting deploy"
+              grep -oE "PLACEHOLDER_[A-Z_]+" "$ENV_FILE" | uniq
+              exit 1
+            fi
+
+      # 8. Atomically Switch Symlink
       - name: Atomically Switch Symlink
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
@@ -142,11 +267,11 @@ jobs:
 
             echo "Deploying release: ${{ steps.timestamp.outputs.timestamp }}"
 
-            # 1. Safety Check: If target is a directory and not a link, abort with instructions
-            if [ -d "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
-              echo "CRITICAL ERROR: $TARGET_LINK is a physical directory."
+            # 1. Safety Check: If target exists and is not a symlink, abort
+            if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
+              echo "CRITICAL ERROR: $TARGET_LINK exists and is not a symbolic link."
               echo "Atomic deployment requires this path to be a symbolic link."
-              echo "Please manually rename the existing directory: mv $TARGET_LINK ${TARGET_LINK}_old"
+              echo "Please manually rename or remove the existing entry: mv $TARGET_LINK ${TARGET_LINK}_old"
               exit 1
             fi
 
@@ -159,7 +284,7 @@ jobs:
             cd "/home/${{ secrets.REMOTE_USER }}/releases"
             ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
 
-            echo "Deployment successful."
+            echo "✅ Deployment successful."
 
   notify:
     needs: [build, deploy]

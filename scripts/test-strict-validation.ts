@@ -12,11 +12,14 @@ const robotsPath = path.join(ROOT_DIR, "dist", "robots.txt");
 const backupPath = path.join(ROOT_DIR, "dist", "sitemap.xml.bak");
 const robotsBackupPath = path.join(ROOT_DIR, "dist", "robots.txt.bak");
 
-if (!fs.existsSync(path.join(ROOT_DIR, "dist"))) {
-  fs.mkdirSync(path.join(ROOT_DIR, "dist"), { recursive: true });
+const distDir = path.join(ROOT_DIR, "dist");
+const distCreated = !fs.existsSync(distDir);
+if (distCreated) {
+  fs.mkdirSync(distDir, { recursive: true });
 }
 
-if (!fs.existsSync(sitemapPath)) {
+const sitemapExistsInitial = fs.existsSync(sitemapPath);
+if (!sitemapExistsInitial) {
   console.warn("⚠ dist/sitemap.xml not found - creating minimal fixture");
   const minimalSitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -84,9 +87,25 @@ try {
 
 } finally {
   // Restore
-  if (fs.existsSync(backupPath)) {
-    fs.copyFileSync(backupPath, sitemapPath);
-    fs.unlinkSync(backupPath);
+  if (sitemapExistsInitial) {
+    if (fs.existsSync(backupPath)) {
+      fs.copyFileSync(backupPath, sitemapPath);
+      fs.unlinkSync(backupPath);
+    }
+  } else if (fs.existsSync(sitemapPath)) {
+    // If it didn't exist initially, remove any temporary sitemap created during the test
+    fs.unlinkSync(sitemapPath);
+    if (fs.existsSync(backupPath)) {
+      fs.unlinkSync(backupPath);
+    }
+  }
+
+  // Final cleanup: if we created dist/, remove it if it's empty
+  if (distCreated && fs.existsSync(distDir)) {
+    const files = fs.readdirSync(distDir);
+    if (files.length === 0) {
+      fs.rmdirSync(distDir);
+    }
   }
 }
 

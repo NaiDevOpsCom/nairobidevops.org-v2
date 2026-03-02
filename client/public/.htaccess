@@ -101,6 +101,9 @@ Options -MultiViews
   RewriteRule ^/?api/luma/(.*)$ /api/luma.php?path=$1 [QSA,L]
 
   # SPA Routing - Fallback to index.html if file/folder/link doesn't exist
+  # Bypass SPA routing for /api/ requests (allow 404/405 from PHP instead of rewriting to index.html)
+  RewriteRule ^/?api/ - [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-l

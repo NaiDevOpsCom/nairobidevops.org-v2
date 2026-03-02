@@ -60,8 +60,11 @@ export default function Navbar() {
         }
         setCurrentLocation(window.location.pathname + href);
       }
+    } else if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href)) {
+      // handle mailto:, tel:, ftp:, etc.
+      window.location.assign(href);
     }
-    // mailto:, tel:, etc. are ignored or handled by default browser behavior if needed,
+    // fallthrough handled by default browser behavior if needed,
     // but here we just no-op to prevent querySelector crashes.
 
     setIsOpen(false);

@@ -101,6 +101,11 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api\/luma/, ""),
           secure: true,
         },
+        "/api": {
+          target: "https://nairobidevops.org",
+          changeOrigin: true,
+          secure: true,
+        },
       },
     },
   };
