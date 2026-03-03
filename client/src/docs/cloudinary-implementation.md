@@ -12,10 +12,10 @@ The Cloudinary integration uses a hardened proxy layer to securely interact with
 
 - **File**: `client/public/api/imagesCloudinary.php`
 - **Security Logic**:
-    - **Shared Config**: Use `config-loader.php` to load credentials from `~/config/secrets.env.php`.
-    - **Utilities**: Use `security-utils.php` for origin validation and rate limiting.
-    - **IP-Based Rate Limiting**: Prevents brute-force probing of Cloudinary folders.
-    - **Disk Caching**: Responses are cached in `~/cache/api_responses/` to reduce upstream load and stay within API limits.
+  - **Shared Config**: Use `config-loader.php` to load credentials from `~/config/secrets.env.php`.
+  - **Utilities**: Use `security-utils.php` for origin validation and rate limiting.
+  - **IP-Based Rate Limiting**: Prevents brute-force probing of Cloudinary folders.
+  - **Disk Caching**: Responses are cached in `~/cache/api_responses/` to reduce upstream load and stay within API limits.
 - **Authentication**: Requires a valid `X-Proxy-Token` or a trusted AJAX request from the primary domain.
 
 ### 2. Deployment & Secret Management
@@ -23,6 +23,7 @@ The Cloudinary integration uses a hardened proxy layer to securely interact with
 Secrets are managed centrally via GitHub Secrets and injected into a shared directory on the server during deployment.
 
 **Secrets Injected:**
+
 - `CLD_CLOUD_NAME`
 - `CLD_API_KEY`
 - `CLD_API_SECRET`

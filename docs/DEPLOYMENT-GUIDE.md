@@ -136,12 +136,14 @@ Options -MultiViews
 The project uses a hardened GitHub Actions workflow for atomic, symlink-based releases with secure, shared secret management.
 
 **Key Security Features:**
+
 - **Shared Secret Store**: Secrets are injected into `/home/user/config/secrets.env.php` (outside `public_html`).
 - **Zero-Downtime Rotation**: Supports multiple valid tokens via JSON array in `PROXY_API_TOKEN`.
 - **Atomic Releases**: Uses symlink switching (`ln -sfn` + `mv -Tf`) for zero downtime.
 - **Permissions**: Directories are `700` and config files are `600`.
 
 **Injection Logic (GHA):**
+
 ```bash
 # Workflow creates ~/config/ if missing
 mkdir -p "$CONFIG_DIR"
