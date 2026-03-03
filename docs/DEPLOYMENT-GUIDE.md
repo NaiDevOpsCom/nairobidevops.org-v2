@@ -129,179 +129,51 @@ Options -MultiViews
 </IfModule>
 ```
 
-## API Implementation
-
-### Luma Calendar API Proxy
-
-**PHP Proxy:** `api/luma.php`
-
-```php
-<?php
-// Security headers and validation
-$base_url = 'https://api.luma.com';
-$path = isset($_GET['path']) ? $_GET['path'] : '';
-
-// Path validation (prevents SSRF)
-if (!$path || preg_match('#(\\.\\.|//)#', $path) || !preg_match('#^[a-zA-Z0-9/_\\-\\.\?=&]+$#', $path)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid or missing path']);
-    exit;
-}
-
-// Build target URL and proxy request
-$target_url = $base_url . '/' . ltrim($path, '/');
-$ch = curl_init($target_url);
-// ... curl configuration and response handling
-?>
-```
-
-### Frontend API Calls
-
-**TypeScript:** `src/lib/lumaCalendar.ts`
-
-```typescript
-const LUMA_CALENDAR_URL = "/api/luma/ics/get";
-
-export async function fetchLumaEvents(): Promise<LumaEvent[]> {
-  let response: Response;
-
-  try {
-    // Try proxied endpoint (works on both platforms)
-    response = await fetch(LUMA_CALENDAR_URL);
-    if (!response.ok) {
-      throw new Error(`Proxied fetch failed: ${response.status}`);
-    }
-  } catch (error) {
-    // Fallback to direct Luma API
-    console.warn("Attempting direct fetch fallback...", error);
-    const directUrl = `https://api.luma.com/ics/get?entity=calendar&id=cal-fFX28aaHRNQkThJ`;
-    response = await fetch(directUrl);
-    if (!response.ok) {
-      throw new Error(`Direct fetch failed: ${response.statusText}`);
-    }
-  }
-
-  // ... parse ICS data and return events
-}
-```
-
-## Deployment Workflow
-
-### Branch Strategy
-
-```
-main → Production (cPanel)
-  ↓
-pre-dev → Staging (Vercel)
-  ↓
-feature/* → Development
-```
-
-### Vercel Deployment (Staging)
-
-1. **Push to pre-dev branch**
-
-   ```bash
-   git checkout pre-dev
-   git add .
-   git commit -m "feat: new feature"
-   git push origin pre-dev
-   ```
-
-2. **Automatic Deployment**
-   - Vercel detects push
-   - Runs `npm run build:staging`
-   - Deploys to staging URL
-   - Provides preview URL
-
-3. **Verification**
-   - Visit staging URL
-   - Test all functionality
-   - Check API endpoints
-
-### cPanel Deployment (Production)
-
-#### Method 1: Manual Upload
-
-1. **Build Production**
-
-   ```bash
-   git checkout main
-   git pull origin main
-   npm run build:prod
-   ```
-
-2. **Upload via cPanel File Manager**
-   - Navigate to `public_html/`
-   - Backup existing files
-   - Upload `dist/` contents
-   - Extract if uploaded as ZIP
-
-3. **Set Permissions**
-
-   ```
-   chmod 755 public_html/api/
-   chmod 644 public_html/api/luma.php
-   chmod 644 public_html/.htaccess
-   ```
-
-4. **Verify Deployment**
-   ```bash
-   # Test API endpoint
-   curl "https://nairobidevops.org/api/luma/ics/get?entity=calendar&id=cal-fFX28aaHRNQkThJ"
-   ```
-
 #### Method 2: Automated Deployment (GitHub Actions)
 
 **Workflow:** `.github/workflows/deploy.yml`
 
-```yaml
-name: Deploy to cPanel
+The project uses a hardened GitHub Actions workflow for atomic, symlink-based releases with secure, shared secret management.
 
-on:
-  push:
-    branches: [main]
+**Key Security Features:**
+- **Shared Secret Store**: Secrets are injected into `/home/user/config/secrets.env.php` (outside `public_html`).
+- **Zero-Downtime Rotation**: Supports multiple valid tokens via JSON array in `PROXY_API_TOKEN`.
+- **Atomic Releases**: Uses symlink switching (`ln -sfn` + `mv -Tf`) for zero downtime.
+- **Permissions**: Directories are `700` and config files are `600`.
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+**Injection Logic (GHA):**
+```bash
+# Workflow creates ~/config/ if missing
+mkdir -p "$CONFIG_DIR"
+chmod 700 "$CONFIG_DIR"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build production
-        run: npm run build:prod
-
-      - name: Deploy to cPanel
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /home/${{ secrets.USERNAME }}/public_html
-            rm -rf dist_backup
-            mv dist dist_backup || true
-            exit
-
-      - name: Upload files
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "dist/*"
-          target: "/home/${{ secrets.USERNAME }}/public_html/"
-          strip_components: 1
+# Secrets are escaped and written atomically to secrets.env.php
+cat > "${ENV_FILE}.tmp" <<-EOF
+<?php
+define('CLD_CLOUD_NAME', '${SAFE_CLOUD_NAME}');
+define('CLD_API_KEY',    '${SAFE_API_KEY}');
+define('CLD_API_SECRET', '${SAFE_API_SECRET}');
+define('PROXY_API_TOKEN', '${SAFE_PROXY_TOKEN}');
+EOF
+chmod 600 "${ENV_FILE}.tmp"
+mv "${ENV_FILE}.tmp" "$ENV_FILE"
 ```
+
+### API Implementation
+
+### Hardened Proxy Architecture
+
+Both `api/luma.php` and `api/imagesCloudinary.php` utilize a common security layer:
+
+1. **config-loader.php**: Locates the shared `secrets.env.php` outside the web root.
+2. **security-utils.php**: Provides centralized logic for:
+   - **IP-based Rate Limiting**: Prevents abuse with file-based tracking in `~/cache/rate_limits/`.
+   - **Origin/Referer Validation**: Strict whitelist checking against production domains.
+   - **Token Validation**: Supports single string or rotated token arrays.
+3. **Caching**: Response caching in `~/cache/api_responses/` with configurable TTL and atomic writes.
+
+**Frontend API Calls:**
+Proxied calls should include the `X-Proxy-Token` header for authentication when not from a trusted AJAX context.
 
 ## Security Configuration
 
