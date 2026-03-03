@@ -1,4 +1,4 @@
-export type CloudinaryFolder = "ndcCampusTour" | "ndcPartners" | "community";
+export type CloudinaryFolder = "ndcCampusTour" | "ndcPartners";
 
 export interface CloudinaryResource {
   publicId: string;

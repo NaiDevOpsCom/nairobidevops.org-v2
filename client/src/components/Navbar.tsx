@@ -60,8 +60,8 @@ export default function Navbar() {
         }
         setCurrentLocation(window.location.pathname + href);
       }
-    } else if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href)) {
-      // handle mailto:, tel:, ftp:, etc.
+    } else if (/^(mailto|tel):/i.test(href)) {
+      // handle mailto:, tel: specifically to avoid dangerous schemes like javascript:
       window.location.assign(href);
     }
     // fallthrough handled by default browser behavior if needed,

@@ -16,16 +16,18 @@ $allowedOrigins = [
 ];
 
 $validOrigin = SecurityUtils::validateOrigin($allowedOrigins);
-if ($validOrigin !== null) {
+if (!empty($validOrigin)) {
     header('Access-Control-Allow-Origin: ' . $validOrigin);
     header('Vary: Origin');
 }
 
 // 2. Preflight Handling
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$allowedMethods = ["GET", "POST", "OPTIONS"];
+
 if ($method === 'OPTIONS') {
-    if ($validOrigin !== null) {
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    if (!empty($validOrigin)) {
+        header('Access-Control-Allow-Methods: GET, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token');
         header('Access-Control-Max-Age: 86400');
     }
@@ -33,11 +35,19 @@ if ($method === 'OPTIONS') {
     exit;
 }
 
+// 2.1 Hardened Method Allowlist
+if (!in_array($method, $allowedMethods, true)) {
+    http_response_code(405);
+    header('Allow: ' . implode(', ', $allowedMethods));
+    echo json_encode(['error' => 'Method Not Allowed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    exit;
+}
+
 // 3. Rate Limiting
 $cacheRootDir = dirname(__DIR__, 3) . '/cache';
 if (!SecurityUtils::checkRateLimit($cacheRootDir . '/rate_limits', 30, 60)) {
     http_response_code(429);
-    echo json_encode(['error' => 'Too Many Requests']);
+    echo json_encode(['error' => 'Too Many Requests'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -48,13 +58,13 @@ $nextCursor = isset($_GET['next_cursor']) ? trim($_GET['next_cursor']) : '';
 
 if (!in_array($folder, $allowedFolders, true)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Invalid folder']);
+    echo json_encode(['error' => 'Invalid folder'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
 if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=+]+$/', $nextCursor)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Invalid cursor']);
+    echo json_encode(['error' => 'Invalid cursor'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -71,9 +81,9 @@ $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_AP
 $isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
 $isAuthenticated = SecurityUtils::validateToken($authHeaderToken, $expectedToken);
 
-if (!$isAuthenticated && !($validOrigin && $isAjax)) {
+if (!$isAuthenticated && !( !empty($validOrigin) && $isAjax)) {
     http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
+    echo json_encode(['error' => 'Unauthorized'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -98,7 +108,7 @@ $apiSecret = defined('CLD_API_SECRET') ? CLD_API_SECRET : getenv('CLD_API_SECRET
 
 if (!$cloudName || !$apiKey || !$apiSecret) {
     http_response_code(500);
-    echo json_encode(['error' => 'Server configuration error']);
+    echo json_encode(['error' => 'Server configuration error'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -124,7 +134,7 @@ curl_close($ch);
 
 if ($response === false || $http_code !== 200) {
     http_response_code(502);
-    echo json_encode(['error' => 'Upstream error']);
+    echo json_encode(['error' => 'Upstream error'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -132,7 +142,7 @@ if ($response === false || $http_code !== 200) {
 $data = json_decode($response, true);
 if (!$data || !isset($data['resources'])) {
     http_response_code(502);
-    echo json_encode(['error' => 'Invalid upstream response']);
+    echo json_encode(['error' => 'Invalid upstream response'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -155,10 +165,11 @@ $shaped = [
     'images'      => $shapedResources,
     'nextCursor'  => $data['next_cursor'] ?? null,
     'hasMore'     => !empty($data['next_cursor']),
-    'returned'    => count($shapedResources),
+    'total'       => count($shapedResources), // Align with TS CloudinaryResponse type
 ];
 
-$json = json_encode($shaped);
+// 8. Cache result and output with safety flags
+$json = json_encode($shaped, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 if ($method === 'GET') {
     if (!is_dir(dirname($cacheFile))) mkdir(dirname($cacheFile), 0700, true);
     file_put_contents($cacheFile . '.tmp', $json, LOCK_EX);

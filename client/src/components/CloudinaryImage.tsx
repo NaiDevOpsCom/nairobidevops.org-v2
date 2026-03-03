@@ -59,7 +59,7 @@ export function CloudinaryImage({ publicId, alt, className, width, height }: Clo
     // Return a placeholder or empty div if Cloudinary is misconfigured
     return (
       <div
-        className={`${className} bg-gray-200 animate-pulse rounded flex items-center justify-center`}
+        className={`${className || ""} bg-gray-200 animate-pulse rounded flex items-center justify-center`}
         style={{ width, height }}
       >
         <span className="text-gray-400 text-xs">Image unavailable</span>

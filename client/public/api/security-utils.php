@@ -23,21 +23,28 @@ class SecurityUtils {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? ($headersLower['origin'] ?? '');
         $referer = $_SERVER['HTTP_REFERER'] ?? ($headersLower['referer'] ?? '');
 
-        $isAllowedOrigin = !empty($origin) && in_array(rtrim($origin, '/'), $allowedOrigins, true);
+        // 1. Precise Origin check
+        if (!empty($origin)) {
+            $originTrimmed = rtrim($origin, '/');
+            foreach ($allowedOrigins as $allowed) {
+                if ($originTrimmed === rtrim($allowed, '/')) {
+                    return $allowed;
+                }
+            }
+        }
         
-        // If Origin is missing (some browsers/requests), check Referer
-        $isAllowedReferer = false;
+        // 2. Fallback to Referer check
         if (!empty($referer)) {
             foreach ($allowedOrigins as $allowed) {
-                if (str_starts_with($referer, $allowed)) {
-                    $isAllowedReferer = true;
-                    break;
+                if (strpos($referer, $allowed) === 0) {
+                    // Return the allowed origin that matched the referer
+                    // This ensures a valid Access-Control-Allow-Origin header is returned
+                    return $allowed;
                 }
             }
         }
 
-        // Return the origin to be used in CORS header if valid
-        return ($isAllowedOrigin || $isAllowedReferer) ? $origin : null;
+        return null;
     }
 
     /**
@@ -53,7 +60,10 @@ class SecurityUtils {
         }
 
         $fp = fopen($file, 'c+');
-        if (!$fp) return true; // Fail open if we can't write? Or fail closed? Let's fail open but log.
+        if (!$fp) {
+            error_log("Rate limiter: Failed to open $file for writing. Failing closed.");
+            return false;
+        }
 
         flock($fp, LOCK_EX);
         

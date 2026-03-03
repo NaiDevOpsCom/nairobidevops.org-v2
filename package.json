@@ -12,9 +12,9 @@
     "check": "npm run check:lint && npm run check:types && npm run check:format",
     "build": "npm run security:generate && npm run check && vite build --mode production && node scripts/setup-cpanel.js",
     "build:staging": "npm run security:generate && vite build --mode staging && node scripts/setup-cpanel.js",
-    "build:prod": "npm run security:generate && vite build --mode production && node scripts/setup-cpanel.js",
-    "build:ci": "npm run security:generate && vite build --mode production && node scripts/setup-cpanel.js",
-    "build:ci:staging": "npm run security:generate && vite build --mode staging && node scripts/setup-cpanel.js",
+    "build:prod": "npm run build",
+    "build:ci": "npm run build",
+    "build:ci:staging": "npm run build:staging",
     "preview": "vite preview",
     "test": "vitest run --root client",
     "test:watch": "vitest",
@@ -98,7 +98,7 @@
     "@tailwindcss/postcss": "^4.2.1",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.2.1",
-    "@types/node": "^25.3.3",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
@@ -129,5 +129,8 @@
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

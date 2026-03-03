@@ -9,6 +9,8 @@
 require_once __DIR__ . '/config-loader.php';
 require_once __DIR__ . '/security-utils.php';
 
+header('X-Content-Type-Options: nosniff');
+
 // 1. Strict Origin & Referer Validation
 $allowedOrigins = [
     'https://nairobidevops.org',
@@ -16,7 +18,7 @@ $allowedOrigins = [
 ];
 
 $validOrigin = SecurityUtils::validateOrigin($allowedOrigins);
-if ($validOrigin !== null) {
+if (!empty($validOrigin)) {
     header("Access-Control-Allow-Origin: $validOrigin");
     header("Vary: Origin");
 }
@@ -26,7 +28,7 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $allowedMethods = ["GET", "POST", "OPTIONS", "HEAD"];
 
 if ($method === 'OPTIONS') {
-    if ($validOrigin !== null) {
+    if (!empty($validOrigin)) {
         header("Access-Control-Allow-Methods: " . implode(", ", $allowedMethods));
         header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token");
         header("Access-Control-Max-Age: 86400");
@@ -40,7 +42,7 @@ $cacheRootDir = dirname(__DIR__, 3) . '/cache'; // /home/user/cache
 if (!SecurityUtils::checkRateLimit($cacheRootDir . '/rate_limits', 30, 60)) {
     http_response_code(429);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Too Many Requests']);
+    echo json_encode(['error' => 'Too Many Requests'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -58,23 +60,32 @@ $isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttpreques
 $isAuthenticated = SecurityUtils::validateToken($authHeaderToken, $expectedToken);
 
 // Fix the 401: If not authenticated by token, allow ONLY if Trusted Origin + AJAX
-if (!$isAuthenticated && !($validOrigin && $isAjax)) {
+if (!$isAuthenticated && !( !empty($validOrigin) && $isAjax)) {
     http_response_code(401);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Unauthorized']);
+    echo json_encode(['error' => 'Unauthorized'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
-// 5. Build Target URL
+// 5. Hardened Method Allowlist
+if (!in_array($method, $allowedMethods, true)) {
+    http_response_code(405);
+    header('Allow: ' . implode(', ', $allowedMethods));
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Method Not Allowed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    exit;
+}
+
+// 6. Build Target URL
 $base_url = 'https://api.luma.com';
 $path = isset($_GET['path']) ? (string)$_GET['path'] : '';
 $path = '/' . ltrim($path, '/');
 
 // Validate path
-if ($path === '/' || !preg_match('#^/[a-zA-Z0-9/_\.\-\?=&]*$#', $path) || str_contains($path, '..')) {
+if ($path === '/' || !preg_match('#^/[a-zA-Z0-9/_\.\-\?=&]*$#', $path) || strpos($path, '..') !== false) {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Invalid path']);
+    echo json_encode(['error' => 'Invalid path'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
@@ -83,14 +94,17 @@ unset($queryParams['path']);
 $queryString = http_build_query($queryParams);
 $target_url = $base_url . $path . ($queryString ? '?' . $queryString : '');
 
-// 6. Caching (GET requests only)
+// 7. Caching (GET requests only)
 $cacheFile = $cacheRootDir . '/api_responses/luma_' . md5($target_url) . '.json';
 $cacheTTL = 300; // 5 minutes
 
 if ($method === 'GET' && file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
     $cachedData = file_get_contents($cacheFile);
+    $cacheMetaFile = $cacheFile . '.meta';
+    $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : 'application/json; charset=utf-8';
+    
     if ($cachedData) {
-        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Type: ' . $cachedContentType);
         header('X-Cache: HIT');
         echo $cachedData;
         exit;
@@ -125,7 +139,7 @@ $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 if (curl_errno($ch)) {
     http_response_code(500);
     error_log('Luma Proxy Error: ' . curl_error($ch));
-    echo json_encode(['error' => 'Upstream failed']);
+    echo json_encode(['error' => 'Upstream failed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     curl_close($ch);
     exit;
 }
@@ -141,6 +155,11 @@ if ($method === 'GET' && $http_code === 200) {
     // Atomic write
     file_put_contents($cacheFile . '.tmp', $response, LOCK_EX);
     rename($cacheFile . '.tmp', $cacheFile);
+    
+    // Cache Content-Type metadata
+    if ($contentType) {
+        file_put_contents($cacheFile . '.meta', $contentType);
+    }
 }
 
 if ($method !== 'HEAD') echo $response;

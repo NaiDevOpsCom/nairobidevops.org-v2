@@ -31,7 +31,7 @@ Secrets are managed centrally via GitHub Secrets and injected into a shared dire
 
 ## Validation
 
-- **CI Checks:** Validated correct frontend format formatting via `npm run check`.
+- **CI Checks:** Validated frontend formatting via `npm run check`.
 - **Build Verification:** Output compiled successfully via `npm run build` after modifications.
 - **Audit:** Verified that `imagesCloudinary.php` is using `Authorization: Basic` for Cloudinary Admin API.
 - **Security:** Confirmed `index.html` does not contain the `api-bearer-token` meta tag.
@@ -123,9 +123,9 @@ const { images, loading, error } = useCloudinaryFolder("yourNewFolderName");
 - Ensure the `api/imagesCloudinary.php` file is uploaded to the `public_html/api/` directory on the server.
 - The `.htaccess` file includes rules to protect the `api` directory from direct browsing.
 
-### `.htaccess` Security Configuration
+### `.htaccess` Security Configuration (Example)
 
-To explicitly secure the `public_html/api/` directory so requests are correctly routed and restricted, you can place an `.htaccess` file inside `public_html/api/` with the following configuration:
+To explicitly secure the `public_html/api/` directory while allowing legitimate frontend requests, you can place an `.htaccess` file inside `public_html/api/` with the following configuration. Note that this example checks for common proxy headers, but **actual token validation must still occur in the PHP code**.
 
 ```apache
 # Disable directory browsing
@@ -136,16 +136,18 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Restrict direct access to PHP files by requiring an Authorization header
+# Restrict direct access to PHP files by requiring standard headers
 <FilesMatch "\.php$">
-    # NOTE: This only checks if the header EXISTS.
-    # Actual token verification must be done securely within the PHP scripts using environment variables.
+    # Allow if standard proxy headers are present (X-Proxy-Token or X-Requested-With)
+    SetEnvIf X-Proxy-Token "^.+$" ALLOW_PROXY
+    SetEnvIf X-Requested-With "^XMLHttpRequest$" ALLOW_AJAX
+    SetEnvIf Authorization "^(Bearer .*)$" ALLOW_AUTH
 
-    # Example: Require the Authorization header to be present
-    SetEnvIf Authorization "^(Bearer .*)$" HAS_AUTH
-    Require env HAS_AUTH
-
-    # Or, if configuring IP whitelisting:
-    # Require ip 192.168.1.100
+    # Combine logical OR for header presence
+    Order Deny,Allow
+    Deny from all
+    Allow from env ALLOW_PROXY
+    Allow from env ALLOW_AJAX
+    Allow from env ALLOW_AUTH
 </FilesMatch>
 ```

@@ -192,8 +192,8 @@ jobs:
             # Step 0: Validate secrets
             for var in CLD_CLOUD_NAME CLD_API_KEY CLD_API_SECRET PROXY_API_TOKEN; do
               val="${!var}"
-              if [[ -z "${val}" || "${val}" =~ [$'\r'$'\0'] ]]; then
-                echo "❌ ERROR: Secret $var is empty or contains forbidden control characters — aborting deploy"
+              if [[ -z "${val}" || "${val}" =~ [$'\n'$'\r'$'\0'] ]]; then
+                echo "❌ ERROR: Secret $var is empty or contains forbidden control characters (LF, CR, NULL) — aborting deploy"
                 exit 1
               fi
             done

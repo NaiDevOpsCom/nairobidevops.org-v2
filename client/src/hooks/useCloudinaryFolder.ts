@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 import { CloudinaryFolder, CloudinaryResource, CloudinaryResponse } from "../types/cloudinary";
 
@@ -9,11 +9,15 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
+  const inFlightCursor = useRef<string | null | undefined>(null);
+  const loadMoreController = useRef<AbortController | null>(null);
 
   const fetchImages = useCallback(
     async (cursor?: string, signal?: AbortSignal) => {
       try {
         if (cursor) {
+          if (inFlightCursor.current === cursor) return;
+          inFlightCursor.current = cursor;
           setLoadingMore(true);
         } else {
           setLoading(true);
@@ -64,6 +68,9 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         if (!signal?.aborted) {
           setLoading(false);
           setLoadingMore(false);
+          if (cursor === inFlightCursor.current) {
+            inFlightCursor.current = null;
+          }
         }
       }
     },
@@ -82,17 +89,22 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
     fetchImages(undefined, controller.signal);
     return () => {
       controller.abort();
+      loadMoreController.current?.abort();
     };
   }, [fetchImages, folder]);
 
   const loadMore = useCallback(() => {
     if (nextCursor && !loadingMore) {
-      fetchImages(nextCursor);
+      loadMoreController.current?.abort();
+      loadMoreController.current = new AbortController();
+      fetchImages(nextCursor, loadMoreController.current.signal);
     }
   }, [nextCursor, loadingMore, fetchImages]);
 
   const retry = useCallback(() => {
-    fetchImages();
+    loadMoreController.current?.abort();
+    loadMoreController.current = new AbortController();
+    fetchImages(undefined, loadMoreController.current.signal);
   }, [fetchImages]);
 
   return {
