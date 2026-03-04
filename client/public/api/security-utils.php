@@ -5,6 +5,39 @@
 
 class SecurityUtils {
     /**
+     * Normalize an origin string to strict scheme://host[:port] form.
+     * Returns null for invalid/unsupported origins.
+     */
+    private static function normalizeOrigin($origin) {
+        if (!is_string($origin) || trim($origin) === '') {
+            return null;
+        }
+
+        $parts = parse_url(trim($origin));
+        if (!$parts || !isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $host = strtolower($parts['host']);
+        $normalized = $scheme . '://' . $host;
+
+        if (isset($parts['port'])) {
+            $port = (int)$parts['port'];
+            $isDefaultPort = ($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443);
+            if (!$isDefaultPort) {
+                $normalized .= ':' . $port;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
      * Get real IP, resistant to spoofing if we know we are behind a trusted proxy.
      * In a standard cPanel environment, REMOTE_ADDR is usually the most reliable
      * unless a specific proxy (like Cloudflare) is used and configured.
@@ -22,36 +55,30 @@ class SecurityUtils {
         
         $origin = $_SERVER['HTTP_ORIGIN'] ?? ($headersLower['origin'] ?? '');
         $referer = $_SERVER['HTTP_REFERER'] ?? ($headersLower['referer'] ?? '');
+        $normalizedAllowedOrigins = [];
+        foreach ($allowedOrigins as $allowed) {
+            $normalized = self::normalizeOrigin($allowed);
+            if ($normalized !== null) {
+                if (isset($normalizedAllowedOrigins[$normalized])) {
+                    error_log("SecurityUtils::normalizeOrigin: Duplicate normalized origin detected. '$allowed' and '{$normalizedAllowedOrigins[$normalized]}' both normalize to '$normalized'. Using the latter.");
+                }
+                $normalizedAllowedOrigins[$normalized] = rtrim($allowed, '/');
+            }
+        }
 
         // 1. Precise Origin check
         if (!empty($origin)) {
-            $originTrimmed = rtrim($origin, '/');
-            foreach ($allowedOrigins as $allowed) {
-                if ($originTrimmed === rtrim($allowed, '/')) {
-                    return $allowed;
-                }
+            $normalizedOrigin = self::normalizeOrigin($origin);
+            if ($normalizedOrigin !== null && isset($normalizedAllowedOrigins[$normalizedOrigin])) {
+                return $normalizedAllowedOrigins[$normalizedOrigin];
             }
         }
         
-        // 2. Fallback to Referer check
+        // 2. Fallback to Referer origin check
         if (!empty($referer)) {
-            $refererParts = parse_url($referer);
-            if ($refererParts && isset($refererParts['scheme'], $refererParts['host'])) {
-                $refererOrigin = $refererParts['scheme'] . '://' . $refererParts['host'];
-                if (isset($refererParts['port'])) {
-                    // Normalize: only append port if it's not the default for the scheme
-                    $port = (int)$refererParts['port'];
-                    if (($refererParts['scheme'] === 'http' && $port !== 80) || 
-                        ($refererParts['scheme'] === 'https' && $port !== 443)) {
-                        $refererOrigin .= ':' . $port;
-                    }
-                }
-
-                foreach ($allowedOrigins as $allowed) {
-                    if (rtrim($refererOrigin, '/') === rtrim($allowed, '/')) {
-                        return $allowed;
-                    }
-                }
+            $normalizedRefererOrigin = self::normalizeOrigin($referer);
+            if ($normalizedRefererOrigin !== null && isset($normalizedAllowedOrigins[$normalizedRefererOrigin])) {
+                return $normalizedAllowedOrigins[$normalizedRefererOrigin];
             }
         }
 

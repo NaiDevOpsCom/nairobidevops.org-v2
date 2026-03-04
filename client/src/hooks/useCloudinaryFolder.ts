@@ -52,8 +52,6 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
 
         const data: CloudinaryResponse = await response.json();
 
-        if (signal?.aborted) return;
-
         const fetchedResources = data?.images ?? [];
 
         setImages((prev) => (cursor ? [...prev, ...fetchedResources] : fetchedResources));
@@ -61,19 +59,19 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         setHasMore(data.hasMore);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
-          if (cursor === inFlightCursor.current) {
-            inFlightCursor.current = null;
-          }
-          return;
+          // Silent for normal control flow
+        } else {
+          setError(err instanceof Error ? err.message : "An unknown error occurred");
         }
-        setError(err instanceof Error ? err.message : "An unknown error occurred");
       } finally {
-        if (!signal?.aborted) {
-          setLoading(false);
+        if (cursor) {
           setLoadingMore(false);
+          // Only clear if the cursor we started with is still the one in flight
           if (cursor === inFlightCursor.current) {
             inFlightCursor.current = null;
           }
+        } else {
+          setLoading(false);
         }
       }
     },
