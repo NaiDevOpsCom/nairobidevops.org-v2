@@ -27,7 +27,7 @@ $allowedMethods = ["GET", "POST", "OPTIONS"];
 
 if ($method === 'OPTIONS') {
     if (!empty($validOrigin)) {
-        header('Access-Control-Allow-Methods: GET, OPTIONS');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token');
         header('Access-Control-Max-Age: 86400');
     }

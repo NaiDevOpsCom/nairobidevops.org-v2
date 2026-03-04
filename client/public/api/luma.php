@@ -95,7 +95,9 @@ $queryString = http_build_query($queryParams);
 $target_url = $base_url . $path . ($queryString ? '?' . $queryString : '');
 
 // 7. Caching (GET requests only)
-$cacheFile = $cacheRootDir . '/api_responses/luma_' . md5($target_url) . '.json';
+$authContext = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$cacheKey = md5($target_url . '|' . $authContext);
+$cacheFile = $cacheRootDir . '/api_responses/luma_' . $cacheKey . '.json';
 $cacheTTL = 300; // 5 minutes
 
 if ($method === 'GET' && file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
@@ -139,6 +141,7 @@ $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 if (curl_errno($ch)) {
     http_response_code(500);
     error_log('Luma Proxy Error: ' . curl_error($ch));
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Upstream failed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     curl_close($ch);
     exit;

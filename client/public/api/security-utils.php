@@ -35,11 +35,22 @@ class SecurityUtils {
         
         // 2. Fallback to Referer check
         if (!empty($referer)) {
-            foreach ($allowedOrigins as $allowed) {
-                if (strpos($referer, $allowed) === 0) {
-                    // Return the allowed origin that matched the referer
-                    // This ensures a valid Access-Control-Allow-Origin header is returned
-                    return $allowed;
+            $refererParts = parse_url($referer);
+            if ($refererParts && isset($refererParts['scheme'], $refererParts['host'])) {
+                $refererOrigin = $refererParts['scheme'] . '://' . $refererParts['host'];
+                if (isset($refererParts['port'])) {
+                    // Normalize: only append port if it's not the default for the scheme
+                    $port = (int)$refererParts['port'];
+                    if (($refererParts['scheme'] === 'http' && $port !== 80) || 
+                        ($refererParts['scheme'] === 'https' && $port !== 443)) {
+                        $refererOrigin .= ':' . $port;
+                    }
+                }
+
+                foreach ($allowedOrigins as $allowed) {
+                    if (rtrim($refererOrigin, '/') === rtrim($allowed, '/')) {
+                        return $allowed;
+                    }
                 }
             }
         }
