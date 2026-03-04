@@ -61,9 +61,6 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
         setHasMore(data.hasMore);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
-          if (cursor === inFlightCursor.current) {
-            inFlightCursor.current = null;
-          }
           return;
         }
         setError(err instanceof Error ? err.message : "An unknown error occurred");
