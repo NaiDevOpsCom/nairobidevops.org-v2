@@ -39,7 +39,12 @@ class SecurityUtils {
             if ($refererParts && isset($refererParts['scheme'], $refererParts['host'])) {
                 $refererOrigin = $refererParts['scheme'] . '://' . $refererParts['host'];
                 if (isset($refererParts['port'])) {
-                    $refererOrigin .= ':' . $refererParts['port'];
+                    // Normalize: only append port if it's not the default for the scheme
+                    $port = (int)$refererParts['port'];
+                    if (($refererParts['scheme'] === 'http' && $port !== 80) || 
+                        ($refererParts['scheme'] === 'https' && $port !== 443)) {
+                        $refererOrigin .= ':' . $port;
+                    }
                 }
 
                 foreach ($allowedOrigins as $allowed) {

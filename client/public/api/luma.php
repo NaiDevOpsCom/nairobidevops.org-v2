@@ -60,7 +60,7 @@ $isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttpreques
 $isAuthenticated = SecurityUtils::validateToken($authHeaderToken, $expectedToken);
 
 // Fix the 401: If not authenticated by token, allow ONLY if Trusted Origin + AJAX
-if (!$isAuthenticated && !( empty($expectedToken) && !empty($validOrigin) && $isAjax)) {
+if (!$isAuthenticated && !( !empty($validOrigin) && $isAjax)) {
     http_response_code(401);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Unauthorized'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
