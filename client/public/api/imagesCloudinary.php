@@ -27,7 +27,7 @@ $allowedMethods = ["GET", "POST", "OPTIONS"];
 
 if ($method === 'OPTIONS') {
     if (!empty($validOrigin)) {
-        header('Access-Control-Allow-Methods: GET, OPTIONS');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token');
         header('Access-Control-Max-Age: 86400');
     }
@@ -81,7 +81,7 @@ $expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_AP
 $isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
 $isAuthenticated = SecurityUtils::validateToken($authHeaderToken, $expectedToken);
 
-if (!$isAuthenticated && !( !empty($validOrigin) && $isAjax)) {
+if (!$isAuthenticated && !( empty($expectedToken) && !empty($validOrigin) && $isAjax)) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
