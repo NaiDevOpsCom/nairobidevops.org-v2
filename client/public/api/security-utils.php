@@ -60,7 +60,7 @@ class SecurityUtils {
             $normalized = self::normalizeOrigin($allowed);
             if ($normalized !== null) {
                 if (isset($normalizedAllowedOrigins[$normalized])) {
-                    error_log("SecurityUtils::normalizeOrigin: Duplicate normalized origin detected. '$allowed' and '{$normalizedAllowedOrigins[$normalized]}' both normalize to '$normalized'. Using the latter.");
+                    error_log("SecurityUtils::normalizeOrigin: Duplicate normalized origin detected. '$allowed' and '{$normalizedAllowedOrigins[$normalized]}' both normalize to '$normalized'. Overwriting with the new value.");
                 }
                 $normalizedAllowedOrigins[$normalized] = rtrim($allowed, '/');
             }
