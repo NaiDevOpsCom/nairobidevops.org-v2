@@ -285,7 +285,7 @@ jobs:
           echo "sitemap-status=success" >> $GITHUB_ENV
 
       - name: Upload Check Results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: quality-results-${{ matrix.check }}
