@@ -16,7 +16,7 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
   const fetchImages = useCallback(
     async (cursor?: string, signal?: AbortSignal) => {
       const requestId = ++requestIdRef.current;
-      
+
       try {
         if (cursor) {
           if (inFlightCursor.current === cursor) return;
