@@ -95,12 +95,13 @@ $queryString = http_build_query($queryParams);
 $target_url = $base_url . $path . ($queryString ? '?' . $queryString : '');
 
 // 7. Caching (GET requests only)
-$authContext = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$authContext = $headersLower['authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$hasAuthorization = trim($authContext) !== '';
 $cacheKey = md5($target_url . '|' . $authContext);
 $cacheFile = $cacheRootDir . '/api_responses/luma_' . $cacheKey . '.json';
 $cacheTTL = 300; // 5 minutes
 
-if ($method === 'GET' && file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
+if ($method === 'GET' && !$hasAuthorization && file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
     $cachedData = file_get_contents($cacheFile);
     $cacheMetaFile = $cacheFile . '.meta';
     $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : 'application/json; charset=utf-8';
@@ -129,7 +130,7 @@ if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
 
 // Forward Authorization
 $forwardHeaders = [];
-$forwardAuthHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+$forwardAuthHeader = !empty($authContext) ? $authContext : null;
 if ($forwardAuthHeader) $forwardHeaders[] = 'Authorization: ' . preg_replace('/\v+/', '', $forwardAuthHeader);
 if (isset($_SERVER['CONTENT_TYPE'])) $forwardHeaders[] = 'Content-Type: ' . preg_replace('/\v+/', '', $_SERVER['CONTENT_TYPE']);
 if (!empty($forwardHeaders)) curl_setopt($ch, CURLOPT_HTTPHEADER, $forwardHeaders);
@@ -151,9 +152,9 @@ curl_close($ch);
 // 8. Cache result and output
 http_response_code($http_code);
 header('Content-Type: ' . ($contentType ?: 'application/json; charset=utf-8'));
-header('X-Cache: MISS');
+header('X-Cache: ' . ($hasAuthorization ? 'BYPASS' : 'MISS'));
 
-if ($method === 'GET' && $http_code === 200) {
+if ($method === 'GET' && !$hasAuthorization && $http_code === 200) {
     if (!is_dir(dirname($cacheFile))) mkdir(dirname($cacheFile), 0700, true);
     // Atomic write
     file_put_contents($cacheFile . '.tmp', $response, LOCK_EX);
