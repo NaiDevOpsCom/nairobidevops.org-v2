@@ -11,9 +11,12 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
   const [hasMore, setHasMore] = useState(false);
   const inFlightCursor = useRef<string | null | undefined>(null);
   const loadMoreController = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   const fetchImages = useCallback(
     async (cursor?: string, signal?: AbortSignal) => {
+      const requestId = ++requestIdRef.current;
+
       try {
         if (cursor) {
           if (inFlightCursor.current === cursor) return;
@@ -52,27 +55,33 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
 
         const data: CloudinaryResponse = await response.json();
 
-        if (signal?.aborted) return;
-
         const fetchedResources = data?.images ?? [];
 
-        setImages((prev) => (cursor ? [...prev, ...fetchedResources] : fetchedResources));
-        setNextCursor(data.nextCursor);
-        setHasMore(data.hasMore);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          if (cursor === inFlightCursor.current) {
-            inFlightCursor.current = null;
-          }
-          return;
+        // Only update state if this is still the latest request
+        if (requestId === requestIdRef.current) {
+          setImages((prev) => (cursor ? [...prev, ...fetchedResources] : fetchedResources));
+          setNextCursor(data.nextCursor);
+          setHasMore(data.hasMore);
         }
-        setError(err instanceof Error ? err.message : "An unknown error occurred");
+      } catch (err) {
+        if (requestId === requestIdRef.current) {
+          if (err instanceof DOMException && err.name === "AbortError") {
+            return; // AbortError is expected, ignore for normal control flow
+          } else {
+            setError(err instanceof Error ? err.message : "An unknown error occurred");
+          }
+        }
       } finally {
-        if (!signal?.aborted) {
-          setLoading(false);
-          setLoadingMore(false);
-          if (cursor === inFlightCursor.current) {
-            inFlightCursor.current = null;
+        // Only update loading state if this is still the latest request
+        if (requestId === requestIdRef.current) {
+          if (cursor) {
+            setLoadingMore(false);
+            // Only clear if the cursor we started with is still the one in flight
+            if (cursor === inFlightCursor.current) {
+              inFlightCursor.current = null;
+            }
+          } else {
+            setLoading(false);
           }
         }
       }
@@ -88,6 +97,7 @@ export function useCloudinaryFolder(folder: CloudinaryFolder) {
     setNextCursor(undefined);
     setHasMore(false);
     setLoadingMore(false);
+    inFlightCursor.current = null;
 
     fetchImages(undefined, controller.signal);
     return () => {
