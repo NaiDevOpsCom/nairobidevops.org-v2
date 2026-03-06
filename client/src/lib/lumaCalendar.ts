@@ -53,9 +53,10 @@ export async function fetchLumaEvents(): Promise<LumaEvent[]> {
   const proxyTimeoutId = setTimeout(() => proxyController.abort(), 10000); // 10s timeout
 
   try {
-    const tokenMeta = document.querySelector(
-      'meta[name="api-bearer-token"]'
-    ) as HTMLMetaElement | null;
+    const tokenMeta =
+      typeof document !== "undefined"
+        ? (document.querySelector('meta[name="api-bearer-token"]') as HTMLMetaElement | null)
+        : null;
     const token = tokenMeta?.content?.trim();
 
     response = await fetch(proxiedUrl, {

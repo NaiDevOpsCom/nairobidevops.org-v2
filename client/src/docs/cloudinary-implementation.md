@@ -6,32 +6,32 @@ This document outlines the Cloudinary integration for image storage and the PHP 
 
 The integration consists of a React frontend and a PHP-based backend proxy to securely handle Cloudinary API requests without exposing secrets.
 
-### 1. PHP Proxy (`public_html/api/imagesCloudinary.php`)
+### 1. PHP Proxy Architecture
 
-- **Role**: Intermediate layer that communicates with the Cloudinary Admin API.
-- **Security**: Accesses `CLD_API_KEY` and `CLD_API_SECRET` from server environment variables.
-- **Verification**: Requires proper authentication (e.g., API keys, JWT, or authenticated session) to prevent unauthorized access. It also relies on CORS origin restrictions, input validation/sanitization, and should be served strictly over HTTPS. The `X-Requested-With: XMLHttpRequest` header may still be present for UX filtering but is not an access control mechanism.
-- **Functionality**: Fetches resources from specified folders (e.g., `ndcCampusTour`) and returns them in a JSON format compatible with the frontend.
+The Cloudinary integration uses a hardened proxy layer to securely interact with the Admin API.
 
-### 4. Same-origin Validation (Security & UX Heuristics)
+- **File**: `client/public/api/imagesCloudinary.php`
+- **Security Logic**:
+  - **Shared Config**: Use `config-loader.php` to load credentials from `~/config/secrets.env.php`.
+  - **Utilities**: Use `security-utils.php` for origin validation and rate limiting.
+  - **IP-Based Rate Limiting**: Prevents brute-force probing of Cloudinary folders.
+  - **Disk Caching**: Responses are cached in `~/cache/api_responses/` to reduce upstream load and stay within API limits.
+- **Authentication**: Requires a valid `X-Proxy-Token` or a trusted AJAX request from the primary domain.
 
-- **Files:** `client/public/api/luma.php`, `client/public/api/imagesCloudinary.php`
-- **Change:** Backend proxies use `X-Requested-With: XMLHttpRequest` as a request-context hint to filter non-AJAX traffic. Note that headers like `Sec-Fetch-Site` or `X-Requested-With` can be spoofed and are **NOT** as a substitute for proper authentication.
-- **Requirement**: Always require proper authentication (e.g., proxy tokens, server-side session checks, or signed requests) for any endpoint serving sensitive data or performing privileged actions. Heuristic headers should only be used as additional context or for non-security filtering.
+### 2. Deployment & Secret Management
 
-### 5. Bearer Token Removal
+Secrets are managed centrally via GitHub Secrets and injected into a shared directory on the server during deployment.
 
-- **Files:** `client/src/lib/lumaCalendar.ts`, `client/index.html` (verified)
-- **Change:** Removed the strict requirement for the `api-bearer-token` in the frontend fetch logic. The token is now only included if present, and confirmed it is already removed from `index.html` to prevent accidental credential leakage.
+**Secrets Injected:**
 
-### 6. Deployment Workflow Documentation Fix
-
-- **File:** `.github/workflows/deploy.yml`
-- **Change:** Updated comments to correctly state that FOUR secrets (including `PROXY_API_TOKEN`) are injected into the production environment's `.env.php` file.
+- `CLD_CLOUD_NAME`
+- `CLD_API_KEY`
+- `CLD_API_SECRET`
+- `PROXY_API_TOKEN` (Supports JSON array for rotation)
 
 ## Validation
 
-- **CI Checks:** Validated correct frontend format formatting via `npm run check`.
+- **CI Checks:** Validated frontend formatting via `npm run check`.
 - **Build Verification:** Output compiled successfully via `npm run build` after modifications.
 - **Audit:** Verified that `imagesCloudinary.php` is using `Authorization: Basic` for Cloudinary Admin API.
 - **Security:** Confirmed `index.html` does not contain the `api-bearer-token` meta tag.
@@ -123,9 +123,9 @@ const { images, loading, error } = useCloudinaryFolder("yourNewFolderName");
 - Ensure the `api/imagesCloudinary.php` file is uploaded to the `public_html/api/` directory on the server.
 - The `.htaccess` file includes rules to protect the `api` directory from direct browsing.
 
-### `.htaccess` Security Configuration
+### `.htaccess` Security Configuration (Example)
 
-To explicitly secure the `public_html/api/` directory so requests are correctly routed and restricted, you can place an `.htaccess` file inside `public_html/api/` with the following configuration:
+To explicitly secure the `public_html/api/` directory while allowing legitimate frontend requests, you can place an `.htaccess` file inside `public_html/api/` with the following configuration. Note that this example checks for common proxy headers, but **actual token validation must still occur in the PHP code**.
 
 ```apache
 # Disable directory browsing
@@ -136,16 +136,18 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Restrict direct access to PHP files by requiring an Authorization header
+# Restrict direct access to PHP files by requiring standard headers
 <FilesMatch "\.php$">
-    # NOTE: This only checks if the header EXISTS.
-    # Actual token verification must be done securely within the PHP scripts using environment variables.
+    # Allow if standard proxy headers are present (X-Proxy-Token or X-Requested-With)
+    SetEnvIf X-Proxy-Token "^.+$" ALLOW_PROXY
+    SetEnvIf X-Requested-With "^XMLHttpRequest$" ALLOW_AJAX
+    SetEnvIf Authorization "^(Bearer .*)$" ALLOW_AUTH
 
-    # Example: Require the Authorization header to be present
-    SetEnvIf Authorization "^(Bearer .*)$" HAS_AUTH
-    Require env HAS_AUTH
-
-    # Or, if configuring IP whitelisting:
-    # Require ip 192.168.1.100
+    # Combine logical OR for header presence
+    Order Deny,Allow
+    Deny from all
+    Allow from env ALLOW_PROXY
+    Allow from env ALLOW_AJAX
+    Allow from env ALLOW_AUTH
 </FilesMatch>
 ```

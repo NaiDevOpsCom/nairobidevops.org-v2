@@ -90,14 +90,15 @@ try {
   if (sitemapExistsInitial) {
     if (fs.existsSync(backupPath)) {
       fs.copyFileSync(backupPath, sitemapPath);
-      fs.unlinkSync(backupPath);
     }
   } else if (fs.existsSync(sitemapPath)) {
     // If it didn't exist initially, remove any temporary sitemap created during the test
     fs.unlinkSync(sitemapPath);
-    if (fs.existsSync(backupPath)) {
-      fs.unlinkSync(backupPath);
-    }
+  }
+
+  // Final cleanup of backup file
+  if (fs.existsSync(backupPath)) {
+    fs.unlinkSync(backupPath);
   }
 
   // Final cleanup: if we created dist/, remove it if it's empty

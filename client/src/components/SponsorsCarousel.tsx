@@ -156,9 +156,9 @@ export function SponsorsCarousel() {
   return (
     <div className="w-full space-y-8 md:space-y-12">
       {/* Row 1: scrolls right → left */}
-      <CarouselRow partners={row1} direction="right" duration={50} />
+      <CarouselRow partners={row1} direction="left" duration={50} />
       {/* Row 2: scrolls left → right */}
-      {row2.length > 0 && <CarouselRow partners={row2} direction="left" duration={50} />}
+      {row2.length > 0 && <CarouselRow partners={row2} direction="right" duration={50} />}
     </div>
   );
 }
