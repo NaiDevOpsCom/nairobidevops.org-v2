@@ -12,7 +12,7 @@ const packageJsonPath = path.join(__dirname, '..', 'package.json')
 const lockFilePath = path.join(__dirname, '..', 'package-lock.json')
 
 function normalizeVersion(version) {
-  const parts = version.trim().split('.').map((value) => Number(value))
+  const parts = version.trim().split('.').map(Number)
   while (parts.length < 3) parts.push(0)
   return parts.slice(0, 3).map((value) => Number.isNaN(value) ? 0 : value).join('.')
 }
@@ -103,7 +103,7 @@ async function readJson(filePath) {
 function gatherDependencyList(packageJson) {
   const dependencies = Object.keys(packageJson.dependencies ?? {})
   const devDependencies = Object.keys(packageJson.devDependencies ?? {})
-  return [...new Set([...dependencies, ...devDependencies])].sort()
+  return [...new Set([...dependencies, ...devDependencies])].sort((left, right) => left.localeCompare(right))
 }
 
 async function resolveDependencyVersion(name, packageJson, lockfile) {
@@ -186,7 +186,9 @@ async function run() {
   console.log(`Updated package.json engines.node from ${currentRange ?? '<unset>'} to ${updatedRange}`)
 }
 
-run().catch((error) => {
+try {
+  await run()
+} catch (error) {
   console.error('Node engine check failed:', error)
   process.exit(1)
-})
+}
