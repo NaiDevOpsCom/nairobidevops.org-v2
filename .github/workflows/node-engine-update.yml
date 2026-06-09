@@ -17,12 +17,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+        uses: actions/checkout@b4ffde65f046dd1072458a4ec0ce4a0edde97b9c
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fa1a50d02f
+        uses: actions/setup-node@794a9cc57bab5a2ee1a9c6fb2db00049c2795bcc
         with:
           node-version: 20
           cache: "npm"
@@ -42,7 +42,7 @@ jobs:
 
       - name: Create pull request
         if: steps.check-engine.outputs.updated == 'true'
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@c5c780c4db3c8c697e338646f0b4e385f47ccd7d
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: update Node.js engine range"

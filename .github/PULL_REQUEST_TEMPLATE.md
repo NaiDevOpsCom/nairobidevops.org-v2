@@ -94,6 +94,7 @@ Closes #<!-- issue number -->
 
 ### Required for all PRs
 
+- [ ] `npm run format` has been run to format all code
 - [ ] `npm run build` passes with no errors
 - [ ] `npm run lint` passes with no new warnings
 - [ ] `npm run typecheck` passes with no TypeScript errors

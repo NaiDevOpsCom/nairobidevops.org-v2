@@ -34,6 +34,13 @@ function maxVersion(versions) {
   }, null)
 }
 
+function minVersion(versions) {
+  return versions.reduce((lowest, next) => {
+    if (!lowest) return next
+    return compareVersions(next, lowest) === -1 ? next : lowest
+  }, null)
+}
+
 function extractVersionCandidates(value) {
   if (!value) return []
   const regex = /\d+(?:\.\d+){0,2}/g
@@ -100,6 +107,19 @@ function gatherDependencyList(packageJson) {
 }
 
 async function resolveDependencyVersion(name, packageJson, lockfile) {
+  // Handle npm v3+ lockfile format (uses packages object)
+  if (lockfile.packages) {
+    // Try root package first
+    const rootDep = lockfile.packages[`node_modules/${name}`]
+    if (rootDep?.version) return rootDep.version
+    // For scoped packages
+    for (const [key, pkg] of Object.entries(lockfile.packages)) {
+      if (key.endsWith(`node_modules/${name}`) && pkg.version) {
+        return pkg.version
+      }
+    }
+  }
+  // Fallback to v2 lockfile format (uses flat dependencies object)
   const locked = lockfile.dependencies?.[name]?.version
   if (locked) return locked
   if (packageJson.dependencies?.[name]) return packageJson.dependencies[name]
@@ -126,7 +146,7 @@ async function collectRequiredNodeVersions() {
       if (!range) continue
       const candidates = extractVersionCandidates(range)
       if (candidates.length === 0) continue
-      requiredVersions.push(maxVersion(candidates))
+      requiredVersions.push(minVersion(candidates))
     }
   })
 
@@ -149,6 +169,7 @@ async function run() {
     console.log('Unable to determine a required minimum Node.js version. No update made.')
     return
   }
+  // Note: maxVersion here is correct - we want the highest minimum requirement across all dependencies
 
   if (currentRange && await semverSatisfies(requiredMinimum, currentRange)) {
     console.log(`Current engines.node range (${currentRange}) already supports Node ${requiredMinimum}. No update needed.`)
