@@ -1,0 +1,56 @@
+name: Node Engine Range Update
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-node-engine:
+    name: Update package.json node engine range
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@794a9cc57bab5a2ee1a9c6fb2db00049c2795bcc
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+
+      - id: check-engine
+        name: Check and update node engine range
+        run: |
+          node scripts/check-node-engine.js
+          if git diff --quiet package.json; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request
+        if: steps.check-engine.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@c5c780c4db3c8c697e338646f0b4e385f47ccd7d
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update Node.js engine range"
+          title: "chore: update Node.js engine range"
+          body: |
+            This PR updates the `engines.node` field in `package.json` based on the Node requirements declared by our direct dependencies.
+
+            If a dependency needs a newer Node release, this change keeps the project engine range aligned with that requirement.
+          branch: auto/update-node-engine
+          base: pre-staging
+          labels: automated

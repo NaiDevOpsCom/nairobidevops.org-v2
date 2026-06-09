@@ -8,7 +8,7 @@
       "https://www.youtube.com",
       "https://va.vercel-scripts.com"
     ],
-    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": [
       "'self'",
       "data:",
@@ -18,7 +18,7 @@
       "https://images.unsplash.com",
       "https://pbs.twimg.com"
     ],
-    "font-src": ["'self'", "https://fonts.gstatic.com"],
+    "font-src": ["'self'"],
     "object-src": ["'none'"],
     "frame-src": ["https://www.youtube.com"],
     "connect-src": [

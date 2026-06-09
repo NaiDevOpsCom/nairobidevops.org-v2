@@ -9,6 +9,7 @@
     "check:lint": "npm run lint",
     "check:types": "npm run typecheck",
     "check:format": "npm run format:check",
+    "update:node-engine": "node scripts/check-node-engine.js",
     "check": "npm run check:lint && npm run check:types && npm run check:format",
     "build": "npm run security:generate && npm run check && vite build --mode production && node scripts/setup-cpanel.js",
     "build:staging": "npm run security:generate && vite build --mode staging && node scripts/setup-cpanel.js",
