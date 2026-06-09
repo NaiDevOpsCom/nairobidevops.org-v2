@@ -71,3 +71,13 @@ npm-debug.log*
 
 # Ignore local-only files
 *.localqodana.sarif.json
+
+# Ignore local AI / tool state and generated config
+.agents/
+.cursor/
+.jetro/
+.mcp.json
+.windsurfrules
+AGENT.md
+CLAUDE.md
+.github/copilot-instructions.md

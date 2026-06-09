@@ -1,8 +1,4 @@
 /* ==========================
-   Google Fonts
-========================== */
-
-/* ==========================
    Tailwind Directives
 ========================== */
 @import "tailwindcss";
@@ -74,7 +70,9 @@
 }
 
 .figma-heading {
-  font-family: "Poppins", sans-serif;
+  font-family:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
   font-weight: 700;
   font-style: normal;
   font-size: 36px;
