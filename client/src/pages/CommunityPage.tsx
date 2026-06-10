@@ -721,8 +721,7 @@ const CommunityProjectsSection: React.FC = () => (
                 aria-label={`View details for ${project.title} project`}
               >
                 <span className="relative">
-                  View Project
-                  {" "}
+                  View Project{" "}
                   <span
                     className="absolute -right-5 opacity-0 group-hover/button:opacity-100 group-hover/button:translate-x-1.5 transition-all duration-200"
                     aria-hidden="true"
