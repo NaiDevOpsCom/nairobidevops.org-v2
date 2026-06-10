@@ -800,14 +800,14 @@ const CollaborationCTASection: React.FC = () => {
 
 // --- Main Community Page Component ---
 export default function CommunityPage() {
-  const timerRef = React.useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     const handleScroll = () => {
       // Clear any existing timeout before scheduling a new one
       if (timerRef.current) {
         clearTimeout(timerRef.current);
-        timerRef.current = undefined;
+        timerRef.current = null;
       }
 
       if (window.location.hash) {
