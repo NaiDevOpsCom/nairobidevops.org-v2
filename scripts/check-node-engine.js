@@ -13,20 +13,14 @@ const packageJsonPath = path.join(__dirname, '..', 'package.json')
 const lockFilePath = path.join(__dirname, '..', 'package-lock.json')
 
 
-function compareVersions(left, right) {
-  const a = left.split('.').map(Number)
-  const b = right.split('.').map(Number)
-  for (let i = 0; i < 3; i += 1) {
-    if (a[i] > b[i]) return 1
-    if (a[i] < b[i]) return -1
-  }
-  return 0
-}
-
 function maxVersion(versions) {
   return versions.reduce((highest, next) => {
     if (!highest) return next
-    return compareVersions(next, highest) === 1 ? next : highest
+    try {
+      return semver.gt(next, highest) ? next : highest
+    } catch {
+      return highest
+    }
   }, null)
 }
 
