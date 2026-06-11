@@ -38,7 +38,7 @@ if ($method === 'OPTIONS') {
 }
 
 // 3. Rate Limiting (IP-based, outside public_html)
-$cacheRootDir = dirname(__DIR__, 3) . '/cache'; // /home/user/cache
+$cacheRootDir = get_proxy_cache_dir(); // /home/user/cache
 if (!SecurityUtils::checkRateLimit($cacheRootDir . '/rate_limits', 30, 60)) {
     http_response_code(429);
     header('Content-Type: application/json; charset=utf-8');
@@ -92,7 +92,10 @@ if ($path === '/' || !preg_match('#^/[a-zA-Z0-9/_\.\-\?=&]*$#', $path) || strpos
 $queryParams = $_GET;
 unset($queryParams['path']);
 $queryString = http_build_query($queryParams);
-$target_url = $base_url . $path . ($queryString ? '?' . $queryString : '');
+$target_url = $base_url . $path;
+if ($queryString !== '') {
+    $target_url .= (strpos($path, '?') === false ? '?' : '&') . $queryString;
+}
 
 // 7. Caching (GET requests only)
 $authContext = $headersLower['authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
