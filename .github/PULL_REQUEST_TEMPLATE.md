@@ -111,7 +111,7 @@ Closes #<!-- issue number -->
 - [ ] Before/after screenshots included above
 - [ ] `prefers-reduced-motion` not broken (Framer Motion animations still respect this)
 
-### Required for content changes (`src/data/`)
+### Required for content changes (`client/src/data/`)
 
 - [ ] All new entries follow the field format documented in [CONTENT_GUIDE.md](../CONTENT_GUIDE.md)
 - [ ] Speaker IDs are unique and follow the correct format (`"2026-s9"`, `"2025-18"`, etc.)
@@ -122,7 +122,7 @@ Closes #<!-- issue number -->
 
 ### Required for new components
 
-- [ ] Component lives in the correct folder (`components/ui/` for primitives, `components/shared/` for custom, `components/landing/` for homepage sections)
+- [ ] Component lives in the correct folder (`client/src/components/ui/` for primitives, `client/src/components/` for shared/custom, `client/src/components/landing/` or `client/src/components/events/` for feature sections)
 - [ ] Props are typed with a named interface (not inline, not `any`)
 - [ ] Uses plain function declaration, not `React.FC`
 - [ ] shadcn/ui components added via CLI (`npx shadcn@latest add`), not manually created in `components/ui/`

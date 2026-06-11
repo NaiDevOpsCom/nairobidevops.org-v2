@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import semver from 'semver'
 
 const execFileAsync = promisify(execFile)
 const __filename = fileURLToPath(import.meta.url)
@@ -11,11 +12,6 @@ const __dirname = path.dirname(__filename)
 const packageJsonPath = path.join(__dirname, '..', 'package.json')
 const lockFilePath = path.join(__dirname, '..', 'package-lock.json')
 
-function normalizeVersion(version) {
-  const parts = version.trim().split('.').map(Number)
-  while (parts.length < 3) parts.push(0)
-  return parts.slice(0, 3).map((value) => Number.isNaN(value) ? 0 : value).join('.')
-}
 
 function compareVersions(left, right) {
   const a = left.split('.').map(Number)
@@ -34,18 +30,14 @@ function maxVersion(versions) {
   }, null)
 }
 
-function minVersion(versions) {
-  return versions.reduce((lowest, next) => {
-    if (!lowest) return next
-    return compareVersions(next, lowest) === -1 ? next : lowest
-  }, null)
-}
-
-function extractVersionCandidates(value) {
-  if (!value) return []
-  const regex = /\d+(?:\.\d+){0,2}/g
-  const matches = [...String(value).matchAll(regex)].map((match) => normalizeVersion(match[0]))
-  return matches.filter(Boolean)
+function getMinVersionFromRange(range) {
+  if (!range) return null
+  try {
+    const min = semver.minVersion(range)
+    return min ? min.version : null
+  } catch {
+    return null
+  }
 }
 
 function getNodeEnginesRange(engines) {
@@ -77,11 +69,7 @@ async function npmViewEngines(packageName, versionSpec) {
 async function semverSatisfies(version, range) {
   if (!version || !range) return false
   try {
-    await execFileAsync('npx', ['semver', version, '-r', range], {
-      timeout: 120000,
-      maxBuffer: 10 * 1024 * 1024,
-    })
-    return true
+    return semver.satisfies(version, range)
   } catch {
     return false
   }
@@ -112,10 +100,14 @@ async function resolveDependencyVersion(name, packageJson, lockfile) {
     // Try root package first
     const rootDep = lockfile.packages[`node_modules/${name}`]
     if (rootDep?.version) return rootDep.version
-    // For scoped packages
+    // For scoped packages or other packages not matched directly,
+    // check entry keys, but ensure it's NOT a nested transitive dependency.
     for (const [key, pkg] of Object.entries(lockfile.packages)) {
       if (key.endsWith(`node_modules/${name}`) && pkg.version) {
-        return pkg.version
+        const parts = key.split('node_modules')
+        if (parts.length <= 2) {
+          return pkg.version
+        }
       }
     }
   }
@@ -144,9 +136,9 @@ async function collectRequiredNodeVersions() {
       const engines = await npmViewEngines(name, versionSpec)
       const range = getNodeEnginesRange(engines)
       if (!range) continue
-      const candidates = extractVersionCandidates(range)
-      if (candidates.length === 0) continue
-      requiredVersions.push(minVersion(candidates))
+      const minVer = getMinVersionFromRange(range)
+      if (!minVer || minVer === '0.0.0') continue
+      requiredVersions.push(minVer)
     }
   })
 

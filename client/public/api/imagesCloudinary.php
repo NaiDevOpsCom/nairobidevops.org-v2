@@ -44,7 +44,7 @@ if (!in_array($method, $allowedMethods, true)) {
 }
 
 // 3. Rate Limiting
-$cacheRootDir = dirname(__DIR__, 3) . '/cache';
+$cacheRootDir = get_proxy_cache_dir();
 if (!SecurityUtils::checkRateLimit($cacheRootDir . '/rate_limits', 30, 60)) {
     http_response_code(429);
     echo json_encode(['error' => 'Too Many Requests'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);

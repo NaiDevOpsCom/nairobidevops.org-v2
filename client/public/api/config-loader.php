@@ -6,14 +6,18 @@
  * outside the public_html directory for security.
  */
 
-function load_shared_config() {
-    // 1. Try to find the config directory relative to this file.
-    // Structure:
-    // /home/user/config/secrets.env.php
-    // /home/user/releases/TIMESTAMP/api/config-loader.php
-    // /home/user/current -> /home/user/releases/TIMESTAMP
-    
-    $possiblePaths = [
+/**
+ * Returns the centralized cache root directory path.
+ */
+function get_proxy_cache_dir() {
+    return dirname(__DIR__, 3) . '/cache';
+}
+
+/**
+ * Returns the list of possible paths where the secrets.env.php configuration file might reside.
+ */
+function get_proxy_config_paths() {
+    return [
         // From release dir: dirname(__DIR__, 3) / config
         dirname(__DIR__, 3) . '/config/secrets.env.php',
         // From symlinked dir (if current is at /home/user/current)
@@ -21,6 +25,10 @@ function load_shared_config() {
         // Absolute fallback for common cPanel structures if others fail
         '/home/' . get_current_user() . '/config/secrets.env.php'
     ];
+}
+
+function load_shared_config() {
+    $possiblePaths = get_proxy_config_paths();
 
     foreach ($possiblePaths as $path) {
         if (file_exists($path)) {
