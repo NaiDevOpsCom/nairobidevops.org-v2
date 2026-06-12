@@ -22,7 +22,7 @@ We use **GitHub Dependabot** to automate our dependency management. Dependabot a
 
 ### Key Configuration Decisions
 
-- **Daily Monitoring**: We check for updates every morning (`09:00 Africa/Nairobi`) to ensure we are alerted to zero-day vulnerabilities as quickly as possible.
+- **Weekly Monitoring**: We check for updates every week to ensure we are alerted to vulnerabilities in a timely manner.
 - **Dependency Grouping**: To maintain a stable build, we group related packages (e.g., `react` and `@types/react`) so they are updated together, reducing the risk of version mismatch errors.
 - **PR Limit**: We limit the number of open Dependabot Pull Requests to `10` to prevent "alert fatigue" and ensure that each security update is reviewed carefully.
 - **Designated Reviewers**: All security PRs are automatically assigned to senior developers for immediate review.
@@ -35,7 +35,7 @@ The Dependabot configuration is located at:
 ### Relevant Sections Explained
 
 - `package-ecosystem: "npm"`: Monitors our JavaScript/TypeScript dependencies.
-- `interval: "daily"`: The frequency of security checks.
+- `interval: "weekly"`: The frequency of security checks.
 - `groups`: Logical groupings developed to ensure that core React and toolchain components remain in sync during updates.
 - `ignore`: Configuration to skip specific version ranges (e.g., blocking major version upgrades that contain breaking changes until the team is ready).
 
