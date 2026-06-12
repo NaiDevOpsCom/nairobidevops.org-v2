@@ -31,6 +31,7 @@ updates:
           - "wouter"
           - "zod"
         exclude-patterns:
+          - "react-day-picker"
           - "eslint*"
           - "eslint-*"
           - "@eslint/*"
@@ -47,11 +48,6 @@ updates:
           - "autoprefixer"
           - "esbuild"
           - "terser"
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "monthly"
-    groups:
       tooling:
         patterns:
           - "eslint*"
