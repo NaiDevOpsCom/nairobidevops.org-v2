@@ -61,16 +61,8 @@ export default defineConfig(({ mode }) => {
       terserOptions: isHardened
         ? {
             compress: {
-              drop_console: false,
+              drop_console: true,
               drop_debugger: true,
-              pure_funcs: [
-                "console.log",
-                "console.info",
-                "console.debug",
-                "console.warn",
-                "console.group",
-                "console.groupEnd",
-              ],
             },
           }
         : undefined,
