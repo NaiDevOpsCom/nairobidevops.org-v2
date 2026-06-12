@@ -61,23 +61,17 @@ export default defineConfig(({ mode }) => {
       terserOptions: isHardened
         ? {
             compress: {
-              drop_console: false,
+              drop_console: true,
               drop_debugger: true,
-              pure_funcs: [
-                "console.log",
-                "console.info",
-                "console.debug",
-                "console.warn",
-                "console.group",
-                "console.groupEnd",
-              ],
             },
           }
         : undefined,
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ["react", "react-dom"],
+          manualChunks(id: string) {
+            if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/")) {
+              return "vendor";
+            }
           },
         },
         external: [],

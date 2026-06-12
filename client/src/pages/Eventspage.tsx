@@ -5,9 +5,9 @@ import {
   Award,
   Rocket,
   Handshake,
-  Youtube,
   ChevronLeft,
   ChevronRight,
+  Video,
 } from "lucide-react";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
@@ -271,7 +271,7 @@ export default function Eventspage() {
                 aria-label="Visit Nairobi DevOps YouTube Channel Library (opens in new tab)"
                 className="flex items-center gap-2"
               >
-                <Youtube className="w-5 h-5" aria-hidden="true" />
+                <Video className="w-5 h-5" aria-hidden="true" />
                 <span>Visit Channel Library</span>
               </a>
             </Button>

@@ -4,6 +4,27 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "npm"
+    # Ignore major version bumps for production deps to force manual review.
+    # These packages frequently introduce breaking changes that require code updates.
+    ignore:
+      - dependency-name: "lucide-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "motion"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "recharts"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
     groups:
       frontend-dependencies:
         patterns:
@@ -48,6 +69,16 @@ updates:
           - "autoprefixer"
           - "esbuild"
           - "terser"
+      vite:
+        patterns:
+          - "vite"
+      vite-plugins:
+        patterns:
+          - "@vitejs/*"
+          - "@tailwindcss/*"
+          - "tailwindcss"
+          - "postcss"
+          - "autoprefixer"
       tooling:
         patterns:
           - "eslint*"
@@ -57,11 +88,5 @@ updates:
           - "prettier"
           - "typescript"
           - "tsx"
-          - "vite"
-          - "@vitejs/*"
-          - "@tailwindcss/*"
-          - "tailwindcss"
-          - "postcss"
-          - "autoprefixer"
           - "esbuild"
           - "terser"
