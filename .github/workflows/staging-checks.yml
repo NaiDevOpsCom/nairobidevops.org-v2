@@ -23,6 +23,45 @@ env:
   BUNDLE_SIZE_WARNING_MB: "8"
 
 jobs:
+  dependency-compat:
+    name: Dependency Type Compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.actor == 'dependabot[bot]' || github.actor == 'renovate[bot]'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: ./.github/actions/cache-vite-npm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Check Type Compatibility
+        run: |
+          echo "🔷 Checking dependency type compatibility..."
+          if npm run typecheck 2>&1; then
+            echo "✅ Types compatible with updated dependencies"
+            echo "compat-status=success" >> $GITHUB_ENV
+          else
+            echo "::error::Dependency update introduces type errors. The updated package may have breaking API changes."
+            echo "::error::Fix the type errors in the source code, or manually review the dependency update."
+            echo "compat-status=failed" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Quick Build Smoke Test
+        run: |
+          set -o pipefail
+          echo "🏗️ Running quick build smoke test..."
+          npm run security:generate
+          npx vite build --mode staging --logLevel error 2>&1 | tail -5
+          echo "✅ Build smoke test passed"
+
   quality-checks:
     name: Comprehensive Quality Validation
     runs-on: ubuntu-latest

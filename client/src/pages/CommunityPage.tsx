@@ -11,7 +11,7 @@ import {
   Compass,
   GraduationCap,
   Bell,
-  YoutubeIcon,
+  Video,
 } from "lucide-react";
 import React, { useMemo } from "react";
 import { Link } from "wouter";
@@ -635,7 +635,7 @@ const EventsMeetupsSection: React.FC = () => {
               rel="noopener noreferrer"
               className="flex items-center gap-2"
             >
-              <YoutubeIcon className="w-5 h-5" />
+              <Video className="w-5 h-5" />
               <span>Visit Channel Library</span>
             </a>
           </Button>
