@@ -27,11 +27,7 @@ function sitemapPlugin(enabled: boolean): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const branch =
-    process.env.GITHUB_BASE_REF ||
-    process.env.GITHUB_REF_NAME ||
-    process.env.VERCEL_GIT_COMMIT_REF ||
-    "";
+  const branch = process.env.GITHUB_BASE_REF || process.env.GITHUB_REF_NAME || "";
 
   const isHardenedBranch = ["production", "staging", "main", "pre-dev", "pre-staging"].includes(
     branch

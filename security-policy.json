@@ -5,8 +5,7 @@
       "'self'",
       "https://www.googletagmanager.com",
       "https://www.google-analytics.com",
-      "https://www.youtube.com",
-      "https://va.vercel-scripts.com"
+      "https://www.youtube.com"
     ],
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": [
@@ -28,8 +27,7 @@
       "https://web.mypayd.app",
       "https://www.googleapis.com",
       "https://www.google-analytics.com",
-      "https://region1.google-analytics.com",
-      "https://vitals.vercel-insights.com"
+      "https://region1.google-analytics.com"
     ],
     "frame-ancestors": ["'none'"],
     "base-uri": ["'self'"],
@@ -46,7 +44,6 @@
   "proxies": [
     {
       "source": "/api/luma/:path*",
-      "vercelDestination": "https://api.luma.com/:path*",
       "apacheRewrite": "/api/luma.php?path=$1"
     }
   ],

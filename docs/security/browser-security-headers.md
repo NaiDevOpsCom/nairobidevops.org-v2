@@ -29,21 +29,23 @@ We implement these headers at the infrastructure level using our deployment conf
 
 ## Code & Configuration Location
 
-Security headers are defined in the Vercel configuration file:
-**[`vercel.json`](../../vercel.json)**
+Security headers are defined centrally in the security policy file:
+**[`security-policy.json`](../../security-policy.json)**
+
+During the build process, the generator script compiles this policy into an Apache configuration file:
+**`client/public/.htaccess`**
 
 ### Relevant Sections Explained
 
-The headers are defined within the `"headers"` array, targeting the `"source": "/(.*)"` pattern to ensure they are applied to every single request across the entire application.
+The headers are defined within the `"headers"` object in `security-policy.json` and compiled into `.htaccess` header directives.
 
-```json
-{
-  "key": "X-Frame-Options",
-  "value": "DENY"
-}
+```apache
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+</IfModule>
 ```
 
-_This snippet shows how we explicitly block framing._
+_This snippet shows how Apache forces the browser to block framing._
 
 ## Security Benefits
 

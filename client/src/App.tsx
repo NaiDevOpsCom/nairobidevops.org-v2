@@ -1,5 +1,4 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Analytics } from "@vercel/analytics/react";
 import { useEffect, type ComponentType } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Switch, Route, useLocation } from "wouter";
@@ -79,7 +78,6 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
-            <Analytics />
           </TooltipProvider>
         </ThemeProvider>
       </HelmetProvider>
