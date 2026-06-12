@@ -2,21 +2,21 @@
 
 ## Overview
 
-This guide covers deploying the Nairobi DevOps website to both Vercel (staging) and cPanel (production) environments from a single codebase.
+This guide covers deploying the Nairobi DevOps website to cPanel (for both staging and production environments) from a single codebase.
 
 ## Environment Architecture
 
-### Staging (Vercel)
+### Staging (cPanel Subdomain)
 
-- **URL:** Pre-staging branch → Vercel deployment
-- **Platform:** Serverless functions
-- **API Routing:** Automatic via `vercel.json`
+- **URL:** Pre-staging branch → cPanel staging environment
+- **Platform:** Apache web server
+- **API Routing:** Manual `.htaccess` rewrite rules
 - **Build:** `npm run build:staging`
 
-### Production (cPanel)
+### Production (cPanel Main Domain)
 
 - **URL:** Main branch → nairobidevops.org
-- **Platform:** Traditional Apache hosting
+- **Platform:** Apache web server
 - **API Routing:** Manual `.htaccess` rewrite rules
 - **Build:** `npm run build:prod`
 
@@ -35,12 +35,6 @@ This guide covers deploying the Nairobi DevOps website to both Vercel (staging) 
 - File manager access or SSH
 - SSL certificate (HTTPS required)
 
-### Vercel Requirements
-
-- GitHub integration
-- Vercel account
-- Project connected to repository
-
 ## Build System Setup
 
 ### Build Scripts Overview
@@ -58,7 +52,6 @@ This guide covers deploying the Nairobi DevOps website to both Vercel (staging) 
 1. **Security Headers Generation** (`npm run security:generate`)
    - Reads `security-policy.json`
    - Generates `.htaccess` for cPanel
-   - Updates `vercel.json` headers
 
 2. **Code Quality Checks** (`npm run check`)
    - ESLint linting
@@ -76,29 +69,6 @@ This guide covers deploying the Nairobi DevOps website to both Vercel (staging) 
    - Creates cPanel-compatible structure
 
 ## Environment-Specific Configurations
-
-### Vercel Configuration
-
-**File:** `vercel.json`
-
-```json
-{
-  "buildCommand": "npm run build:staging",
-  "outputDirectory": "dist",
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com..."
-        }
-      ]
-    }
-  ],
-  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/$1" }]
-}
-```
 
 ### cPanel Configuration
 
@@ -327,14 +297,6 @@ export default defineConfig({
 
 ## Rollback Procedures
 
-### Vercel Rollback
-
-1. Go to Vercel dashboard
-2. Select project
-3. Click "Deployments" tab
-4. Find previous successful deployment
-5. Click "..." menu and select "Promote to Production"
-
 ### cPanel Rollback
 
 ```bash
@@ -380,18 +342,11 @@ tar -czf "backup_${DATE}.tar.gz" public_html/
 aws s3 cp "backup_${DATE}.tar.gz" s3://backup-bucket/
 ```
 
-**Vercel:**
-
-- Automatic deployment history (last 25 deployments)
-- Environment variables backed up
-- Integration with GitHub provides code backup
-
 ## Contact & Support
 
 ### Emergency Contacts
 
 - **cPanel Support:** hosting-provider.com/support
-- **Vercel Support:** vercel.com/support
 - **GitHub Issues:** github.com/NaiDevOpsCom/ndc-redesign-website/issues
 
 ### Documentation
@@ -402,4 +357,4 @@ aws s3 cp "backup_${DATE}.tar.gz" s3://backup-bucket/
 
 ---
 
-This deployment guide ensures consistent, secure, and maintainable deployments across both Vercel and cPanel environments while maintaining a single source of truth for your codebase.
+This deployment guide ensures consistent, secure, and maintainable deployments across cPanel environments while maintaining a single source of truth for your codebase.

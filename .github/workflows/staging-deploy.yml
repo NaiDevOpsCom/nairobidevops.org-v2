@@ -1,0 +1,451 @@
+name: Deploy to cPanel (Staging)
+
+permissions:
+  contents: read
+
+# One deploy at a time — do NOT cancel in-progress staging deploys
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - pre-staging
+    paths:
+      - "client/src/**"
+      - "client/public/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "postcss.config.js"
+      - "tailwind.config.ts"
+      - "security-policy.json"
+      - "index.html"
+      - "components.json"
+      - ".github/workflows/staging-deploy.yml"
+
+jobs:
+  build:
+    name: Build (Staging Mode)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the code
+      - name: Checkout Code
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98 # v4.2.2
+
+      # 2. Install Node.js & restore cache
+      - name: Setup Node.js and Cache
+        uses: ./.github/actions/cache-vite-npm
+        with:
+          node-version: 20
+
+      # 3. Install dependencies and build in staging mode
+      #
+      # Vite automatically copies everything in client/public/ into dist/ verbatim.
+      # This means these files land in dist/ as part of the build:
+      #   client/public/api/imagesCloudinary.php  →  dist/api/imagesCloudinary.php
+      #   client/public/api/luma.php              →  dist/api/luma.php
+      #   client/public/.htaccess                 →  dist/.htaccess
+      #   client/public/analytics.js              →  dist/analytics.js
+      #   client/public/robots.txt                →  dist/robots.txt
+      #
+      - name: Install and Build (Staging)
+        run: |
+          npm ci
+
+          # Build in staging mode (build:staging internally runs security:generate)
+          npm run build:staging
+
+          # Validate build output
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
+            echo "Error: dist/ directory is missing or empty"
+            exit 1
+          fi
+
+          # Confirm PHP proxy files made it into the build
+          if [ ! -f "dist/api/imagesCloudinary.php" ]; then
+            echo "Error: dist/api/imagesCloudinary.php is missing from build output"
+            exit 1
+          fi
+          if [ ! -f "dist/api/luma.php" ]; then
+            echo "Error: dist/api/luma.php is missing from build output"
+            exit 1
+          fi
+
+      # 4. Generate and validate sitemap & robots.txt
+      - name: Generate and Validate Sitemap & Robots.txt
+        run: |
+          npm run sitemap:generate
+          npm run sitemap:validate
+
+      # 5. Upload build artifact
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: dist-staging
+          path: dist
+          retention-days: 1
+          include-hidden-files: true # Required — ensures .htaccess is included
+
+  deploy:
+    name: Deploy to Staging (cPanel)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+
+    outputs:
+      release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
+
+    steps:
+      # 1. Download build artifact
+      - name: Download Build Artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist-staging
+          path: dist
+
+      # 2. Generate release timestamp
+      - name: Generate Release Timestamp
+        id: timestamp
+        run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+
+      # 3. Setup SSH
+      - name: Setup SSH
+        env:
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
+
+      # 4. Create release directory on server
+      - name: Create Release Directory
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          script: |
+            # Create staging releases directory structure
+            mkdir -p "/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP/api"
+
+      # 5. Package and sync to server
+      - name: Package and Sync to Release
+        env:
+          REMOTE_PORT: ${{ secrets.REMOTE_PORT || 22 }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        run: |
+          # Tarball the full dist/ output (includes .htaccess, PHP proxies, assets)
+          tar -czf release.tar.gz -C dist .
+
+          scp -P "${REMOTE_PORT:-22}" \
+            -o StrictHostKeyChecking=yes \
+            release.tar.gz \
+            "$REMOTE_USER"@"$REMOTE_HOST":"/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP/"
+
+      # 6. Extract release on server
+      - name: Extract Release on Server
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          script: |
+            cd "/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP"
+            tar -xzf release.tar.gz
+            rm release.tar.gz
+
+      # 7. Inject shared secrets onto server
+      #
+      # WHY: Both imagesCloudinary.php and luma.php need Cloudinary credentials
+      # to sign API requests. Credentials must never be in the repo or dist/.
+      #
+      # HOW: A PHP constants file (secrets.env.php) is written to a SHARED location
+      # OUTSIDE the document root for maximum security.
+      # Location: /home/$REMOTE_USER/config/staging-secrets.env.php
+      - name: Inject Shared Secrets onto Server
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          CLD_CLOUD_NAME: ${{ secrets.CLD_CLOUD_NAME }}
+          CLD_API_KEY: ${{ secrets.CLD_API_KEY }}
+          CLD_API_SECRET: ${{ secrets.CLD_API_SECRET }}
+          PROXY_API_TOKEN: ${{ secrets.PROXY_API_TOKEN }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,CLD_CLOUD_NAME,CLD_API_KEY,CLD_API_SECRET,PROXY_API_TOKEN
+          script: |
+            set -euo pipefail
+
+            CONFIG_DIR="/home/$REMOTE_USER/config"
+            ENV_FILE="${CONFIG_DIR}/staging-secrets.env.php"
+
+            # Create config directory with restricted permissions
+            mkdir -p "$CONFIG_DIR"
+            chmod 700 "$CONFIG_DIR"
+
+            # Step 0: Validate secrets
+            for var in CLD_CLOUD_NAME CLD_API_KEY CLD_API_SECRET PROXY_API_TOKEN; do
+              val="${!var}"
+              if [[ -z "${val}" || "${val}" =~ [$'\n'$'\r'$'\0'] ]]; then
+                echo "❌ ERROR: Secret $var is empty or contains forbidden control characters — aborting deploy"
+                exit 1
+              fi
+            done
+
+            # Step A: Escape PHP single-quote content
+            SAFE_CLOUD_NAME="${CLD_CLOUD_NAME//\\/\\\\}"
+            SAFE_CLOUD_NAME="${SAFE_CLOUD_NAME//\'/\\\'}"
+            SAFE_API_KEY="${CLD_API_KEY//\\/\\\\}"
+            SAFE_API_KEY="${SAFE_API_KEY//\'/\\\'}"
+            SAFE_API_SECRET="${CLD_API_SECRET//\\/\\\\}"
+            SAFE_API_SECRET="${SAFE_API_SECRET//\'/\\\'}"
+            SAFE_PROXY_TOKEN="${PROXY_API_TOKEN//\\/\\\\}"
+            SAFE_PROXY_TOKEN="${SAFE_PROXY_TOKEN//\'/\\\'}"
+
+            # Step B: Generate the file atomically
+            cat > "${ENV_FILE}.tmp" <<-EOF
+            <?php
+            // ---------------------------------------------------------------
+            // STAGING SHARED SECRETS - Generated by GitHub Actions
+            // DO NOT edit manually — overwritten on every deploy.
+            // ---------------------------------------------------------------
+            define('CLD_CLOUD_NAME', '${SAFE_CLOUD_NAME}');
+            define('CLD_API_KEY',    '${SAFE_API_KEY}');
+            define('CLD_API_SECRET', '${SAFE_API_SECRET}');
+            define('PROXY_API_TOKEN', '${SAFE_PROXY_TOKEN}');
+            EOF
+
+            chmod 600 "${ENV_FILE}.tmp"
+            mv "${ENV_FILE}.tmp" "$ENV_FILE"
+
+            # Step D: Confirm file exists
+            if [ -f "$ENV_FILE" ]; then
+              echo "✅ Staging shared secrets updated at ${ENV_FILE}"
+            else
+              echo "❌ ERROR: Staging shared secrets were not created — aborting deploy"
+              exit 1
+            fi
+
+      # 8. Atomically switch symlink & clean ALL previous staging releases
+      #
+      # NOTE: Unlike production (which retains last 5 releases for rollback),
+      # staging aggressively removes ALL previous releases to keep the server clean.
+      - name: Atomically Switch Symlink & Clean Previous Releases
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          STAGING_REMOTE_PATH: ${{ secrets.STAGING_REMOTE_PATH }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,STAGING_REMOTE_PATH,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+
+            RELEASE_DIR="/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP"
+            TARGET_LINK="$STAGING_REMOTE_PATH"
+            TMP_LINK="${TARGET_LINK}.tmp"
+
+            echo "🚀 Deploying staging release: $RELEASE_TIMESTAMP"
+
+            # 1. Safety Check: If target exists and is not a symlink, abort
+            if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
+              echo "CRITICAL ERROR: $TARGET_LINK exists and is not a symbolic link."
+              echo "Atomic deployment requires this path to be a symbolic link."
+              echo "Please manually rename or remove the existing entry: mv $TARGET_LINK ${TARGET_LINK}_old"
+              exit 1
+            fi
+
+            # 2. Atomic symlink switch
+            ln -sfn "$RELEASE_DIR" "$TMP_LINK"
+            mv -Tf "$TMP_LINK" "$TARGET_LINK"
+
+            echo "✅ Symlink switched to new release."
+
+            # 3. Clean ALL previous staging releases (keep only current)
+            #    Staging does not need rollback history — full clean each deploy.
+            echo "🧹 Cleaning all previous staging releases..."
+            RELEASES_DIR="/home/$REMOTE_USER/staging-releases"
+            CURRENT_RELEASE="$RELEASE_TIMESTAMP"
+
+            cd "$RELEASES_DIR"
+            for dir in */; do
+              dir="${dir%/}"  # strip trailing slash
+              if [ "$dir" != "$CURRENT_RELEASE" ]; then
+                echo "  Removing old release: $dir"
+                rm -rf "$dir"
+              fi
+            done
+
+            echo "✅ Staging deployment successful."
+
+      # 9. Health check — verify the staging URL responds
+      - name: Health Check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: |
+          echo "🌐 Verifying staging deployment at $STAGING_URL..."
+
+          # Validate URL scheme
+          if ! printf '%s' "$STAGING_URL" | grep -Eq '^https?://'; then
+            echo "::error::Invalid STAGING_URL (must start with http:// or https://)"
+            exit 1
+          fi
+
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          SUCCESS=false
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            read -r HTTP_CODE FINAL_URL <<< "$(curl -L -s -o /dev/null \
+              --connect-timeout 10 \
+              --max-time 30 \
+              -w '%{http_code} %{url_effective}' \
+              "$STAGING_URL" 2>/dev/null || echo '000 '"$STAGING_URL")"
+
+            TARGET_HOST=$(printf '%s' "$STAGING_URL" | awk -F/ '{print $3}')
+            FINAL_HOST=$(printf '%s' "$FINAL_URL" | awk -F/ '{print $3}')
+
+            echo "📊 Attempt $((RETRY_COUNT+1)): HTTP $HTTP_CODE"
+
+            # Security: fail if redirected to unexpected host
+            if [ "$FINAL_HOST" != "$TARGET_HOST" ]; then
+              echo "::error::Security Risk: Redirected to unexpected host: $FINAL_HOST"
+              break
+            fi
+
+            case "$HTTP_CODE" in
+              2* | 3*)
+                echo "✅ Staging health check passed (HTTP $HTTP_CODE)"
+                SUCCESS=true
+                break
+                ;;
+              *)
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  SLEEP_TIME=$((2 ** RETRY_COUNT))
+                  echo "⏳ Retrying in ${SLEEP_TIME}s..."
+                  sleep $SLEEP_TIME
+                fi
+                ;;
+            esac
+          done
+
+          if [ "$SUCCESS" != true ]; then
+            echo "::error::Staging health check failed after $MAX_RETRIES attempts (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+  notify:
+    name: Notify Staging Deployment
+    needs: [build, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set Release Timestamp
+        run: |
+          TS="${{ needs.deploy.outputs.release_timestamp }}"
+          if [ -z "$TS" ]; then TS="${{ github.run_id }}"; fi
+          echo "RELEASE_TIMESTAMP=$TS" >> $GITHUB_ENV
+
+      - name: Send Success Email
+        if: ${{ needs.build.result == 'success' && needs.deploy.result == 'success' }}
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c # v17
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ Staging Deployment Successful - ${{ github.repository }}"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            🎉 Staging deployment was successful!
+
+            📦 Deployment Details:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Repository:    ${{ github.repository }}
+            Branch:        ${{ github.ref_name }}
+            Environment:   staging
+            Release ID:    ${{ env.RELEASE_TIMESTAMP }}
+            Commit SHA:    ${{ github.sha }}
+            Triggered by:  ${{ github.actor }}
+
+            🔗 Links:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Staging URL:   ${{ secrets.STAGING_URL }}
+            Workflow Run:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Commit:        ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
+            🧪 Review and test at the staging URL before merging to main.
+
+            ---
+            This is an automated message from GitHub Actions (c) Nairobi DevOps.
+
+      - name: Send Failure Email
+        if: ${{ needs.build.result != 'success' || needs.deploy.result != 'success' }}
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c # v17
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ Staging Deployment Failed - ${{ github.repository }}"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            ⚠️ Staging deployment has failed. Please review before merging to main.
+
+            📦 Deployment Details:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Repository:    ${{ github.repository }}
+            Branch:        ${{ github.ref_name }}
+            Environment:   staging
+            Release ID:    ${{ env.RELEASE_TIMESTAMP }}
+            Commit SHA:    ${{ github.sha }}
+            Triggered by:  ${{ github.actor }}
+
+            🔗 Action Required:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Please review the workflow logs immediately:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Commit details:
+            ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
+            🔧 Next Steps:
+            1. Check the workflow logs for error details
+            2. Review the commit changes
+            3. Fix the issue and push a new commit or re-run the workflow
+
+            ---
+            This is an automated message from GitHub Actions (c) Nairobi DevOps.

@@ -23,7 +23,6 @@ export default [
       "**/.vite",
       "client/public/analytics.js",
       "**/*.min.js",
-      "vercel.json",
       "luma.ics",
       ".git-blame-ignore-revs",
       ".deepsource.toml",
