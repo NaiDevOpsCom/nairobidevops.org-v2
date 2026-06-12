@@ -20,6 +20,13 @@ export default function Navbar() {
   const [location, setLocation] = useLocation();
   const [currentLocation, setCurrentLocation] = useState(location);
 
+  useEffect(() => {
+    // Sync active-route state with wouter on any navigation
+    // (browser back/forward is handled by the popstate listener below)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentLocation(location);
+  }, [location]);
+
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/about", label: "About Us" },

@@ -98,7 +98,12 @@ const Carousel = React.forwardRef<
     api.on("reInit", onSelect);
     api.on("select", onSelect);
 
+    // Initial sync: Embla fires "select" only on non-default index,
+    // so explicitly sync scroll state on mount to avoid disabled buttons.
+    const raf = requestAnimationFrame(() => onSelect(api));
+
     return () => {
+      cancelAnimationFrame(raf);
       api?.off("reInit", onSelect);
       api?.off("select", onSelect);
     };
