@@ -186,3 +186,12 @@ html {
     background-color: var(--input);
   }
 }
+
+/* ==========================
+   react-day-picker Calendar
+========================== */
+.day-range-end {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
