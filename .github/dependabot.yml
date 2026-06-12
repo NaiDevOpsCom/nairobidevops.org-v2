@@ -1,76 +1,71 @@
 version: 2
-
 updates:
-  # 1. React / TypeScript dependencies (npm)
   - package-ecosystem: "npm"
     directory: "/"
-    target-branch: "pre-staging"
-    schedule:
-      interval: "daily"
-      time: "09:00"
-      timezone: "Africa/Nairobi"
-
-    open-pull-requests-limit: 10
-
-    reviewers:
-      - "jumalaw98"
-
-    # Group dependencies for stability
-    groups:
-      # 🔒 React core must move together
-      react-core:
-        patterns:
-          - "react"
-          - "@types/react"
-        update-types:
-          - "minor"
-          - "patch"
-
-      # 🔒 React DOM must move together
-      react-dom-core:
-        patterns:
-          - "react-dom"
-          - "@types/react-dom"
-        update-types:
-          - "minor"
-          - "patch"
-
-      # Group ESLint + TypeScript-ESLint together
-      eslint-group:
-        patterns:
-          - "eslint"
-          - "@typescript-eslint/parser"
-          - "@typescript-eslint/eslint-plugin"
-
-      # Other frontend dependencies
-      frontend-dependencies:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-    # Ignore ESLint v9 until ecosystem is ready
-    ignore:
-      - dependency-name: "eslint"
-        versions: [">=9"]
-
-  # 2. GitHub Actions dependencies
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    target-branch: "pre-staging"
     schedule:
       interval: "weekly"
-      time: "09:00"
-      timezone: "Africa/Nairobi"
-
-    reviewers:
-      - "jumalaw98"
-
     groups:
-      github-actions:
+      frontend-dependencies:
         patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
+          - "@radix-ui/*"
+          - "@tanstack/*"
+          - "@cloudinary/*"
+          - "@hookform/*"
+          - "@unpic/*"
+          - "@vercel/*"
+          - "class-variance-authority"
+          - "clsx"
+          - "cmdk"
+          - "date-fns"
+          - "embla-carousel*"
+          - "ical.js"
+          - "input-otp"
+          - "lucide-react"
+          - "motion"
+          - "react"
+          - "react-dom"
+          - "react-*"
+          - "recharts"
+          - "tailwind-merge"
+          - "vaul"
+          - "wouter"
+          - "zod"
+        exclude-patterns:
+          - "eslint*"
+          - "eslint-*"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+          - "@vitest/*"
+          - "prettier"
+          - "typescript"
+          - "tsx"
+          - "vite"
+          - "@vitejs/*"
+          - "@tailwindcss/*"
+          - "tailwindcss"
+          - "postcss"
+          - "autoprefixer"
+          - "esbuild"
+          - "terser"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      tooling:
+        patterns:
+          - "eslint*"
+          - "@eslint/*"
+          - "@typescript-eslint/*"
+          - "@vitest/*"
+          - "prettier"
+          - "typescript"
+          - "tsx"
+          - "vite"
+          - "@vitejs/*"
+          - "@tailwindcss/*"
+          - "tailwindcss"
+          - "postcss"
+          - "autoprefixer"
+          - "esbuild"
+          - "terser"

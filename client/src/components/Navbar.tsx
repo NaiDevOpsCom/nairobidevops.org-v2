@@ -21,7 +21,11 @@ export default function Navbar() {
   const [currentLocation, setCurrentLocation] = useState(location);
 
   useEffect(() => {
-    setCurrentLocation(location);
+    // Sync active-route state on any wouter navigation.
+    // Use browser URL (not wouter's hash-stripped location) to
+    // preserve hash tracking for hash-aware link highlighting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentLocation(window.location.pathname + window.location.hash);
   }, [location]);
 
   const navLinks = [
@@ -50,6 +54,7 @@ export default function Navbar() {
       openExternal(href);
     } else if (href.startsWith("/")) {
       setLocation(href);
+      setCurrentLocation(href);
     } else if (href.startsWith("#")) {
       const element = document.querySelector(href);
       if (element) {
