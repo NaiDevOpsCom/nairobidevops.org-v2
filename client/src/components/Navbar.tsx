@@ -20,10 +20,6 @@ export default function Navbar() {
   const [location, setLocation] = useLocation();
   const [currentLocation, setCurrentLocation] = useState(location);
 
-  useEffect(() => {
-    setCurrentLocation(location);
-  }, [location]);
-
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/about", label: "About Us" },
@@ -50,6 +46,7 @@ export default function Navbar() {
       openExternal(href);
     } else if (href.startsWith("/")) {
       setLocation(href);
+      setCurrentLocation(href);
     } else if (href.startsWith("#")) {
       const element = document.querySelector(href);
       if (element) {
