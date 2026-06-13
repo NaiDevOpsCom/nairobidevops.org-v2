@@ -2,7 +2,7 @@ name: PR Auto Label
 
 on:
   pull_request_target:
-    types: [opened, reopened]
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read
@@ -30,21 +30,20 @@ jobs:
             const currentLabels = context.payload.pull_request.labels.map(l => l.name);
 
             const titleRules = [
-              { patterns: ['feat:'], label: 'feature' },
-              { patterns: ['fix:'], label: 'bug' },
-              { patterns: ['docs:'], label: 'documentation' },
-              { patterns: ['refactor:'], label: 'refactor' },
-              { patterns: ['ci:'], label: 'ci/cd' },
-              { patterns: ['build(deps):', 'build(deps-dev):', 'build:'], label: 'dependencies' },
-              { patterns: ['test:'], label: 'tests' },
-              { patterns: ['security:'], label: 'security' },
+              { regex: /^feat(\(.*?\))?:\s/, label: 'feature' },
+              { regex: /^fix(\(.*?\))?:\s/, label: 'bug' },
+              { regex: /^docs(\(.*?\))?:\s/, label: 'documentation' },
+              { regex: /^refactor(\(.*?\))?:\s/, label: 'refactor' },
+              { regex: /^ci(\(.*?\))?:\s/, label: 'ci/cd' },
+              { regex: /^build(\(deps(?:-dev)?\))?:\s/, label: 'dependencies' },
+              { regex: /^test(\(.*?\))?:\s/, label: 'tests' },
+              { regex: /^security(\(.*?\))?:\s/, label: 'security' },
             ];
 
             const toAdd = [];
 
             for (const rule of titleRules) {
-              const matched = rule.patterns.some(p => title.startsWith(p));
-              if (matched && !currentLabels.includes(rule.label)) {
+              if (rule.regex.test(title) && !currentLabels.includes(rule.label)) {
                 toAdd.push(rule.label);
               }
             }

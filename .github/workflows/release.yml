@@ -109,6 +109,7 @@ jobs:
             CURRENT="${LAST_TAG#v}"; RANGE="${LAST_TAG}..HEAD"
           fi
           echo "current_version=${CURRENT}" >> $GITHUB_OUTPUT
+          echo "changelog_range=${RANGE}" >> $GITHUB_OUTPUT
 
           # Manual override takes priority
           MANUAL_BUMP="${{ github.event.inputs.bump }}"
@@ -134,7 +135,7 @@ jobs:
           fi
           echo "bump=${BUMP}" >> $GITHUB_OUTPUT
 
-      - name: Calculate new version
+      - name: Validate and calculate new version
         id: semver
         if: steps.verify-merge.outputs.result == 'true'
         run: |
@@ -142,6 +143,14 @@ jobs:
           MANUAL_VER="${{ steps.bump.outputs.manual_version }}"
 
           if [ "$BUMP" = "manual" ] && [ -n "$MANUAL_VER" ]; then
+            # Validate manual version is a valid semver
+            node -e "
+              const v = process.argv[1];
+              if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(v)) {
+                console.error('Invalid semver: ' + v);
+                process.exit(1);
+              }
+            " "${MANUAL_VER}"
             echo "new_version=${MANUAL_VER}" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -200,20 +209,18 @@ jobs:
       - name: Generate changelog
         id: changelog
         if: steps.guard.outputs.skip == 'false'
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
           NEW_VERSION: ${{ steps.semver.outputs.new_version }}
+          CHANGELOG_RANGE: ${{ steps.bump.outputs.changelog_range }}
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const newVersion = process.env.NEW_VERSION;
 
-            let range = 'HEAD';
-            try {
-              const t = require('child_process')
-                .execSync('git tag --sort=-version:refname | head -1', { encoding: 'utf8' }).trim();
-              if (t) range = `${t}..HEAD`;
-            } catch {}
+            // Use the range captured before creating the new tag,
+            // so we get the commits between the previous tag and HEAD.
+            const range = process.env.CHANGELOG_RANGE || 'HEAD';
 
             const categories = {
               'Breaking Changes': [],

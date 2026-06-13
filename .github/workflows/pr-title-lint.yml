@@ -2,7 +2,7 @@ name: PR Title Lint
 
 on:
   pull_request_target:
-    types: [opened, edited, reopened]
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   pull-requests: write
@@ -30,8 +30,6 @@ jobs:
             test
             security
           requireScope: false
-          subjectPatternError: |
-            The subject "{subject}" must start with a lowercase letter.
           validateSingleCommit: false
           wip: true
           ignoreLabels: |
