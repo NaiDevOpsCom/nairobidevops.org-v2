@@ -35,7 +35,7 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     outputs:
-      new_version: ${{ steps.update-version.outputs.new_version }}
+      new_version: ${{ steps.update-version.outputs.new_version || steps.update-version-recovery.outputs.new_version }}
 
     steps:
       - name: Checkout repository
@@ -78,18 +78,21 @@ jobs:
               const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
                 owner: context.repo.owner, repo: context.repo.repo, commit_sha: context.sha
               });
-              const match = prs.find(p => p.head.ref === 'pre-staging' && p.merged_at);
+              const match = prs.find(p =>
+                p.head.ref === 'pre-staging' &&
+                p.base.ref === 'main' &&
+                p.merged_at
+              );
               if (match) {
                 core.setOutput('pr_number', String(match.number));
                 core.setOutput('pr_title', match.title);
                 return 'true';
               }
-            } catch { /* fallback */ }
+            } catch (e) {
+              core.warning('Failed to query PRs: ' + e.message);
+            }
 
-            const msg = (commit.data.commit.message || '').toLowerCase();
-            if (msg.includes('pre-staging')) return 'true';
-
-            core.notice('Not a pre-staging merge — skipping');
+            core.notice('Not a pre-staging → main merge — skipping');
             return 'false';
 
       - name: Fetch tags
@@ -144,10 +147,12 @@ jobs:
 
           if [ "$BUMP" = "manual" ] && [ -n "$MANUAL_VER" ]; then
             # Validate manual version is a valid semver
+            # Only accept strict numeric x.y.z — prerelease/build suffixes
+            # would break the IFS-based integer arithmetic in the bump step.
             node -e "
               const v = process.argv[1];
-              if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(v)) {
-                console.error('Invalid semver: ' + v);
+              if (!/^\d+\.\d+\.\d+$/.test(v)) {
+                console.error('Invalid version: ' + v + ' (must be numeric x.y.z)');
                 process.exit(1);
               }
             " "${MANUAL_VER}"
@@ -163,16 +168,34 @@ jobs:
             patch) echo "new_version=${P[0]}.${P[1]}.$((P[2]+1))" ;;
           esac >> $GITHUB_OUTPUT
 
-      - name: Guard — reject duplicate tag
+      - name: Guard — check for existing tag & release
         id: guard
         if: steps.verify-merge.outputs.result == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           V="${{ steps.semver.outputs.new_version }}"
+          TAG_EXISTS=false
+          RELEASE_EXISTS=false
+
           if git tag -l "v${V}" | grep -q .; then
-            echo "Tag v${V} already exists — skipping."
+            TAG_EXISTS=true
+          fi
+
+          if gh release view "v${V}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            RELEASE_EXISTS=true
+          fi
+
+          if [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "true" ]; then
+            echo "Tag and release v${V} both exist — skipping."
             echo "skip=true" >> $GITHUB_OUTPUT
+          elif [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "false" ]; then
+            echo "::warning::Tag v${V} exists but release is missing — will create release."
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "tag_only=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
+            echo "tag_only=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Guard — reject rollback (older than latest tag)
@@ -189,7 +212,7 @@ jobs:
 
       - name: Bump package.json & create tag
         id: update-version
-        if: steps.guard.outputs.skip == 'false'
+        if: steps.guard.outputs.skip == 'false' && steps.guard.outputs.tag_only != 'true'
         run: |
           V="${{ steps.semver.outputs.new_version }}"
           node -e "
@@ -205,6 +228,14 @@ jobs:
           git tag "v${V}"
           git push origin "v${V}"
           echo "new_version=${V}" >> $GITHUB_OUTPUT
+
+      # When recovering from a partial run (tag exists, release missing),
+      # propagate new_version so changelog + release steps can proceed.
+      - name: Propagate version (tag-only recovery)
+        id: update-version-recovery
+        if: steps.guard.outputs.skip == 'false' && steps.guard.outputs.tag_only == 'true'
+        run: |
+          echo "new_version=${{ steps.semver.outputs.new_version }}" >> $GITHUB_OUTPUT
 
       - name: Generate changelog
         id: changelog

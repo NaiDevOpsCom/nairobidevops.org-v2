@@ -34,14 +34,14 @@ jobs:
               { regex: /^fix(\(.*?\))?!?:\s/, label: 'bug' },
               { regex: /^docs(\(.*?\))?!?:\s/, label: 'documentation' },
               { regex: /^refactor(\(.*?\))?!?:\s/, label: 'refactor' },
+              { regex: /^chore(\(.*?\))?!?:\s/, label: 'refactor' },
               { regex: /^ci(\(.*?\))?!?:\s/, label: 'ci/cd' },
               { regex: /^build(\(deps(?:-dev)?\))?!?:\s/, label: 'dependencies' },
               { regex: /^test(\(.*?\))?!?:\s/, label: 'tests' },
               { regex: /^security(\(.*?\))?!?:\s/, label: 'security' },
             ];
 
-            // All labels this workflow manages (title-rule labels + breaking-change).
-            const managedLabels = [...titleRules.map(r => r.label), 'breaking-change'];
+
 
             const toAdd = [];
             const toRemove = [];

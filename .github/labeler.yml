@@ -36,6 +36,6 @@ security:
   - changed-files:
       - any-glob-to-any-file:
           - "**/security/**"
-          - "**/security*"
-          - "**/*security*"
+          - "**/security-*"
+          - "**/*.security.*"
           - "security-policy.json"
