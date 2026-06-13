@@ -1,13 +1,16 @@
 <?php
 /**
  * Luma Calendar API Proxy (Hardened)
- * 
- * Securely proxies requests to api.luma.com while enforcing 
+ *
+ * Securely proxies requests to api.luma.com while enforcing
  * authentication, origin validation, rate limiting, and caching.
  */
 
 require_once __DIR__ . '/config-loader.php';
 require_once __DIR__ . '/security-utils.php';
+
+const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
+const CONTENT_TYPE_HEADER = 'Content-Type: ';
 
 header('X-Content-Type-Options: nosniff');
 
@@ -38,16 +41,21 @@ if ($method === 'OPTIONS') {
 }
 
 // 3. Rate Limiting (IP-based, outside public_html)
-$cacheRootDir = get_proxy_cache_dir(); // /home/user/cache
+$cacheRootDir = getProxyCacheDir(); // /home/user/cache
 if (!SecurityUtils::checkRateLimit($cacheRootDir . '/rate_limits', 30, 60)) {
     http_response_code(429);
-    header('Content-Type: application/json; charset=utf-8');
+    header(CONTENT_TYPE_HEADER . JSON_CONTENT_TYPE);
     echo json_encode(['error' => 'Too Many Requests'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 
 // 4. Authentication (Supports Rotation)
-$headers = function_exists('getallheaders') ? getallheaders() : (function_exists('apache_request_headers') ? apache_request_headers() : []);
+$headers = [];
+if (function_exists('getallheaders')) {
+    $headers = getallheaders();
+} elseif (function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+}
 $headersLower = array_change_key_case($headers, CASE_LOWER);
 
 $authHeaderToken = $headersLower['x-proxy-token'] ?? '';
@@ -62,7 +70,7 @@ $isAuthenticated = SecurityUtils::validateToken($authHeaderToken, $expectedToken
 // Fix the 401: If not authenticated by token, allow ONLY if Trusted Origin + AJAX
 if (!$isAuthenticated && !( !empty($validOrigin) && $isAjax)) {
     http_response_code(401);
-    header('Content-Type: application/json; charset=utf-8');
+    header(CONTENT_TYPE_HEADER . JSON_CONTENT_TYPE);
     echo json_encode(['error' => 'Unauthorized'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
@@ -71,7 +79,7 @@ if (!$isAuthenticated && !( !empty($validOrigin) && $isAjax)) {
 if (!in_array($method, $allowedMethods, true)) {
     http_response_code(405);
     header('Allow: ' . implode(', ', $allowedMethods));
-    header('Content-Type: application/json; charset=utf-8');
+    header(CONTENT_TYPE_HEADER . JSON_CONTENT_TYPE);
     echo json_encode(['error' => 'Method Not Allowed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
@@ -84,7 +92,7 @@ $path = '/' . ltrim($path, '/');
 // Validate path
 if ($path === '/' || !preg_match('#^/[a-zA-Z0-9/_\.\-\?=&]*$#', $path) || strpos($path, '..') !== false) {
     http_response_code(400);
-    header('Content-Type: application/json; charset=utf-8');
+    header(CONTENT_TYPE_HEADER . JSON_CONTENT_TYPE);
     echo json_encode(['error' => 'Invalid path'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
@@ -107,10 +115,10 @@ $cacheTTL = 300; // 5 minutes
 if ($method === 'GET' && !$hasAuthorization && file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
     $cachedData = file_get_contents($cacheFile);
     $cacheMetaFile = $cacheFile . '.meta';
-    $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : 'application/json; charset=utf-8';
+    $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : JSON_CONTENT_TYPE;
     
     if ($cachedData) {
-        header('Content-Type: ' . $cachedContentType);
+        header(CONTENT_TYPE_HEADER . $cachedContentType);
         header('X-Cache: HIT');
         echo $cachedData;
         exit;
@@ -126,17 +134,25 @@ curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 
-if ($method === 'HEAD') curl_setopt($ch, CURLOPT_NOBODY, true);
-if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
-    curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
-}
+if ($method === 'HEAD') {
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+    }
+    if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
+    }
 
-// Forward Authorization
-$forwardHeaders = [];
-$forwardAuthHeader = !empty($authContext) ? $authContext : null;
-if ($forwardAuthHeader) $forwardHeaders[] = 'Authorization: ' . preg_replace('/\v+/', '', $forwardAuthHeader);
-if (isset($_SERVER['CONTENT_TYPE'])) $forwardHeaders[] = 'Content-Type: ' . preg_replace('/\v+/', '', $_SERVER['CONTENT_TYPE']);
-if (!empty($forwardHeaders)) curl_setopt($ch, CURLOPT_HTTPHEADER, $forwardHeaders);
+    // Forward Authorization
+    $forwardHeaders = [];
+    $forwardAuthHeader = !empty($authContext) ? $authContext : null;
+    if ($forwardAuthHeader) {
+        $forwardHeaders[] = 'Authorization: ' . preg_replace('/\v+/', '', $forwardAuthHeader);
+    }
+    if (isset($_SERVER['CONTENT_TYPE'])) {
+        $forwardHeaders[] = CONTENT_TYPE_HEADER . preg_replace('/\v+/', '', $_SERVER['CONTENT_TYPE']);
+    }
+    if (!empty($forwardHeaders)) {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $forwardHeaders);
+    }
 
 $response = curl_exec($ch);
 $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -145,7 +161,7 @@ $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 if (curl_errno($ch)) {
     http_response_code(500);
     error_log('Luma Proxy Error: ' . curl_error($ch));
-    header('Content-Type: application/json; charset=utf-8');
+    header(CONTENT_TYPE_HEADER . JSON_CONTENT_TYPE);
     echo json_encode(['error' => 'Upstream failed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     curl_close($ch);
     exit;
@@ -154,11 +170,13 @@ curl_close($ch);
 
 // 8. Cache result and output
 http_response_code($http_code);
-header('Content-Type: ' . ($contentType ?: 'application/json; charset=utf-8'));
+header(CONTENT_TYPE_HEADER . ($contentType ?: JSON_CONTENT_TYPE));
 header('X-Cache: ' . ($hasAuthorization ? 'BYPASS' : 'MISS'));
 
 if ($method === 'GET' && !$hasAuthorization && $http_code === 200) {
-    if (!is_dir(dirname($cacheFile))) mkdir(dirname($cacheFile), 0700, true);
+    if (!is_dir(dirname($cacheFile))) {
+        mkdir(dirname($cacheFile), 0700, true);
+    }
     // Atomic write
     file_put_contents($cacheFile . '.tmp', $response, LOCK_EX);
     rename($cacheFile . '.tmp', $cacheFile);
@@ -169,4 +187,6 @@ if ($method === 'GET' && !$hasAuthorization && $http_code === 200) {
     }
 }
 
-if ($method !== 'HEAD') echo $response;
+if ($method !== 'HEAD') {
+    echo $response;
+}

@@ -1,8 +1,5 @@
 name: Deploy to cPanel (Staging)
 
-permissions:
-  contents: read
-
 # One deploy at a time — do NOT cancel in-progress staging deploys
 concurrency:
   group: deploy-staging
@@ -32,6 +29,8 @@ jobs:
   build:
     name: Build (Staging Mode)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       # 1. Check out the code

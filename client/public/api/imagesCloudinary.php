@@ -44,7 +44,7 @@ if (!in_array($method, $allowedMethods, true)) {
 }
 
 // 3. Rate Limiting
-$cacheRootDir = get_proxy_cache_dir();
+$cacheRootDir = getProxyCacheDir();
 if (!SecurityUtils::checkRateLimit($cacheRootDir . '/rate_limits', 30, 60)) {
     http_response_code(429);
     echo json_encode(['error' => 'Too Many Requests'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
@@ -69,7 +69,12 @@ if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=+]+$/', $nextCursor)) {
 }
 
 // 5. Authentication
-$headers = function_exists('getallheaders') ? getallheaders() : (function_exists('apache_request_headers') ? apache_request_headers() : []);
+$headers = [];
+if (function_exists('getallheaders')) {
+    $headers = getallheaders();
+} elseif (function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+}
 $headersLower = array_change_key_case($headers, CASE_LOWER);
 
 $authHeaderToken = $headersLower['x-proxy-token'] ?? '';
@@ -118,7 +123,9 @@ $queryParams = [
     'prefix'      => $folder . '/',
     'type'        => 'upload',
 ];
-if ($nextCursor) $queryParams['next_cursor'] = $nextCursor;
+if ($nextCursor) {
+    $queryParams['next_cursor'] = $nextCursor;
+}
 
 $apiUrl = "https://api.cloudinary.com/v1_1/{$cloudName}/resources/image?" . http_build_query($queryParams);
 
@@ -171,7 +178,9 @@ $shaped = [
 // 8. Cache result and output with safety flags
 $json = json_encode($shaped, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 if ($method === 'GET') {
-    if (!is_dir(dirname($cacheFile))) mkdir(dirname($cacheFile), 0700, true);
+    if (!is_dir(dirname($cacheFile))) {
+        mkdir(dirname($cacheFile), 0700, true);
+    }
     file_put_contents($cacheFile . '.tmp', $json, LOCK_EX);
     rename($cacheFile . '.tmp', $cacheFile);
 }
