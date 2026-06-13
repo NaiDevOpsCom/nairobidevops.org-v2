@@ -88,23 +88,28 @@ function gatherDependencyList(packageJson) {
   return [...new Set([...dependencies, ...devDependencies])].sort((left, right) => left.localeCompare(right))
 }
 
-async function resolveDependencyVersion(name, packageJson, lockfile) {
-  // Handle npm v3+ lockfile format (uses packages object)
-  if (lockfile.packages) {
-    // Try root package first
-    const rootDep = lockfile.packages[`node_modules/${name}`]
-    if (rootDep?.version) return rootDep.version
-    // For scoped packages or other packages not matched directly,
-    // check entry keys, but ensure it's NOT a nested transitive dependency.
-    for (const [key, pkg] of Object.entries(lockfile.packages)) {
-      if (key.endsWith(`node_modules/${name}`) && pkg.version) {
-        const parts = key.split('node_modules')
-        if (parts.length <= 2) {
-          return pkg.version
-        }
-      }
+function findPackageVersion(packages, name) {
+  const rootDep = packages[`node_modules/${name}`]
+  if (rootDep?.version) return rootDep.version
+
+  for (const [key, pkg] of Object.entries(packages)) {
+    if (!key.endsWith(`node_modules/${name}`) || !pkg?.version) continue
+
+    const parts = key.split('node_modules')
+    if (parts.length <= 2) {
+      return pkg.version
     }
   }
+
+  return null
+}
+
+async function resolveDependencyVersion(name, packageJson, lockfile) {
+  if (lockfile.packages) {
+    const packageVersion = findPackageVersion(lockfile.packages, name)
+    if (packageVersion) return packageVersion
+  }
+
   // Fallback to v2 lockfile format (uses flat dependencies object)
   const locked = lockfile.dependencies?.[name]?.version
   if (locked) return locked

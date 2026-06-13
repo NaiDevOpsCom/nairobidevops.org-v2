@@ -1,5 +1,7 @@
+# Workflow name
 name: Deploy to cPanel (Staging)
 
+# Minimum GITHUB_TOKEN permissions — top-level so all jobs inherit this by default
 permissions:
   contents: read
 
@@ -32,6 +34,8 @@ jobs:
   build:
     name: Build (Staging Mode)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       # 1. Check out the code

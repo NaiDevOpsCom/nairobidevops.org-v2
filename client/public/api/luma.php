@@ -1,92 +1,21 @@
 <?php
 /**
  * Luma Calendar API Proxy (Hardened)
- * 
- * Securely proxies requests to api.luma.com while enforcing 
- * authentication, origin validation, rate limiting, and caching.
  */
 
-require_once __DIR__ . '/config-loader.php';
-require_once __DIR__ . '/security-utils.php';
+require_once __DIR__ . '/api-middleware.php';
 
-header('X-Content-Type-Options: nosniff');
+const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
+const CONTENT_TYPE_HEADER = 'Content-Type: ';
 
-// 1. Strict Origin & Referer Validation
-$allowedOrigins = [
-    'https://nairobidevops.org',
-    'https://www.nairobidevops.org'
-];
+$ctx = proxyRunMiddleware(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS', 'HEAD']);
 
-$validOrigin = SecurityUtils::validateOrigin($allowedOrigins);
-if (!empty($validOrigin)) {
-    header("Access-Control-Allow-Origin: $validOrigin");
-    header("Vary: Origin");
-}
-
-// 2. Preflight Handling
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$allowedMethods = ["GET", "POST", "OPTIONS", "HEAD"];
-
-if ($method === 'OPTIONS') {
-    if (!empty($validOrigin)) {
-        header("Access-Control-Allow-Methods: " . implode(", ", $allowedMethods));
-        header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Proxy-Token");
-        header("Access-Control-Max-Age: 86400");
-    }
-    http_response_code(204);
-    exit;
-}
-
-// 3. Rate Limiting (IP-based, outside public_html)
-$cacheRootDir = get_proxy_cache_dir(); // /home/user/cache
-if (!SecurityUtils::checkRateLimit($cacheRootDir . '/rate_limits', 30, 60)) {
-    http_response_code(429);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Too Many Requests'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-    exit;
-}
-
-// 4. Authentication (Supports Rotation)
-$headers = function_exists('getallheaders') ? getallheaders() : (function_exists('apache_request_headers') ? apache_request_headers() : []);
-$headersLower = array_change_key_case($headers, CASE_LOWER);
-
-$authHeaderToken = $headersLower['x-proxy-token'] ?? '';
-if (preg_match('/Bearer\s+(.*)$/i', $authHeaderToken, $matches)) {
-    $authHeaderToken = trim($matches[1]);
-}
-
-$expectedToken = defined('PROXY_API_TOKEN') ? PROXY_API_TOKEN : getenv('PROXY_API_TOKEN');
-$isAjax = strtolower($headersLower['x-requested-with'] ?? '') === 'xmlhttprequest';
-$isAuthenticated = SecurityUtils::validateToken($authHeaderToken, $expectedToken);
-
-// Fix the 401: If not authenticated by token, allow ONLY if Trusted Origin + AJAX
-if (!$isAuthenticated && !( !empty($validOrigin) && $isAjax)) {
-    http_response_code(401);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Unauthorized'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-    exit;
-}
-
-// 5. Hardened Method Allowlist
-if (!in_array($method, $allowedMethods, true)) {
-    http_response_code(405);
-    header('Allow: ' . implode(', ', $allowedMethods));
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Method Not Allowed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-    exit;
-}
-
-// 6. Build Target URL
 $base_url = 'https://api.luma.com';
 $path = isset($_GET['path']) ? (string)$_GET['path'] : '';
 $path = '/' . ltrim($path, '/');
 
-// Validate path
 if ($path === '/' || !preg_match('#^/[a-zA-Z0-9/_\.\-\?=&]*$#', $path) || strpos($path, '..') !== false) {
-    http_response_code(400);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Invalid path'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-    exit;
+    proxyJsonError('Invalid path', 400);
 }
 
 $queryParams = $_GET;
@@ -97,76 +26,67 @@ if ($queryString !== '') {
     $target_url .= (strpos($path, '?') === false ? '?' : '&') . $queryString;
 }
 
-// 7. Caching (GET requests only)
-$authContext = $headersLower['authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$authContext = $ctx['headersLower']['authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
 $hasAuthorization = trim($authContext) !== '';
 $cacheKey = md5($target_url . '|' . $authContext);
-$cacheFile = $cacheRootDir . '/api_responses/luma_' . $cacheKey . '.json';
-$cacheTTL = 300; // 5 minutes
+$cacheFile = $ctx['cacheRootDir'] . '/api_responses/luma_' . $cacheKey . '.json';
+$cacheTTL = 300;
 
-if ($method === 'GET' && !$hasAuthorization && file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
-    $cachedData = file_get_contents($cacheFile);
+if ($ctx['method'] === 'GET' && !$hasAuthorization) {
     $cacheMetaFile = $cacheFile . '.meta';
-    $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : 'application/json; charset=utf-8';
-    
-    if ($cachedData) {
-        header('Content-Type: ' . $cachedContentType);
-        header('X-Cache: HIT');
-        echo $cachedData;
-        exit;
-    }
+    $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : JSON_CONTENT_TYPE;
+    proxyServeCache($cacheFile, $cacheTTL, $cachedContentType);
 }
 
-// 7. Proxy the Request
 $ch = curl_init($target_url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $ctx['method']);
 
-if ($method === 'HEAD') curl_setopt($ch, CURLOPT_NOBODY, true);
-if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
+if ($ctx['method'] === 'HEAD') {
+    curl_setopt($ch, CURLOPT_NOBODY, true);
+}
+if (in_array($ctx['method'], ['POST', 'PUT', 'PATCH'])) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
 }
 
-// Forward Authorization
 $forwardHeaders = [];
 $forwardAuthHeader = !empty($authContext) ? $authContext : null;
-if ($forwardAuthHeader) $forwardHeaders[] = 'Authorization: ' . preg_replace('/\v+/', '', $forwardAuthHeader);
-if (isset($_SERVER['CONTENT_TYPE'])) $forwardHeaders[] = 'Content-Type: ' . preg_replace('/\v+/', '', $_SERVER['CONTENT_TYPE']);
-if (!empty($forwardHeaders)) curl_setopt($ch, CURLOPT_HTTPHEADER, $forwardHeaders);
+if ($forwardAuthHeader) {
+    $forwardHeaders[] = 'Authorization: ' . preg_replace('/\v+/', '', $forwardAuthHeader);
+}
+if (isset($_SERVER['CONTENT_TYPE'])) {
+    $forwardHeaders[] = CONTENT_TYPE_HEADER . preg_replace('/\v+/', '', $_SERVER['CONTENT_TYPE']);
+}
+if (!empty($forwardHeaders)) {
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $forwardHeaders);
+}
 
 $response = curl_exec($ch);
 $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 
 if (curl_errno($ch)) {
-    http_response_code(500);
     error_log('Luma Proxy Error: ' . curl_error($ch));
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Upstream failed'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     curl_close($ch);
-    exit;
+    proxyJsonError('Upstream failed', 500);
 }
 curl_close($ch);
 
-// 8. Cache result and output
 http_response_code($http_code);
-header('Content-Type: ' . ($contentType ?: 'application/json; charset=utf-8'));
+header(CONTENT_TYPE_HEADER . ($contentType ?: JSON_CONTENT_TYPE));
 header('X-Cache: ' . ($hasAuthorization ? 'BYPASS' : 'MISS'));
 
-if ($method === 'GET' && !$hasAuthorization && $http_code === 200) {
-    if (!is_dir(dirname($cacheFile))) mkdir(dirname($cacheFile), 0700, true);
-    // Atomic write
-    file_put_contents($cacheFile . '.tmp', $response, LOCK_EX);
-    rename($cacheFile . '.tmp', $cacheFile);
-    
-    // Cache Content-Type metadata
+if ($ctx['method'] === 'GET' && !$hasAuthorization && $http_code === 200) {
+    proxyWriteCache($cacheFile, $response);
     if ($contentType) {
         file_put_contents($cacheFile . '.meta', $contentType);
     }
 }
 
-if ($method !== 'HEAD') echo $response;
+if ($ctx['method'] !== 'HEAD') {
+    echo $response;
+}
