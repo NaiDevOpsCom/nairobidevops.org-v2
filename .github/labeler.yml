@@ -1,0 +1,40 @@
+# File- and branch-based label rules.
+# Title-based labeling is handled by pr-auto-label.yml (github-script step).
+
+feature:
+  - head-branch: ["^feat", "^feature"]
+
+bug:
+  - head-branch: ["^fix", "^bug"]
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["docs/**", "*.md", "CONTENT_GUIDE.md"]
+  - head-branch: ["^docs", "^doc"]
+
+ci/cd:
+  - changed-files:
+      - any-glob-to-any-file: [".github/workflows/**", ".github/actions/**"]
+
+dependencies:
+  - head-branch: ["^dependabot"]
+  - changed-files:
+      - any-glob-to-any-file: ["package.json", "package-lock.json"]
+
+refactor:
+  - head-branch: ["^refactor", "^chore"]
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.test.ts"
+          - "**/*.test.tsx"
+          - "**/*.spec.ts"
+          - "**/__tests__/**"
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/security*"
+          - "**/*security*"
+          - "security-policy.json"
