@@ -1,0 +1,350 @@
+name: Release Automation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Force version bump (major, minor, patch)"
+        required: false
+        type: choice
+        options:
+          - auto
+          - major
+          - minor
+          - patch
+      version:
+        description: "Explicit version (e.g. 2.0.0). Overrides auto-detection."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.update-version.outputs.new_version || steps.update-version-recovery.outputs.new_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies (minimal)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Detect pre-staging → main merge
+        id: verify-merge
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.notice('Manual release trigger');
+              return 'true';
+            }
+
+            const commit = await github.rest.repos.getCommit({
+              owner: context.repo.owner, repo: context.repo.repo, ref: context.sha
+            });
+
+            if (commit.data.parents.length < 2) {
+              core.notice('Not a merge commit — skipping');
+              return 'false';
+            }
+
+            try {
+              const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner, repo: context.repo.repo, commit_sha: context.sha
+              });
+              const match = prs.find(p =>
+                p.head.ref === 'pre-staging' &&
+                p.base.ref === 'main' &&
+                p.merged_at
+              );
+              if (match) {
+                core.setOutput('pr_number', String(match.number));
+                core.setOutput('pr_title', match.title);
+                return 'true';
+              }
+            } catch (e) {
+              core.warning('Failed to query PRs: ' + e.message);
+            }
+
+            core.notice('Not a pre-staging → main merge — skipping');
+            return 'false';
+
+      - name: Fetch tags
+        if: steps.verify-merge.outputs.result == 'true'
+        run: git fetch --tags --force
+
+      - name: Determine version bump
+        id: bump
+        if: steps.verify-merge.outputs.result == 'true'
+        run: |
+          LAST_TAG=$(git tag --sort=-version:refname | head -1)
+          echo "last_tag=${LAST_TAG:-none}" >> $GITHUB_OUTPUT
+
+          if [ -z "$LAST_TAG" ]; then
+            CURRENT="0.0.0"; RANGE="HEAD"
+          else
+            CURRENT="${LAST_TAG#v}"; RANGE="${LAST_TAG}..HEAD"
+          fi
+          echo "current_version=${CURRENT}" >> $GITHUB_OUTPUT
+          echo "changelog_range=${RANGE}" >> $GITHUB_OUTPUT
+
+          # Manual override takes priority
+          MANUAL_BUMP="${{ github.event.inputs.bump }}"
+          MANUAL_VER="${{ github.event.inputs.version }}"
+
+          if [ -n "$MANUAL_VER" ]; then
+            echo "bump=manual" >> $GITHUB_OUTPUT
+            echo "manual_version=${MANUAL_VER}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$MANUAL_BUMP" != "" ] && [ "$MANUAL_BUMP" != "auto" ]; then
+            echo "bump=${MANUAL_BUMP}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Auto-detect from commit history
+          BUMP="patch"
+          if git log "$RANGE" --format="%s %b" | grep -qE "BREAKING CHANGE|!: ?"; then
+            BUMP="major"
+          elif git log "$RANGE" --format="%s" | grep -qE "^feat(\(.*\))?:"; then
+            BUMP="minor"
+          fi
+          echo "bump=${BUMP}" >> $GITHUB_OUTPUT
+
+      - name: Validate and calculate new version
+        id: semver
+        if: steps.verify-merge.outputs.result == 'true'
+        run: |
+          BUMP="${{ steps.bump.outputs.bump }}"
+          MANUAL_VER="${{ steps.bump.outputs.manual_version }}"
+
+          if [ "$BUMP" = "manual" ] && [ -n "$MANUAL_VER" ]; then
+            # Validate manual version is a valid semver
+            # Only accept strict numeric x.y.z — prerelease/build suffixes
+            # would break the IFS-based integer arithmetic in the bump step.
+            node -e "
+              const v = process.argv[1];
+              if (!/^\d+\.\d+\.\d+$/.test(v)) {
+                console.error('Invalid version: ' + v + ' (must be numeric x.y.z)');
+                process.exit(1);
+              }
+            " "${MANUAL_VER}"
+            echo "new_version=${MANUAL_VER}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          CURRENT="${{ steps.bump.outputs.current_version }}"
+          IFS='.' read -ra P <<< "$CURRENT"
+          case "$BUMP" in
+            major) echo "new_version=$((P[0]+1)).0.0" ;;
+            minor) echo "new_version=${P[0]}.$((P[1]+1)).0" ;;
+            patch) echo "new_version=${P[0]}.${P[1]}.$((P[2]+1))" ;;
+          esac >> $GITHUB_OUTPUT
+
+      - name: Guard — check for existing tag & release
+        id: guard
+        if: steps.verify-merge.outputs.result == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.semver.outputs.new_version }}"
+          TAG_EXISTS=false
+          RELEASE_EXISTS=false
+
+          if git tag -l "v${V}" | grep -q .; then
+            TAG_EXISTS=true
+          fi
+
+          if gh release view "v${V}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            RELEASE_EXISTS=true
+          fi
+
+          if [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "true" ]; then
+            echo "Tag and release v${V} both exist — skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          elif [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "false" ]; then
+            echo "::warning::Tag v${V} exists but release is missing — will create release."
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "tag_only=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "tag_only=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Guard — reject rollback (older than latest tag)
+        if: steps.guard.outputs.skip == 'false' && steps.bump.outputs.last_tag != 'none'
+        run: |
+          V="${{ steps.semver.outputs.new_version }}"
+          LATEST="${{ steps.bump.outputs.last_tag }}"
+          LATEST="${LATEST#v}"
+          LOWEST=$(printf '%s\n' "$V" "$LATEST" | sort -V | head -1)
+          if [ "$LOWEST" = "$V" ] && [ "$V" != "$LATEST" ]; then
+            echo "::warning::New version v${V} is older than v${LATEST}. Possible rollback."
+            echo "Proceeding anyway — use workflow_dispatch with explicit version to override."
+          fi
+
+      - name: Bump package.json & create tag
+        id: update-version
+        if: steps.guard.outputs.skip == 'false' && steps.guard.outputs.tag_only != 'true'
+        run: |
+          V="${{ steps.semver.outputs.new_version }}"
+          node -e "
+            const pkg = JSON.parse(require('fs').readFileSync('package.json','utf8'));
+            pkg.version = '${V}';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: release v${V}"
+          git push origin HEAD
+          git tag "v${V}"
+          git push origin "v${V}"
+          echo "new_version=${V}" >> $GITHUB_OUTPUT
+
+      # When recovering from a partial run (tag exists, release missing),
+      # propagate new_version so changelog + release steps can proceed.
+      - name: Propagate version (tag-only recovery)
+        id: update-version-recovery
+        if: steps.guard.outputs.skip == 'false' && steps.guard.outputs.tag_only == 'true'
+        run: |
+          echo "new_version=${{ steps.semver.outputs.new_version }}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          NEW_VERSION: ${{ steps.semver.outputs.new_version }}
+          CHANGELOG_RANGE: ${{ steps.bump.outputs.changelog_range }}
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const newVersion = process.env.NEW_VERSION;
+
+            // Use the range captured before creating the new tag,
+            // so we get the commits between the previous tag and HEAD.
+            const range = process.env.CHANGELOG_RANGE || 'HEAD';
+
+            const categories = {
+              'Breaking Changes': [],
+              'Features': [],
+              'Bug Fixes': [],
+              'Documentation': [],
+              'Refactoring': [],
+              'CI/CD': [],
+              'Dependencies': [],
+              'Other': []
+            };
+
+            let raw = '';
+            try {
+              raw = require('child_process')
+                .execSync(`git log ${range} --merges --format="%s|||%b"`, {
+                  encoding: 'utf8', maxBuffer: 10 * 1024 * 1024
+                }).trim();
+            } catch {}
+
+            for (const line of raw.split('\n').filter(Boolean)) {
+              const [s] = line.split('|||');
+              if (!s || /bump version|release \d/i.test(s)) continue;
+
+              const t = s.trim();
+              const strip = (re) => t.replace(re, '').replace(/^[a-z]/, c => c.toUpperCase()).trim();
+
+              if (t.includes('!:')) {
+                categories['Breaking Changes'].push(strip(/^.+?!:\s*/));
+              } else if (/^feat/.test(t)) {
+                categories['Features'].push(strip(/^feat(\(.*?\))?:\s*/));
+              } else if (/^fix/.test(t)) {
+                categories['Bug Fixes'].push(strip(/^fix(\(.*?\))?:\s*/));
+              } else if (/^docs/.test(t)) {
+                categories['Documentation'].push(strip(/^docs(\(.*?\))?:\s*/));
+              } else if (/^refactor/.test(t)) {
+                categories['Refactoring'].push(strip(/^refactor(\(.*?\))?:\s*/));
+              } else if (/^ci/.test(t)) {
+                categories['CI/CD'].push(strip(/^ci(\(.*?\))?:\s*/));
+              } else if (/^build/.test(t)) {
+                // Group dependabot bumps under single line
+                const dep = t.replace(/^build\(deps(?:-dev)?\):\s*/i, '')
+                             .replace(/^build:\s*/i, '')
+                             .replace(/^[a-z]/i, c => c.toUpperCase());
+                categories['Dependencies'].push(dep);
+              } else {
+                categories['Other'].push(t);
+              }
+            }
+
+            const date = new Date().toISOString().split('T')[0];
+            let md = `## v${newVersion} (${date})\n\n`;
+
+            for (const [section, items] of Object.entries(categories)) {
+              if (items.length) {
+                md += `### ${section}\n`;
+                for (const item of items) md += `- ${item}\n`;
+                md += '\n';
+              }
+            }
+
+            if (!md.includes('- ')) md += '- No significant changes captured for this release.\n';
+
+            // Write CHANGELOG.md
+            const fs = require('fs');
+            const header = '# Changelog\n\n';
+            let existing = '';
+            try { existing = fs.readFileSync('CHANGELOG.md', 'utf8'); } catch {}
+            if (!existing) existing = header + 'All notable changes to this project will be documented in this file.\n\n';
+            const separator = existing.startsWith(header) ? '' : (header + '\n');
+            fs.writeFileSync('CHANGELOG.md', separator + md + '\n---\n\n' + existing.replace(/^# Changelog\n\n?/, ''));
+
+            // Write release notes to file (avoids shell escaping issues)
+            fs.writeFileSync('.release-notes.md', md);
+
+      - name: Commit CHANGELOG.md
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          git add CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "No CHANGELOG changes"
+          else
+            git commit -m "chore: update CHANGELOG for v${{ steps.semver.outputs.new_version }}"
+            git push origin main
+          fi
+
+      - name: Create GitHub Release
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.semver.outputs.new_version }}" \
+            --repo "${{ github.repository }}" \
+            --title "v${{ steps.semver.outputs.new_version }}" \
+            --notes-file .release-notes.md \
+            --target "${{ github.sha }}"
