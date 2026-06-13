@@ -99,10 +99,9 @@ function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json
             header('Content-Type: ' . $contentType);
             header('X-Cache: HIT');
             echo $data;
-            return true;
+            exit;
         }
     }
-    return false;
 }
 
 function proxyWriteCache($cacheFile, $data) {

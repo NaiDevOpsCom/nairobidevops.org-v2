@@ -23,8 +23,8 @@ $cursorHash = $nextCursor ? '_' . md5($nextCursor) : '_page1';
 $cacheFile = $ctx['cacheRootDir'] . '/api_responses/cld_' . $folder . $cursorHash . '.json';
 $cacheTTL = 300;
 
-if ($ctx['method'] === 'GET' && proxyServeCache($cacheFile, $cacheTTL)) {
-    exit;
+if ($ctx['method'] === 'GET') {
+    proxyServeCache($cacheFile, $cacheTTL);
 }
 
 $cloudName = defined('CLD_CLOUD_NAME') ? CLD_CLOUD_NAME : getenv('CLD_CLOUD_NAME');

@@ -8,7 +8,7 @@ require_once __DIR__ . '/api-middleware.php';
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const CONTENT_TYPE_HEADER = 'Content-Type: ';
 
-$ctx = proxyRunMiddleware(['GET', 'POST', 'OPTIONS', 'HEAD']);
+$ctx = proxyRunMiddleware(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS', 'HEAD']);
 
 $base_url = 'https://api.luma.com';
 $path = isset($_GET['path']) ? (string)$_GET['path'] : '';
@@ -35,9 +35,7 @@ $cacheTTL = 300;
 if ($ctx['method'] === 'GET' && !$hasAuthorization) {
     $cacheMetaFile = $cacheFile . '.meta';
     $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : JSON_CONTENT_TYPE;
-    if (proxyServeCache($cacheFile, $cacheTTL, $cachedContentType)) {
-        exit;
-    }
+    proxyServeCache($cacheFile, $cacheTTL, $cachedContentType);
 }
 
 $ch = curl_init($target_url);
