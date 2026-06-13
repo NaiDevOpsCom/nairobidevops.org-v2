@@ -1,4 +1,9 @@
+# Workflow name
 name: Deploy to cPanel (Staging)
+
+# Minimum GITHUB_TOKEN permissions — top-level so all jobs inherit this by default
+permissions:
+  contents: read
 
 # One deploy at a time — do NOT cancel in-progress staging deploys
 concurrency:
