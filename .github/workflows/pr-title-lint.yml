@@ -30,6 +30,9 @@ jobs:
             test
             security
           requireScope: false
+          subjectPattern: '^[a-z].+'
+          subjectPatternError: |
+            The subject "{subject}" must start with a lowercase letter.
           validateSingleCommit: false
           wip: true
           ignoreLabels: |

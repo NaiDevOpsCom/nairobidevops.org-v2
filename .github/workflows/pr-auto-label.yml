@@ -30,30 +30,51 @@ jobs:
             const currentLabels = context.payload.pull_request.labels.map(l => l.name);
 
             const titleRules = [
-              { regex: /^feat(\(.*?\))?:\s/, label: 'feature' },
-              { regex: /^fix(\(.*?\))?:\s/, label: 'bug' },
-              { regex: /^docs(\(.*?\))?:\s/, label: 'documentation' },
-              { regex: /^refactor(\(.*?\))?:\s/, label: 'refactor' },
-              { regex: /^ci(\(.*?\))?:\s/, label: 'ci/cd' },
-              { regex: /^build(\(deps(?:-dev)?\))?:\s/, label: 'dependencies' },
-              { regex: /^test(\(.*?\))?:\s/, label: 'tests' },
-              { regex: /^security(\(.*?\))?:\s/, label: 'security' },
+              { regex: /^feat(\(.*?\))?!?:\s/, label: 'feature' },
+              { regex: /^fix(\(.*?\))?!?:\s/, label: 'bug' },
+              { regex: /^docs(\(.*?\))?!?:\s/, label: 'documentation' },
+              { regex: /^refactor(\(.*?\))?!?:\s/, label: 'refactor' },
+              { regex: /^ci(\(.*?\))?!?:\s/, label: 'ci/cd' },
+              { regex: /^build(\(deps(?:-dev)?\))?!?:\s/, label: 'dependencies' },
+              { regex: /^test(\(.*?\))?!?:\s/, label: 'tests' },
+              { regex: /^security(\(.*?\))?!?:\s/, label: 'security' },
             ];
 
+            // All labels this workflow manages (title-rule labels + breaking-change).
+            const managedLabels = [...titleRules.map(r => r.label), 'breaking-change'];
+
             const toAdd = [];
+            const toRemove = [];
 
             for (const rule of titleRules) {
-              if (rule.regex.test(title) && !currentLabels.includes(rule.label)) {
+              const matches = rule.regex.test(title);
+              if (matches && !currentLabels.includes(rule.label)) {
                 toAdd.push(rule.label);
+              } else if (!matches && currentLabels.includes(rule.label)) {
+                toRemove.push(rule.label);
               }
             }
 
-            if (/\)?!:/.test(title) && !currentLabels.includes('breaking-change')) {
+            const isBreaking = /\)?!:/.test(title);
+            if (isBreaking && !currentLabels.includes('breaking-change')) {
               toAdd.push('breaking-change');
+            } else if (!isBreaking && currentLabels.includes('breaking-change')) {
+              toRemove.push('breaking-change');
             }
 
             if (toAdd.length > 0) {
               await github.rest.issues.addLabels({
                 owner, repo, issue_number: number, labels: toAdd
               });
+            }
+
+            for (const label of toRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number: number, name: label
+                });
+              } catch (e) {
+                // Label may have already been removed manually — ignore 404s.
+                if (e.status !== 404) throw e;
+              }
             }
