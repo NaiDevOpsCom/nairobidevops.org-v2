@@ -125,11 +125,28 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          printf '%s' "$SSH_PRIVATE_KEY" | sed 's/\r$//' > ~/.ssh/id_rsa
+
+          if [ -z "$KNOWN_HOSTS" ]; then
+            echo "❌ KNOWN_HOSTS is empty. Confirm it is set in the staging environment secrets."
+            exit 1
+          fi
+
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "❌ SSH_PRIVATE_KEY is empty. Confirm it is set in the staging environment secrets."
+            exit 1
+          fi
+
+          printf '%s\n' "$KNOWN_HOSTS" | sed 's/\r$//' > ~/.ssh/known_hosts
+
+          KEY_CONTENT="$SSH_PRIVATE_KEY"
+          if printf '%s' "$KEY_CONTENT" | grep -q '\\n'; then
+            KEY_CONTENT="$(printf '%s' "$KEY_CONTENT" | sed 's/\\n/\n/g')"
+          fi
+
+          printf '%s\n' "$KEY_CONTENT" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
 
-          if ! grep -qE '^-----BEGIN (OPENSSH|RSA) PRIVATE KEY-----$' ~/.ssh/id_rsa; then
+          if ! grep -qE '^-----BEGIN .+PRIVATE KEY-----$' ~/.ssh/id_rsa; then
             echo "❌ SSH_PRIVATE_KEY is not a valid private key file."
             echo "   Ensure the secret includes the full private key, including the BEGIN/END lines."
             exit 1
