@@ -1,14 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { format } from "prettier";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const POLICY_PATH = path.join(ROOT_DIR, "security-policy.json");
-const VERCEL_CONFIG_PATH = path.join(ROOT_DIR, "vercel.json");
 const HTACCESS_PATH = path.join(ROOT_DIR, "client", "public", ".htaccess");
 
 function loadPolicy() {
@@ -58,106 +56,7 @@ function generateCSPString(cspConfig) {
   return directives.join("; ");
 }
 
-async function updateVercelConfig(policy) {
-  let vercelConfig = {};
-  try {
-    const fileContent = await fs.promises.readFile(VERCEL_CONFIG_PATH, "utf8");
-    vercelConfig = JSON.parse(fileContent);
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      // Initialize with a default structure only if file doesn't exist
-      vercelConfig = { headers: [] };
-    } else {
-      // Fail fast on parse or other I/O errors to prevent data loss
-      console.error(`Error reading or parsing ${VERCEL_CONFIG_PATH}:`, error);
-      process.exit(1);
-    }
-  }
 
-   
-  const cspString = generateCSPString(policy.contentSecurityPolicy);
-
-  const headers = [
-    {
-      key: "Content-Security-Policy",
-      value: cspString,
-    },
-     
-    ...Object.entries(policy.headers).map(([key, value]) => ({
-      key,
-      value,
-    })),
-  ];
-
-  // Update or add the headers section for source "/(.*)"
-  vercelConfig.headers = vercelConfig.headers || [];
-  const headerRuleIndex = vercelConfig.headers.findIndex((h) => h.source === "/(.*)");
-
-  const newSecurityHeaders = headers;
-
-  if (headerRuleIndex >= 0) {
-    // Merge new headers into existing rule, ensuring we update or add
-    const existingRule = vercelConfig.headers[headerRuleIndex];
-    const mergedHeaders = [...existingRule.headers];
-
-    newSecurityHeaders.forEach((newHeader) => {
-      const existingHeaderIndex = mergedHeaders.findIndex((h) => h.key === newHeader.key);
-      if (existingHeaderIndex >= 0) {
-        mergedHeaders[existingHeaderIndex] = newHeader;
-      } else {
-        mergedHeaders.push(newHeader);
-      }
-    });
-
-    vercelConfig.headers[headerRuleIndex].headers = mergedHeaders;
-  } else {
-    vercelConfig.headers.push({
-      source: "/(.*)",
-      headers: newSecurityHeaders,
-    });
-  }
-
-  // Update or add the rewrites section
-  if (policy.proxies && Array.isArray(policy.proxies)) {
-    vercelConfig.rewrites = vercelConfig.rewrites || [];
-    const toVercelSplat = (p) => p.replace(/\(\.\*\)/g, ":path*");
-    const toVercelDest = (d) => d.replace(/\$1/g, ":path*");
-
-    policy.proxies.forEach((proxy) => {
-      const existingRewriteIndex = vercelConfig.rewrites.findIndex(
-        (r) => r.source === proxy.source
-      );
-      const newRewrite = {
-        source: toVercelSplat(proxy.source),
-        destination: toVercelDest(proxy.vercelDestination),
-      };
-      if (existingRewriteIndex >= 0) {
-        vercelConfig.rewrites[existingRewriteIndex] = newRewrite;
-      } else {
-        // Add before the catch-all if it exists
-        const catchAllIndex = vercelConfig.rewrites.findIndex((r) => r.source === "/(.*)");
-        if (catchAllIndex >= 0) {
-          vercelConfig.rewrites.splice(catchAllIndex, 0, newRewrite);
-        } else {
-          vercelConfig.rewrites.push(newRewrite);
-        }
-      }
-    });
-
-    // Ensure unique rewrites per source (keep last occurrence for deterministic overriding)
-    const bySource = new Map();
-    for (const rewrite of vercelConfig.rewrites) {
-      bySource.set(rewrite.source, rewrite);
-    }
-    vercelConfig.rewrites = Array.from(bySource.values());
-  }
-
-  const formattedJson = await format(JSON.stringify(vercelConfig, null, 2), {
-    parser: "json",
-  });
-  await fs.promises.writeFile(VERCEL_CONFIG_PATH, formattedJson);
-  console.log(`Updated Vercel config at ${VERCEL_CONFIG_PATH}`);
-}
 
 const TEMPLATE_PATH = path.join(__dirname, ".htaccess.template");
 
@@ -252,7 +151,6 @@ async function main() {
   console.log("Generating security headers...");
   const policy = loadPolicy();
 
-  await updateVercelConfig(policy);
   generateHtaccess(policy);
 
   console.log("Done.");

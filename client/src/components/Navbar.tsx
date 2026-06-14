@@ -21,7 +21,15 @@ export default function Navbar() {
   const [currentLocation, setCurrentLocation] = useState(location);
 
   useEffect(() => {
-    setCurrentLocation(location);
+    if (globalThis.window === undefined) {
+      return;
+    }
+
+    // Sync active-route state on any wouter navigation.
+    // Use browser URL (not wouter's hash-stripped location) to
+    // preserve hash tracking for hash-aware link highlighting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentLocation(globalThis.window.location.pathname + globalThis.window.location.hash);
   }, [location]);
 
   const navLinks = [
@@ -33,13 +41,13 @@ export default function Navbar() {
   ];
 
   const handleNavClick = (href: string) => {
-    if (typeof window === "undefined" || typeof document === "undefined") return;
+    if (globalThis.window === undefined || globalThis.document === undefined) return;
 
     const openExternal = (raw: string) => {
       try {
         const u = new URL(raw);
         if (u.protocol !== "https:" && u.protocol !== "http:") return;
-        window.open(u.toString(), "_blank", "noopener,noreferrer");
+        globalThis.window?.open(u.toString(), "_blank", "noopener,noreferrer");
       } catch {
         return;
       }
@@ -50,19 +58,20 @@ export default function Navbar() {
       openExternal(href);
     } else if (href.startsWith("/")) {
       setLocation(href);
+      setCurrentLocation(href);
     } else if (href.startsWith("#")) {
       const element = document.querySelector(href);
       if (element) {
         element.scrollIntoView({ behavior: "smooth" });
 
-        if (window.location.hash !== href) {
-          window.history.replaceState(null, "", href);
+        if (globalThis.window?.location.hash !== href) {
+          globalThis.window?.history.replaceState(null, "", href);
         }
-        setCurrentLocation(window.location.pathname + href);
+        setCurrentLocation((globalThis.window?.location.pathname ?? "") + href);
       }
     } else if (/^(mailto|tel):/i.test(href)) {
       // handle mailto:, tel: specifically to avoid dangerous schemes like javascript:
-      window.location.assign(href);
+      globalThis.window?.location.assign(href);
     }
     // fallthrough handled by default browser behavior if needed,
     // but here we just no-op to prevent querySelector crashes.
@@ -72,12 +81,20 @@ export default function Navbar() {
 
   // update active link when navigation occurs (hash change / history)
   useEffect(() => {
-    const handleChange = () => setCurrentLocation(window.location.pathname + window.location.hash);
-    window.addEventListener("popstate", handleChange);
-    window.addEventListener("hashchange", handleChange);
+    if (globalThis.window === undefined) {
+      return undefined;
+    }
+
+    const handleChange = () => {
+      const location = globalThis.window.location;
+      setCurrentLocation(location.pathname + location.hash);
+    };
+
+    globalThis.window.addEventListener("popstate", handleChange);
+    globalThis.window.addEventListener("hashchange", handleChange);
     return () => {
-      window.removeEventListener("popstate", handleChange);
-      window.removeEventListener("hashchange", handleChange);
+      globalThis.window.removeEventListener("popstate", handleChange);
+      globalThis.window.removeEventListener("hashchange", handleChange);
     };
   }, []);
 

@@ -1,8 +1,4 @@
 /* ==========================
-   Google Fonts
-========================== */
-
-/* ==========================
    Tailwind Directives
 ========================== */
 @import "tailwindcss";
@@ -74,7 +70,9 @@
 }
 
 .figma-heading {
-  font-family: "Poppins", sans-serif;
+  font-family:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
   font-weight: 700;
   font-style: normal;
   font-size: 36px;
@@ -187,4 +185,13 @@ html {
   .bg-input {
     background-color: var(--input);
   }
+}
+
+/* ==========================
+   react-day-picker Calendar
+========================== */
+.day-range-end {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: 0 var(--radius) var(--radius) 0;
 }

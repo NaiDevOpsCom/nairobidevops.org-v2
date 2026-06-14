@@ -10,7 +10,7 @@ interface StatisticCounterProps {
 
 const StatisticCounter = ({
   endValue,
-  duration = 2.0,
+  duration = 2,
   className = "text-2xl font-bold text-foreground",
 }: StatisticCounterProps) => {
   const { ref, inView } = useInView({
@@ -21,11 +21,12 @@ const StatisticCounter = ({
   const { numericValue, prefix, suffix } = useMemo(() => {
     const str = String(endValue);
     // find the first numeric substring (handles decimals and commas)
-    const match = str.match(/[-+]?\d[\d,]*\.?\d*/);
+    const regex = /[-+]?\d[\d,]*\.?\d*/;
+    const match = regex.exec(str);
     if (!match) {
-      return { numericValue: NaN, prefix: "", suffix: str };
+      return { numericValue: Number.NaN, prefix: "", suffix: str };
     }
-    const numStr = match[0].replace(/,/g, "");
+    const numStr = match[0].replaceAll(",", "");
     const prefix = str.slice(0, match.index ?? 0);
     const suffix = str.slice((match.index ?? 0) + match[0].length);
     return {
@@ -36,7 +37,7 @@ const StatisticCounter = ({
   }, [endValue]);
 
   // Fallback if the value cannot be parsed
-  if (isNaN(numericValue)) {
+  if (Number.isNaN(numericValue)) {
     return <span className={className}>{String(endValue)}</span>;
   }
 

@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0 # Need full history for dependency review on PRs
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v4.2.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ inputs.node-version }}
           cache: "npm"
@@ -67,13 +67,15 @@ jobs:
 
       - name: Run NPM Audit
         id: npm-audit
+        env:
+          FAIL_LEVEL: ${{ inputs.fail-level }}
         run: |
           echo "🔍 Running npm audit..."
 
           # Validate fail-level input
-          case "${{ inputs.fail-level }}" in
+          case "$FAIL_LEVEL" in
             low|moderate|high|critical) ;;
-            *) echo "::error::Invalid fail-level: ${{ inputs.fail-level }} (expected: low|moderate|high|critical)"; exit 2 ;;
+            *) echo "::error::Invalid fail-level: $FAIL_LEVEL (expected: low|moderate|high|critical)"; exit 2 ;;
           esac
 
           # First, generate the JSON report for the artifact upload step.
@@ -102,9 +104,9 @@ jobs:
           # Now, run npm audit again, this time allowing it to fail the step
           # based on its native exit code and the specified audit level.
           # This simplifies the logic by removing manual parsing and failure checks.
-          npm audit --audit-level=${{ inputs.fail-level }}
+          npm audit --audit-level="$FAIL_LEVEL"
 
-          echo "✅ No vulnerabilities found at ${{ inputs.fail-level }} level or above"
+          echo "✅ No vulnerabilities found at $FAIL_LEVEL level or above"
 
       - name: Dependency Review (PR only)
         if: github.event.pull_request != null

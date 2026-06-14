@@ -40,10 +40,13 @@ Our CSP is implemented via the `Content-Security-Policy` HTTP header.
 
 ## Code & Configuration Location
 
-The CSP is defined in the Vercel configuration file:
-**[`vercel.json`](../../vercel.json)**
+The CSP is defined centrally in the security policy file:
+**[`security-policy.json`](../../security-policy.json)**
 
-The entire policy is contained within the `value` string of the `Content-Security-Policy` header entry.
+During the build process, the generator script compiles this policy into the Apache configuration file:
+**`client/public/.htaccess`**
+
+The entire policy is contained within the `Content-Security-Policy` directive in the `.htaccess` file.
 
 ## Security Benefits
 

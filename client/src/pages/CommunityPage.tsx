@@ -11,7 +11,7 @@ import {
   Compass,
   GraduationCap,
   Bell,
-  Youtube,
+  Video,
 } from "lucide-react";
 import React, { useMemo } from "react";
 import { Link } from "wouter";
@@ -173,11 +173,11 @@ const WhatDefinesUsSection: React.FC = () => (
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-        {allData.whatDefinesUs.map((item, idx) => {
+        {allData.whatDefinesUs.map((item) => {
           const Icon = item.icon;
           return (
             <div
-              key={idx}
+              key={item.title}
               className="group bg-white p-6 md:p-8 rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col items-center text-center"
             >
               <div className="inline-flex items-center justify-center h-16 w-16 rounded-lg bg-white shadow-md group-hover:shadow-lg group-hover:bg-primary/5 transition-all duration-300 mb-6">
@@ -264,8 +264,8 @@ const EmpoweringCommunitySection: React.FC = () => (
                 content:
                   "Maamun's work fosters a culture of empathy, shared success, and continuous improvement—where DevOps is more than a methodology, it's a mindset.",
               },
-            ].map((item, index) => (
-              <div key={index} className="group">
+            ].map((item) => (
+              <div key={item.title} className="group">
                 <div className="flex items-start gap-4">
                   <div>
                     <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-black dark:text-slate-100">
@@ -381,10 +381,10 @@ const CampusTourSection: React.FC = () => (
                 text: "All sessions are free and tailored to your university's needs",
                 icon: GraduationCap,
               },
-            ].map((item, index) => {
+            ].map((item) => {
               const Icon = item.icon;
               return (
-                <div key={index} className="flex items-start gap-4">
+                <div key={item.text} className="flex items-start gap-4">
                   <div className="flex-shrink-0 mt-1">
                     <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
                       <Icon className="w-5 h-5 text-sky-600 dark:text-sky-400" />
@@ -635,7 +635,7 @@ const EventsMeetupsSection: React.FC = () => {
               rel="noopener noreferrer"
               className="flex items-center gap-2"
             >
-              <Youtube className="w-5 h-5" />
+              <Video className="w-5 h-5" />
               <span>Visit Channel Library</span>
             </a>
           </Button>
@@ -697,7 +697,7 @@ const CommunityProjectsSection: React.FC = () => (
                   // Safely compute an ISO date string if the provided date is parseable.
                   // This prevents runtime errors from invalid Date parsing (e.g., "Oct 2024").
                   const d = new Date(project.date);
-                  const iso = isNaN(d.getTime()) ? undefined : d.toISOString().split("T")[0];
+                  const iso = Number.isNaN(d.getTime()) ? undefined : d.toISOString().split("T")[0];
                   return (
                     <time
                       dateTime={iso}
@@ -721,7 +721,7 @@ const CommunityProjectsSection: React.FC = () => (
                 aria-label={`View details for ${project.title} project`}
               >
                 <span className="relative">
-                  View Project
+                  View Project{" "}
                   <span
                     className="absolute -right-5 opacity-0 group-hover/button:opacity-100 group-hover/button:translate-x-1.5 transition-all duration-200"
                     aria-hidden="true"
@@ -800,18 +800,18 @@ const CollaborationCTASection: React.FC = () => {
 
 // --- Main Community Page Component ---
 export default function CommunityPage() {
-  const timerRef = React.useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     const handleScroll = () => {
       // Clear any existing timeout before scheduling a new one
       if (timerRef.current) {
         clearTimeout(timerRef.current);
-        timerRef.current = undefined;
+        timerRef.current = null;
       }
 
-      if (window.location.hash) {
-        const id = window.location.hash.replace("#", "");
+      if (globalThis.location.hash) {
+        const id = globalThis.location.hash.replace("#", "");
         const element = document.getElementById(id);
         if (element) {
           // Small timeout to ensure DOM is ready and layout is stable
@@ -826,10 +826,10 @@ export default function CommunityPage() {
     handleScroll();
 
     // Listen for hash changes in-page
-    window.addEventListener("hashchange", handleScroll);
+    globalThis.addEventListener("hashchange", handleScroll);
 
     return () => {
-      window.removeEventListener("hashchange", handleScroll);
+      globalThis.removeEventListener("hashchange", handleScroll);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);

@@ -27,11 +27,7 @@ function sitemapPlugin(enabled: boolean): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const branch =
-    process.env.GITHUB_BASE_REF ||
-    process.env.GITHUB_REF_NAME ||
-    process.env.VERCEL_GIT_COMMIT_REF ||
-    "";
+  const branch = process.env.GITHUB_BASE_REF || process.env.GITHUB_REF_NAME || "";
 
   const isHardenedBranch = ["production", "staging", "main", "pre-dev", "pre-staging"].includes(
     branch
@@ -61,23 +57,17 @@ export default defineConfig(({ mode }) => {
       terserOptions: isHardened
         ? {
             compress: {
-              drop_console: false,
+              drop_console: true,
               drop_debugger: true,
-              pure_funcs: [
-                "console.log",
-                "console.info",
-                "console.debug",
-                "console.warn",
-                "console.group",
-                "console.groupEnd",
-              ],
             },
           }
         : undefined,
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ["react", "react-dom"],
+          manualChunks(id: string) {
+            if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/")) {
+              return "vendor";
+            }
           },
         },
         external: [],
