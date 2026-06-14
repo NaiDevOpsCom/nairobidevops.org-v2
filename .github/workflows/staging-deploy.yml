@@ -186,7 +186,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key_path: ~/.ssh/id_rsa
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           envs: REMOTE_USER,RELEASE_TIMESTAMP
           script: |
@@ -218,7 +218,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key_path: ~/.ssh/id_rsa
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           envs: REMOTE_USER,RELEASE_TIMESTAMP
           script: |
@@ -245,7 +245,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key_path: ~/.ssh/id_rsa
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           envs: REMOTE_USER,CLD_CLOUD_NAME,CLD_API_KEY,CLD_API_SECRET,PROXY_API_TOKEN
           script: |
@@ -314,7 +314,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key_path: ~/.ssh/id_rsa
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           envs: REMOTE_USER,STAGING_REMOTE_PATH,RELEASE_TIMESTAMP
           script: |
