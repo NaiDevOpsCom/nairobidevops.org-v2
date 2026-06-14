@@ -13,20 +13,21 @@ The workflow is defined in [.github/workflows/deploy.yml](../.github/workflows/d
 ### Triggers
 
 1. **Push to `main`**: Automatically triggers a deployment when changes are merged into the main branch. The workflow monitors the following paths:
-    - `client/src/**`
-    - `client/public/**`
-    - `package.json`
-    - `package-lock.json`
-    - `vite.config.ts`
-    - `tsconfig.json`
-    - `.github/workflows/deploy.yml`
+   - `client/src/**`
+   - `client/public/**`
+   - `package.json`
+   - `package-lock.json`
+   - `vite.config.ts`
+   - `tsconfig.json`
+   - `.github/workflows/deploy.yml`
 2. **Manual Trigger (`workflow_dispatch`)**: Allows manual execution of the workflow from the GitHub "Actions" tab for any branch.
 
 ### Prerequisites (GitHub Secrets)
 
 The following secrets must be configured in the GitHub repository:
 
-- `SSH_PRIVATE_KEY`: Private SSH key for server access (OpenSSH format).
+- `SSH_PRIVATE_KEY_B64`: Base64-encoded private SSH key for server access. Preferred for staging because it avoids multiline copy/paste issues.
+- `SSH_PRIVATE_KEY`: Raw private SSH key for server access (OpenSSH format). Use this only if not using `SSH_PRIVATE_KEY_B64`.
 - `KNOWN_HOSTS`: SSH known hosts for identity verification (use `ssh-keyscan` to obtain this).
 - `REMOTE_HOST`: Server IP or hostname.
 - `REMOTE_USER`: SSH username.
@@ -45,10 +46,18 @@ ssh-keygen -t ed25519 -C "github-actions-ndc-staging" -f ./ndc-staging-deploy-ke
 
 This creates two files:
 
-- `ndc-staging-deploy-key`: private key. Paste the full contents into the GitHub environment secret `SSH_PRIVATE_KEY`.
+- `ndc-staging-deploy-key`: private key. Convert this to base64 and paste it into the GitHub environment secret `SSH_PRIVATE_KEY_B64`.
 - `ndc-staging-deploy-key.pub`: public key. Add this to the cPanel SSH authorized keys for `REMOTE_USER`.
 
-The GitHub secret must include the full private key text, including these wrapper lines:
+On PowerShell, create the base64 value with:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes(".\ndc-staging-deploy-key"))
+```
+
+Paste the command output into the staging environment secret `SSH_PRIVATE_KEY_B64`.
+
+If you use the raw `SSH_PRIVATE_KEY` secret instead, it must include the full private key text, including these wrapper lines:
 
 ```text
 -----BEGIN OPENSSH PRIVATE KEY-----
@@ -65,7 +74,7 @@ After adding the public key in cPanel, authorize it if cPanel requires a separat
 - `REMOTE_USER`: cPanel SSH user.
 - `REMOTE_PORT`: SSH port, usually `22`.
 
-If a deploy fails with `SSH_PRIVATE_KEY could not be parsed by ssh-keygen`, replace the GitHub secret with a newly generated private key and confirm it is not passphrase-protected.
+If a deploy fails with `The deploy key secret could not be parsed by ssh-keygen`, replace `SSH_PRIVATE_KEY_B64` with a base64 value generated directly from the private key file and confirm the key is not passphrase-protected.
 
 ## Implementation Details
 
@@ -86,9 +95,9 @@ Instead of overwriting the existing site, the workflow uses a release-based stru
 2. **Release Directory**: A new directory is created on the server: `/home/${user}/releases/${timestamp}`.
 3. **Sync**: Files from the `dist` directory are synced to the new release directory using `scp`. The target path must end with `.` (e.g., `./dist/.`) to ensure hidden files like `.htaccess` are included.
 4. **Atomic Symlink Switch**: The workflow uses a "Create-and-Move" pattern to ensure atomicity and compatibility with cPanel:
-    - A check verifies that the `REMOTE_PATH` is a symbolic link. If it's a physical directory, the workflow will fail with instructions to rename it.
-    - A temporary symlink is created pointing to the new release.
-    - The `mv -Tf` command atomically replaces the current `REMOTE_PATH` with the new symlink.
+   - A check verifies that the `REMOTE_PATH` is a symbolic link. If it's a physical directory, the workflow will fail with instructions to rename it.
+   - A temporary symlink is created pointing to the new release.
+   - The `mv -Tf` command atomically replaces the current `REMOTE_PATH` with the new symlink.
 5. **Cleanup**: The workflow automatically removes old releases, keeping only the last 5 versions to save disk space.
 
 ### 3. Supply-Chain Security
