@@ -8,7 +8,7 @@ The project uses GitHub Actions for CI/CD, deploying to a cPanel-hosted server v
 
 ## Deployment Workflow
 
-The workflow is defined in [.github/workflows/deploy.yml](../.github/workflows/deploy.yml).
+Production deployment is defined in [.github/workflows/deploy.yml](../.github/workflows/deploy.yml). Staging deployment is defined in [.github/workflows/staging-deploy.yml](../.github/workflows/staging-deploy.yml).
 
 ### Triggers
 
@@ -26,7 +26,7 @@ The workflow is defined in [.github/workflows/deploy.yml](../.github/workflows/d
 
 The following secrets must be configured in the GitHub repository:
 
-- `SSH_PRIVATE_KEY_B64`: Base64-encoded private SSH key for server access. Preferred for staging because it avoids multiline copy/paste issues.
+- `SSH_PRIVATE_KEY_B64`: Base64-encoded private SSH key for server access. Preferred for both staging and production because it avoids multiline copy/paste issues.
 - `SSH_PRIVATE_KEY`: Raw private SSH key for server access (OpenSSH format). Use this only if not using `SSH_PRIVATE_KEY_B64`.
 - `KNOWN_HOSTS`: SSH known hosts for identity verification (use `ssh-keyscan` to obtain this).
 - `REMOTE_HOST`: Server IP or hostname.
@@ -41,21 +41,21 @@ Use a dedicated, unencrypted deploy key for GitHub Actions. Do not reuse your pe
 On your local machine, generate a new key pair:
 
 ```bash
-ssh-keygen -t ed25519 -C "github-actions-ndc-staging" -f ./ndc-staging-deploy-key -N ""
+ssh-keygen -t ed25519 -C "github-actions-ndc-deploy" -f ./ndc-deploy-key -N ""
 ```
 
 This creates two files:
 
-- `ndc-staging-deploy-key`: private key. Convert this to base64 and paste it into the GitHub environment secret `SSH_PRIVATE_KEY_B64`.
-- `ndc-staging-deploy-key.pub`: public key. Add this to the cPanel SSH authorized keys for `REMOTE_USER`.
+- `ndc-deploy-key`: private key. Convert this to base64 and paste it into the GitHub environment secret `SSH_PRIVATE_KEY_B64`.
+- `ndc-deploy-key.pub`: public key. Add this to the cPanel SSH authorized keys for `REMOTE_USER`.
 
 On PowerShell, create the base64 value with:
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes(".\ndc-staging-deploy-key"))
+[Convert]::ToBase64String([IO.File]::ReadAllBytes(".\ndc-deploy-key"))
 ```
 
-Paste the command output into the staging environment secret `SSH_PRIVATE_KEY_B64`.
+Paste the command output into the target GitHub environment secret `SSH_PRIVATE_KEY_B64` (`staging` or `production`).
 
 If you use the raw `SSH_PRIVATE_KEY` secret instead, it must include the full private key text, including these wrapper lines:
 

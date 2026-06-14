@@ -1,10 +1,6 @@
 # Workflow name
 name: Deploy to cPanel (Staging)
 
-# Minimum GITHUB_TOKEN permissions — top-level so all jobs inherit this by default
-permissions:
-  contents: read
-
 # One deploy at a time — do NOT cancel in-progress staging deploys
 concurrency:
   group: deploy-staging
@@ -101,6 +97,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: staging
+    permissions: {}
 
     outputs:
       release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
@@ -419,6 +416,7 @@ jobs:
     needs: [build, deploy]
     if: always()
     runs-on: ubuntu-latest
+    permissions: {}
 
     steps:
       - name: Set Release Timestamp

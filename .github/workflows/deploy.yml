@@ -1,8 +1,5 @@
 name: Deploy to cPanel
 
-permissions:
-  contents: read
-
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -25,6 +22,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       # 1. Check out the code
@@ -87,6 +86,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+    permissions: {}
 
     outputs:
       release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
@@ -106,11 +106,62 @@ jobs:
 
       # 3. Setup SSH
       - name: Setup SSH
+        env:
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+
+          if [ -z "$KNOWN_HOSTS" ]; then
+            echo "❌ KNOWN_HOSTS is empty. Confirm it is set in the production environment secrets."
+            exit 1
+          fi
+
+          if [ -z "$SSH_PRIVATE_KEY" ] && [ -z "$SSH_PRIVATE_KEY_B64" ]; then
+            echo "❌ SSH_PRIVATE_KEY and SSH_PRIVATE_KEY_B64 are both empty."
+            echo "   Set SSH_PRIVATE_KEY_B64 to the base64-encoded private key, or set SSH_PRIVATE_KEY to the raw private key text."
+            exit 1
+          fi
+
+          printf '%s\n' "$KNOWN_HOSTS" | sed 's/\r$//' > ~/.ssh/known_hosts
+
+          if [ -n "$SSH_PRIVATE_KEY_B64" ]; then
+            if ! printf '%s' "$SSH_PRIVATE_KEY_B64" | tr -d '\r\n ' | base64 -d > ~/.ssh/id_rsa; then
+              echo "❌ SSH_PRIVATE_KEY_B64 could not be base64-decoded."
+              echo "   Regenerate it from the private key file and update the production environment secret."
+              exit 1
+            fi
+          else
+            KEY_CONTENT="$SSH_PRIVATE_KEY"
+            if printf '%s' "$KEY_CONTENT" | grep -q '\\n'; then
+              KEY_CONTENT="$(printf '%s' "$KEY_CONTENT" | sed 's/\\n/\n/g')"
+            fi
+            printf '%s\n' "$KEY_CONTENT" | sed 's/\r$//' > ~/.ssh/id_rsa
+          fi
+
           chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
+
+          if grep -qE '^(ssh-rsa|ssh-ed25519|ecdsa-sha2-)' ~/.ssh/id_rsa; then
+            echo "❌ The deploy key secret contains a public key, not a private key."
+            echo "   Put the public key in cPanel authorized_keys and the private key in the GitHub secret."
+            exit 1
+          fi
+
+          if ! grep -qE '^-----BEGIN .+PRIVATE KEY-----$' ~/.ssh/id_rsa; then
+            echo "❌ The deploy key secret is not a valid private key file."
+            echo "   Ensure the secret includes the full private key, including the BEGIN/END lines."
+            echo "   See docs/deployment.md#rotating-deploy-ssh-keys for the key rotation steps."
+            exit 1
+          fi
+
+          if ! ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null 2>&1; then
+            echo "❌ The deploy key secret could not be parsed by ssh-keygen."
+            echo "   Confirm the secret is the raw private key text, not a public key, passphrase-protected key, or malformed value."
+            echo "   If using SSH_PRIVATE_KEY, try SSH_PRIVATE_KEY_B64 to avoid multiline copy/paste issues."
+            echo "   See docs/deployment.md#rotating-deploy-ssh-keys for the key rotation steps."
+            exit 1
+          fi
 
       # 4. Create Release Directory
       - name: Create Release Directory
@@ -118,7 +169,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
             # Create the release dir and api/ subfolder upfront.
@@ -151,7 +202,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
             cd "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}"
@@ -176,7 +227,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           envs: CLD_CLOUD_NAME,CLD_API_KEY,CLD_API_SECRET,PROXY_API_TOKEN
           script: |
@@ -238,7 +289,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
             set -euo pipefail
@@ -273,6 +324,7 @@ jobs:
     needs: [build, deploy]
     if: always()
     runs-on: ubuntu-latest
+    permissions: {}
 
     steps:
       # Use the release timestamp from deploy job
