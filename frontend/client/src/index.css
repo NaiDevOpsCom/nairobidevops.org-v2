@@ -1,0 +1,197 @@
+/* ==========================
+   Tailwind Directives
+========================== */
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+/* ==========================
+   CSS Variables
+========================== */
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(240, 10%, 3.9%);
+  --muted: hsla(0, 0%, 0%, 0.2);
+  --muted-foreground: hsl(215, 16%, 47%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(240, 10%, 3.9%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(240, 10%, 3.9%);
+  --border: hsl(214, 32%, 91%);
+  --input: hsl(214, 32%, 91%);
+  --primary: hsl(209, 95%, 45%);
+  --primary-light: #e6f0fa;
+  --primary-light-blue: #d1e2f2;
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(210, 40%, 96%);
+  --accent-foreground: hsl(222, 84%, 5%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(207, 90%, 54%);
+  --radius: 0.5rem;
+  --nairobi-dark: #023047;
+  --faq-bg: hsla(209, 56%, 88%, 1);
+  --faq-text: #000000;
+  --black-overlay: rgba(0, 0, 0, 0.7);
+  --black-overlay80: rgba(0, 0, 0, 0.8);
+  --background-secondary: hsl(0, 0%, 98%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --background-secondary: #898e99;
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsla(0, 0%, 20%, 1);
+  --secondary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --nairobi-dark: #023047;
+  --faq-bg: #333333;
+  --faq-text: #ffffff;
+}
+
+/* ==========================
+   Text & Fonts
+========================== */
+.text-nairobi-dark {
+  color: var(--nairobi-dark) !important;
+}
+
+.figma-heading {
+  font-family:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
+  font-weight: 700;
+  font-style: normal;
+  font-size: 36px;
+  line-height: 41px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* ==========================
+   Base Layer
+========================== */
+@layer base {
+  body {
+    @apply font-sans antialiased bg-background text-foreground transition-colors duration-300;
+  }
+}
+
+/* ==========================
+   Custom Scrollbar
+========================== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1; /* slate-400 fallback */
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8; /* slate-500 fallback */
+}
+
+/* ==========================
+   Smooth Scroll
+========================== */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ==========================
+   Animations
+========================== */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fade-in-up 0.6s ease-out;
+}
+
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* ==========================
+   Tailwind Custom Utilities (CSS Variables)
+========================== */
+@layer utilities {
+  .border-border {
+    border-color: var(--border);
+  }
+  .text-primary-light-blue {
+    color: var(--primary-light-blue);
+  }
+  .text-primary {
+    color: var(--primary);
+  }
+  .text-secondary {
+    color: var(--secondary);
+  }
+  .text-muted {
+    color: var(--muted);
+  }
+  .text-accent {
+    color: var(--accent);
+  }
+  .text-destructive {
+    color: var(--destructive);
+  }
+  .bg-primary-light-blue {
+    background-color: var(--primary-light-blue);
+  }
+  .bg-background {
+    background-color: var(--background);
+  }
+  .bg-card {
+    background-color: var(--card);
+  }
+  .bg-popover {
+    background-color: var(--popover);
+  }
+  .ring-ring {
+    ring-color: var(--ring);
+  }
+  .bg-input {
+    background-color: var(--input);
+  }
+}
+
+/* ==========================
+   react-day-picker Calendar
+========================== */
+.day-range-end {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
