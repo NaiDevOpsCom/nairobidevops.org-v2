@@ -9,8 +9,9 @@ lerna-debug.log*
 
 # ===== Dependency directories =====
 node_modules/
-client/node_modules/
-server/node_modules/
+frontend/client/node_modules/
+frontend/node_modules/
+backend/node_modules/
 
 # ===== Build / Output =====
 dist/
@@ -18,7 +19,7 @@ dist-ssr/
 build/
 out/
 .next/
-/.vercel/
+.vercel/
 .vercel_build_output/
 /.parcel-cache/
 .cache/

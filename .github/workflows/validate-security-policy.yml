@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -25,6 +28,7 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -44,10 +48,10 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --quiet -- vercel.json client/public/.htaccess; then
-            echo "::error::Security policy files (vercel.json, .htaccess) do not match security-policy.json. Please run 'npm run security:generate' locally and commit the changes."
-            git status
-            git diff
+          if ! git -C "$GITHUB_WORKSPACE" diff --quiet -- frontend/client/public/.htaccess; then
+            echo "::error::Generated security files do not match frontend/security-policy.json. Please run 'npm run security:generate' from frontend/ and commit the changes."
+            git -C "$GITHUB_WORKSPACE" status
+            git -C "$GITHUB_WORKSPACE" diff -- frontend/client/public/.htaccess
             exit 1
           else
             echo "SUCCESS: Generated security files match the policy."

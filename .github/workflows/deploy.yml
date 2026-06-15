@@ -10,20 +10,19 @@ on:
     branches:
       - main
     paths:
-      - "client/src/**"
-      - "client/public/**"
-      - "scripts/**"
-      - "package.json"
-      - "package-lock.json"
-      - "vite.config.ts"
-      - "tsconfig.json"
+      - "frontend/**"
+      - "backend/**"
       - ".github/workflows/deploy.yml"
+      - ".github/actions/cache-vite-npm/action.yml"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       # 1. Check out the code
@@ -38,14 +37,14 @@ jobs:
 
       # 3. Install dependencies and Build
       #
-      # Vite automatically copies everything in client/public/ into dist/ verbatim.
+      # Vite automatically copies everything in frontend/client/public/ into dist/ verbatim.
       # This means these files land in dist/ as part of the build — no separate
       # upload step needed for them:
-      #   client/public/api/imagesCloudinary.php  →  dist/api/imagesCloudinary.php
-      #   client/public/api/luma.php              →  dist/api/luma.php
-      #   client/public/.htaccess                 →  dist/.htaccess
-      #   client/public/analytics.js              →  dist/analytics.js
-      #   client/public/robots.txt                →  dist/robots.txt
+      #   frontend/client/public/api/imagesCloudinary.php  →  dist/api/imagesCloudinary.php
+      #   frontend/client/public/api/luma.php              →  dist/api/luma.php
+      #   frontend/client/public/.htaccess                 →  dist/.htaccess
+      #   frontend/client/public/analytics.js              →  dist/analytics.js
+      #   frontend/client/public/robots.txt                →  dist/robots.txt
       #
       - name: Install and Build
         run: |
@@ -78,7 +77,7 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: dist
-          path: dist
+          path: frontend/dist
           retention-days: 1
           include-hidden-files: true # Required — ensures .htaccess is included in artifact
 
@@ -181,7 +180,7 @@ jobs:
       - name: Package and Sync to Release
         run: |
           # Tarball the full dist/ output.
-          # Already contains (copied by Vite from client/public/):
+          # Already contains (copied by Vite from frontend/client/public/):
           #   ./index.html
           #   ./assets/
           #   ./.htaccess                     ← SPA routing rules

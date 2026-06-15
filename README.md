@@ -51,20 +51,18 @@ This platform empowers developers, automation experts, and tech enthusiasts to l
 
 ```
 NairobiDevOps-1/
-  client/         # React frontend (src/, components/, pages/, contexts/, hooks/, etc.)
-  client/src/data/ # Static data files (testimonials, gallery images, partners, etc.)
-  components.json # UI config
-  tailwind.config.ts # Tailwind CSS config
-  tsconfig.json   # TypeScript config
-  vite.config.ts  # Vite config
-  package.json    # Project dependencies and scripts
+  frontend/        # React frontend app, configs, docs, scripts, and package files
+    client/        # Vite client app (src/, components/, pages/, contexts/, hooks/, etc.)
+    client/src/data/ # Static data files (testimonials, gallery images, partners, etc.)
+    package.json   # Frontend dependencies and scripts
+  backend/         # Backend service placeholder
 ```
 
 ---
 
 ## Data Folder
 
-The `client/src/data/` directory contains static data used throughout the application. This includes:
+The `frontend/client/src/data/` directory contains static data used throughout the application. This includes:
 
 - **testimonialsData.ts**: Member testimonials displayed on the site
 - **galleryData.ts**: Image URLs and metadata for the gallery section
@@ -87,6 +85,7 @@ The `client/src/data/` directory contains static data used throughout the applic
    ```bash
    git clone <repo-url>
    cd ndc-redesign-website
+   cd frontend
    ```
 
 2. **Install dependencies:**
@@ -119,16 +118,16 @@ The `client/src/data/` directory contains static data used throughout the applic
 
 ## Code Style
 
-This project uses **Prettier** for code formatting and **ESLint** for code quality rules. Both are enforced by our CI pipeline. **Mandatory Check**: Please run `npm run format`, `npm run lint`, and `npm run build` before pushing your changes to ensure code integrity and build success.
+This project uses **Prettier** for code formatting and **ESLint** for code quality rules. Both are enforced by our CI pipeline. **Mandatory Check**: Please run `npm run format`, `npm run lint`, and `npm run build` from `frontend/` before pushing your changes to ensure code integrity and build success.
 
 ---
 
 ## Documentation
 
-The `docs/` directory contains detailed documentation about the project's architecture and security workflows:
+The `frontend/docs/` directory contains detailed documentation about the project's architecture and security workflows:
 
-- **[SECURITY-HEADERS.md](docs/SECURITY-HEADERS.md)**: Explains the "Single Source of Truth" architecture for HTTP security headers.
-- **[CONTRIBUTING.md](docs/CONTRIBUTING.md)**: Our main contribution guide.
+- **[SECURITY-HEADERS.md](frontend/docs/SECURITY-HEADERS.md)**: Explains the "Single Source of Truth" architecture for HTTP security headers.
+- **[CONTRIBUTING.md](frontend/docs/CONTRIBUTING.md)**: Our main contribution guide.
 
 ---
 
@@ -136,13 +135,13 @@ The `docs/` directory contains detailed documentation about the project's archit
 
 We welcome contributions from the community! Whether you're fixing a bug, adding a new feature, or improving documentation, your help is valuable.
 
-To ensure a smooth collaboration, please read our **[Contribution Guide](docs/CONTRIBUTING.md)** before you start. It contains detailed information on our development workflow, coding standards, and pull request process.
+To ensure a smooth collaboration, please read our **[Contribution Guide](frontend/docs/CONTRIBUTING.md)** before you start. It contains detailed information on our development workflow, coding standards, and pull request process.
 
 ### Quick Links
 
-- [Branching Strategy](docs/CONTRIBUTING.md#branching-strategy)
-- [Commit Message Convention](docs/CONTRIBUTING.md#commit-message-convention)
-- [Submitting a Pull Request](docs/CONTRIBUTING.md#submitting-a-pull-request)
+- [Branching Strategy](frontend/docs/CONTRIBUTING.md#branching-strategy)
+- [Commit Message Convention](frontend/docs/CONTRIBUTING.md#commit-message-convention)
+- [Submitting a Pull Request](frontend/docs/CONTRIBUTING.md#submitting-a-pull-request)
 
 ---
 

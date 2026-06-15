@@ -23,6 +23,9 @@ jobs:
     name: Dependency Review
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       # ------------------------------------------------------------
@@ -39,6 +42,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       # ------------------------------------------------------------
       # Enforce lockfile presence on PRs
@@ -85,6 +89,6 @@ jobs:
       # ------------------------------------------------------------
       - name: Scan for vulnerable dependencies
         if: ${{ inputs.is-pull-request }}
-        uses: actions/dependency-review-action@5a2ce3f5b92ee19cbb15521a507ef830e3962de0 # v4.3.4
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
         with:
           fail-on-severity: high
