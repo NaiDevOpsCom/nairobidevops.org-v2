@@ -94,16 +94,27 @@ jobs:
 
             const found = primaryLabels.filter(l => labelNames.includes(l));
 
-            if (found.length === 0) {
-              const commentBody = `## 🏷️ Label Required\n\nThis pull request doesn't have any of the primary labels yet. Please add one of the following labels so it can be properly categorised:\n\n${primaryLabels.map(l => `- \`${l}\``).join('\n')}\n\n_You can add a label by clicking the "Labels" section to the right._`;
+              if (found.length === 0) {
+               const commentBody = `## 🏷️ Label Required\n\nThis pull request doesn't have any of the primary labels yet. Please add one of the following labels so it can be properly categorised:\n\n${primaryLabels.map(l => `- \`${l}\``).join('\n')}\n\n_You can add a label by clicking the "Labels" section to the right._`;
 
-              // Find existing bot comment to update (avoid spam)
-              const { data: comments } = await github.rest.issues.listComments({
-                owner, repo, issue_number: number
-              });
-              const botComment = comments.find(c =>
-                c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
-              );
+               // Find existing bot comment to update (avoid spam)
+               // Must fetch all pages since default pagination only returns 30 items
+               let botComment = null;
+               let page = 1;
+               let hasMore = true;
+               while (hasMore) {
+                 const { data: comments } = await github.rest.issues.listComments({
+                   owner, repo, issue_number: number, per_page: 100, page
+                 });
+                 botComment = comments.find(c =>
+                   c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
+                 );
+                 if (botComment || comments.length < 100) {
+                   hasMore = false;
+                 } else {
+                   page++;
+                 }
+               }
 
               if (botComment) {
                 await github.rest.issues.updateComment({
@@ -116,12 +127,23 @@ jobs:
               }
             } else {
               // If labels now exist, remove any previous bot reminder comment
-              const { data: comments } = await github.rest.issues.listComments({
-                owner, repo, issue_number: number
-              });
-              const botComment = comments.find(c =>
-                c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
-              );
+              // Must fetch all pages since default pagination only returns 30 items
+              let botComment = null;
+              let page = 1;
+              let hasMore = true;
+              while (hasMore) {
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner, repo, issue_number: number, per_page: 100, page
+                });
+                botComment = comments.find(c =>
+                  c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
+                );
+                if (botComment || comments.length < 100) {
+                  hasMore = false;
+                } else {
+                  page++;
+                }
+              }
               if (botComment) {
                 await github.rest.issues.deleteComment({
                   owner, repo, comment_id: botComment.id
