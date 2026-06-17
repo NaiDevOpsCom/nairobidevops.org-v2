@@ -92,7 +92,51 @@ function proxyRunMiddleware($allowedMethods = ['GET', 'POST', 'OPTIONS']) {
     ];
 }
 
+/**
+ * Validate that a cache file path resolves to within the trusted cache root.
+ * Prevents path-traversal attacks (CWE-73) when the path is derived from
+ * user-controlled input (query parameters, cursors, etc.).
+ *
+ * @return string The validated, canonicalized path.
+ */
+function proxySafeCachePath($cacheFile) {
+    $cacheRoot = realpath(getProxyCacheDir());
+
+    // If the cache root doesn't exist yet, create it so realpath works.
+    if ($cacheRoot === false) {
+        mkdir(getProxyCacheDir(), 0700, true);
+        $cacheRoot = realpath(getProxyCacheDir());
+    }
+
+    // Resolve the deepest existing ancestor of the target path.
+    $resolved = realpath($cacheFile);
+    if ($resolved === false) {
+        // File doesn't exist yet — resolve from the parent directory.
+        $parentDir = realpath(dirname($cacheFile));
+        if ($parentDir === false) {
+            // Parent doesn't exist either; it will be created by proxyWriteCache.
+            // Normalize logically to strip ".." segments.
+            $relative = str_replace('\\', '/', substr(dirname($cacheFile), strlen(getProxyCacheDir())));
+            // Reject if any remaining ".." segments exist after stripping the root.
+            if (strpos($relative, '..') !== false) {
+                proxyJsonError('Forbidden', 403);
+            }
+            return $cacheFile;
+        }
+        if (strpos($parentDir, $cacheRoot) !== 0) {
+            proxyJsonError('Forbidden', 403);
+        }
+        return $parentDir . DIRECTORY_SEPARATOR . basename($cacheFile);
+    }
+
+    if (strpos($resolved, $cacheRoot) !== 0) {
+        proxyJsonError('Forbidden', 403);
+    }
+    return $resolved;
+}
+
 function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json; charset=utf-8') {
+    $cacheFile = proxySafeCachePath($cacheFile);
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
         $data = file_get_contents($cacheFile);
         if ($data) {
@@ -105,8 +149,10 @@ function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json
 }
 
 function proxyWriteCache($cacheFile, $data) {
-    if (!is_dir(dirname($cacheFile))) {
-        mkdir(dirname($cacheFile), 0700, true);
+    $cacheFile = proxySafeCachePath($cacheFile);
+    $dir = dirname($cacheFile);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0700, true);
     }
     file_put_contents($cacheFile . '.tmp', $data, LOCK_EX);
     rename($cacheFile . '.tmp', $cacheFile);
