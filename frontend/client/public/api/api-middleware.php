@@ -158,28 +158,28 @@ function proxySafeCachePath($cacheFile) {
         proxyJsonError('Forbidden', 403);
     }
 
-    // Resolve the deepest existing ancestor of the target path.
-    $resolved = realpath($cacheFile);
-    if ($resolved === false) {
-        // File doesn't exist yet — resolve from the parent directory.
-        $parentDir = realpath(dirname($cacheFile));
-        if ($parentDir === false) {
-            // Parent doesn't exist either; check containment on canonicalized target path.
-            if (!proxyIsPathWithinRoot($cacheFile, $cacheRoot)) {
-                proxyJsonError('Forbidden', 403);
-            }
-            return $cacheFile;
-        }
-        if (!proxyIsPathWithinRoot($parentDir, $cacheRoot)) {
-            proxyJsonError('Forbidden', 403);
-        }
-        return $parentDir . DIRECTORY_SEPARATOR . basename($cacheFile);
-    }
+    // Extract the safe basename using basename() which is a standard path traversal sanitizer.
+    $safeFilename = basename($cacheFile);
 
-    if (!proxyIsPathWithinRoot($resolved, $cacheRoot)) {
+    // Validate the filename format strictly (allow only alphanumeric, dashes, underscores, and dots).
+    if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $safeFilename)) {
         proxyJsonError('Forbidden', 403);
     }
-    return $resolved;
+
+    // Reconstruct the safe cache path using the trusted responses directory.
+    $responsesDir = $cacheRoot . DIRECTORY_SEPARATOR . 'api_responses';
+    if (!is_dir($responsesDir)) {
+        mkdir($responsesDir, 0700, true);
+    }
+
+    $safePath = $responsesDir . DIRECTORY_SEPARATOR . $safeFilename;
+
+    // Enforce strict containment check.
+    if (!proxyIsPathWithinRoot($safePath, $responsesDir)) {
+        proxyJsonError('Forbidden', 403);
+    }
+
+    return $safePath;
 }
 
 
@@ -198,10 +198,7 @@ function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json
 
 function proxyWriteCache($cacheFile, $data) {
     $cacheFile = proxySafeCachePath($cacheFile);
-    $dir = dirname($cacheFile);
-    if (!is_dir($dir)) {
-        mkdir($dir, 0700, true);
-    }
     file_put_contents($cacheFile . '.tmp', $data, LOCK_EX);
     rename($cacheFile . '.tmp', $cacheFile);
 }
+
