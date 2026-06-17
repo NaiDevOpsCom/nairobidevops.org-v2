@@ -97,18 +97,11 @@ jobs:
             if (found.length === 0) {
               const commentBody = `## 🏷️ Label Required\n\nThis pull request doesn't have any of the primary labels yet. Please add one of the following labels so it can be properly categorised:\n\n${primaryLabels.map(l => `- \`${l}\``).join('\n')}\n\n_You can add a label by clicking the "Labels" section to the right._`;
 
-              // Collect all comments across all pages
-              const allComments = [];
-              let page = 1;
-              while (true) {
-                const { data: comments } = await github.rest.issues.listComments({
-                  owner, repo, issue_number: number, per_page: 100, page
-                });
-                if (comments.length === 0) break;
-                allComments.push(...comments);
-                page++;
-              }
-              const botComment = allComments.find(c =>
+              // Find existing bot comment to update (avoid spam)
+              const { data: comments } = await github.rest.issues.listComments({
+                owner, repo, issue_number: number
+              });
+              const botComment = comments.find(c =>
                 c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
               );
 
@@ -123,17 +116,10 @@ jobs:
               }
             } else {
               // If labels now exist, remove any previous bot reminder comment
-              const allComments = [];
-              let page = 1;
-              while (true) {
-                const { data: comments } = await github.rest.issues.listComments({
-                  owner, repo, issue_number: number, per_page: 100, page
-                });
-                if (comments.length === 0) break;
-                allComments.push(...comments);
-                page++;
-              }
-              const botComment = allComments.find(c =>
+              const { data: comments } = await github.rest.issues.listComments({
+                owner, repo, issue_number: number
+              });
+              const botComment = comments.find(c =>
                 c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
               );
               if (botComment) {

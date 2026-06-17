@@ -39,47 +39,50 @@ jobs:
             automated
             dependencies
 
-      - name: Post help comment on failure
-        if: failure() && steps.lint.outcome == 'failure'
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const title = context.payload.pull_request.title;
-            const body = [
-              'Thanks for opening this PR! The title doesn\'t match our required format.',
-              '',
-              '**PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/):**',
-              '',
-              '| Type | Example |',
-              '|------|---------|',
-              '| `feat:` | `feat: add speaker search filter` |',
-              '| `fix:` | `fix: resolve mobile nav overflow` |',
-              '| `chore:` | `chore: update dependencies` |',
-              '| `docs:` | `docs: update contributing guide` |',
-              '| `refactor:` | `refactor: extract SpeakerCard component` |',
-              '| `ci:` | `ci: speed up build workflow` |',
-              '| `build:` | `build: bump vite to v6` |',
-              '| `test:` | `test: add SpeakerCard unit tests` |',
-              '| `security:` | `security: fix XSS in search input` |',
-              '',
-              '**Current title:** `' + title + '`',
-              '',
-              '**Tip:** You can edit the title directly in this PR\'s title field above.',
-              'No need to close and reopen — just edit and the check will re-run.'
-            ].join('\n');
+       - name: Post help comment on failure
+         if: failure() && steps.lint.outcome == 'failure'
+         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+         with:
+           github-token: ${{ secrets.GITHUB_TOKEN }}
+           script: |
+             const title = context.payload.pull_request.title;
+             const { owner, repo } = context.repo;
+             const { number } = context.issue;
+             
+             const body = [
+               'Thanks for opening this PR! The title doesn\'t match our required format.',
+               '',
+               '**PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/):**',
+               '',
+               '| Type | Example |',
+               '|------|---------|',
+               '| `feat:` | `feat: add speaker search filter` |',
+               '| `fix:` | `fix: resolve mobile nav overflow` |',
+               '| `chore:` | `chore: update dependencies` |',
+               '| `docs:` | `docs: update contributing guide` |',
+               '| `refactor:` | `refactor: extract SpeakerCard component` |',
+               '| `ci:` | `ci: speed up build workflow` |',
+               '| `build:` | `build: bump vite to v6` |',
+               '| `test:` | `test: add SpeakerCard unit tests` |',
+               '| `security:` | `security: fix XSS in search input` |',
+               '',
+               '**Current title:** `' + title + '`',
+               '',
+               '**Tip:** You can edit the title directly in this PR\'s title field above.',
+               'No need to close and reopen — just edit and the check will re-run.'
+             ].join('\n');
 
-            const { data: comments } = await github.rest.issues.listComments({
-              ...context.issue
-            });
+             const { data: comments } = await github.rest.pulls.listComments({
+               owner, repo, pull_number: number
+             });
 
-            const existing = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('Conventional Commits')
-            );
+             const existing = comments.find(c =>
+               c.user.type === 'Bot' && c.body.includes('Conventional Commits')
+             );
 
-            if (!existing) {
-              await github.rest.issues.createComment({
-                ...context.issue,
-                body: body
-              });
-            }
+             if (!existing) {
+               await github.rest.pulls.createReview({
+                 owner, repo, pull_number: number,
+                 body: body, event: 'COMMENT'
+               });
+             }

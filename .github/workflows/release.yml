@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
 
 jobs:
   release:
@@ -337,16 +337,26 @@ jobs:
             // Write release notes to file (avoids shell escaping issues)
             fs.writeFileSync('.release-notes.md', md);
 
-      - name: Commit CHANGELOG.md
-        if: steps.guard.outputs.skip == 'false'
-        run: |
-          git add CHANGELOG.md
-          if git diff --cached --quiet; then
-            echo "No CHANGELOG changes"
-          else
-            git commit -m "chore: update CHANGELOG for v${{ steps.semver.outputs.new_version }}"
-            git push origin main
-          fi
+       - name: Commit CHANGELOG.md
+         if: steps.guard.outputs.skip == 'false'
+         run: |
+           # Detect which branch triggered the release
+           REF="${{ github.ref }}"
+           if [[ $REF == refs/heads/hotfix/* ]]; then
+             # Extract branch name from refs/heads/hotfix/... format
+             TARGET_BRANCH="${REF#refs/heads/}"
+           else
+             # Default to main for regular releases
+             TARGET_BRANCH="main"
+           fi
+           
+           git add CHANGELOG.md
+           if git diff --cached --quiet; then
+             echo "No CHANGELOG changes"
+           else
+             git commit -m "chore: update CHANGELOG for v${{ steps.semver.outputs.new_version }}"
+             git push origin "$TARGET_BRANCH"
+           fi
 
       - name: Create GitHub Release
         if: steps.guard.outputs.skip == 'false'

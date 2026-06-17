@@ -17,7 +17,7 @@ concurrency:
 
 # Global environment variables for all jobs
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   CACHE_VERSION: "v1"
 
 on:
@@ -35,7 +35,7 @@ jobs:
     name: Security Scan
     uses: ./.github/workflows/security-validation.yml
     with:
-      node-version: "20"
+      node-version: "22"
       fail-level: "moderate"
     secrets: inherit
 
@@ -79,10 +79,10 @@ jobs:
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
 
-      - name: Cache Vitest
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: frontend/client/.vitest-cache
+       - name: Cache Vitest
+         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+         with:
+           path: frontend/node_modules/.vitest
           key: vitest-${{ runner.os }}-${{ env.NODE_VERSION }}-${{ hashFiles('frontend/package-lock.json', 'frontend/client/src/utils/__tests__/hardenedBuildCheck.test.ts') }}
           restore-keys: |
             vitest-${{ runner.os }}-${{ env.NODE_VERSION }}-
