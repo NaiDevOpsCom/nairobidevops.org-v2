@@ -40,3 +40,11 @@ security:
           - "frontend/docs/security/**"
           - "**/*security*"
           - "frontend/security-policy.json"
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: ["backend/**"]
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: ["frontend/**"]
