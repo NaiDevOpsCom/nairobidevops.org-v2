@@ -102,19 +102,64 @@ function proxyRunMiddleware($allowedMethods = ['GET', 'POST', 'OPTIONS']) {
  * @return bool True if the path is within the root directory, false otherwise.
  */
 function proxyIsPathWithinRoot($path, $root) {
-    if ($path === '' || $root === '') {
-        return false;
+    $isValid = false;
+
+    if ($path !== '' && $root !== '') {
+        $realPath = realpath($path);
+        $realRoot = realpath($root);
+
+        // Fallback to parent directory if the path itself does not exist yet (common when writing cache files)
+        if ($realPath === false) {
+            $parent = dirname($path);
+            $realPath = realpath($parent);
+        }
+
+        if ($realPath !== false && $realRoot !== false) {
+            $normalizedPath = str_replace('\\', '/', $realPath);
+            $normalizedRoot = str_replace('\\', '/', $realRoot);
+
+            $isValid = ($normalizedPath === $normalizedRoot || strpos($normalizedPath . '/', rtrim($normalizedRoot, '/') . '/') === 0);
+        }
     }
 
-    // Normalize separators to forward slashes
-    $normalizedPath = str_replace('\\', '/', $path);
-    $normalizedRoot = str_replace('\\', '/', $root);
+    return $isValid;
+}
 
-    // Strip trailing slashes from root
-    $normalizedRoot = rtrim($normalizedRoot, '/');
+/**
+ * Helper to ensure a directory exists and return its resolved realpath.
+ *
+ * @param string $dir Directory path.
+ * @return string|bool Resolved path or false on failure.
+ */
+function ensureDirectoryExists($dir) {
+    if (!is_dir($dir)) {
+        mkdir($dir, 0700, true);
+    }
+    return realpath($dir);
+}
 
-    // Logical canonicalization of relative path segments ('.' and '..')
-    $segments = explode('/', $normalizedPath);
+/**
+ * Extracts and canonicalizes path segments relative to the responses directory.
+ *
+ * @param string $cacheFile The input cache file path.
+ * @param string $responsesDir The trusted responses directory.
+ * @return array Canonical segments.
+ */
+function getSafePathSegments($cacheFile, $responsesDir) {
+    $normalizedResponsesDir = str_replace('\\', '/', $responsesDir);
+    $normalizedResponsesDir = rtrim($normalizedResponsesDir, '/');
+
+    $normalizedFile = str_replace('\\', '/', $cacheFile);
+
+    if (strpos($normalizedFile, $normalizedResponsesDir . '/') === 0) {
+        $relativePath = substr($normalizedFile, strlen($normalizedResponsesDir) + 1);
+    } elseif ($normalizedFile === $normalizedResponsesDir) {
+        $relativePath = '';
+    } else {
+        $relativePath = $cacheFile;
+    }
+
+    $segments = explode('/', str_replace('\\', '/', $relativePath));
     $canonicalSegments = [];
     foreach ($segments as $segment) {
         if ($segment === '' || $segment === '.') {
@@ -123,18 +168,18 @@ function proxyIsPathWithinRoot($path, $root) {
         if ($segment === '..') {
             array_pop($canonicalSegments);
         } else {
+            if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $segment)) {
+                proxyJsonError('Forbidden', 403);
+            }
             $canonicalSegments[] = $segment;
         }
     }
 
-    $prefix = (strpos($normalizedPath, '/') === 0) ? '/' : '';
-    $canonicalPath = $prefix . implode('/', $canonicalSegments);
-
-    if ($canonicalPath === $normalizedRoot) {
-        return true;
+    if (empty($canonicalSegments)) {
+        proxyJsonError('Forbidden', 403);
     }
 
-    return strpos($canonicalPath, $normalizedRoot . '/') === 0;
+    return $canonicalSegments;
 }
 
 /**
@@ -145,36 +190,28 @@ function proxyIsPathWithinRoot($path, $root) {
  * @return string The validated, canonicalized path.
  */
 function proxySafeCachePath($cacheFile) {
-    $cacheRoot = realpath(getProxyCacheDir());
-
-    // If the cache root doesn't exist yet, create it so realpath works.
-    if ($cacheRoot === false) {
-        mkdir(getProxyCacheDir(), 0700, true);
-        $cacheRoot = realpath(getProxyCacheDir());
-    }
+    $cacheRoot = ensureDirectoryExists(getProxyCacheDir());
 
     // Fail closed if cache root cannot be resolved.
     if ($cacheRoot === false || $cacheRoot === '') {
         proxyJsonError('Forbidden', 403);
     }
 
-    // Extract the safe basename using basename() which is a standard path traversal sanitizer.
-    $safeFilename = basename($cacheFile);
-
-    // Validate the filename format strictly (allow only alphanumeric, dashes, underscores, and dots).
-    if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $safeFilename)) {
+    $responsesDir = ensureDirectoryExists($cacheRoot . DIRECTORY_SEPARATOR . 'api_responses');
+    if ($responsesDir === false) {
         proxyJsonError('Forbidden', 403);
     }
 
-    // Reconstruct the safe cache path using the trusted responses directory.
-    $responsesDir = $cacheRoot . DIRECTORY_SEPARATOR . 'api_responses';
-    if (!is_dir($responsesDir)) {
-        mkdir($responsesDir, 0700, true);
+    $canonicalSegments = getSafePathSegments($cacheFile, $responsesDir);
+    $safePath = $responsesDir . DIRECTORY_SEPARATOR . implode(DIRECTORY_SEPARATOR, $canonicalSegments);
+
+    // Ensure parent directories exist for the safe cache path (supporting subdirectories).
+    $parentDir = dirname($safePath);
+    if (ensureDirectoryExists($parentDir) === false) {
+        proxyJsonError('Forbidden', 403);
     }
 
-    $safePath = $responsesDir . DIRECTORY_SEPARATOR . $safeFilename;
-
-    // Enforce strict containment check.
+    // Enforce strict containment check with realpath-based symlink resolution.
     if (!proxyIsPathWithinRoot($safePath, $responsesDir)) {
         proxyJsonError('Forbidden', 403);
     }

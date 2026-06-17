@@ -32,9 +32,13 @@ $cacheKey = md5($target_url . '|' . $authContext);
 $cacheFile = $ctx['cacheRootDir'] . '/api_responses/luma_' . $cacheKey . '.json';
 $cacheTTL = 300;
 
-if ($ctx['method'] === 'GET' && !$hasAuthorization) {
+function getLumaMetaCacheFile($cacheFile, $cacheRootDir) {
     $safeMetaFilename = basename($cacheFile . '.meta');
-    $safeMetaFile = $ctx['cacheRootDir'] . '/api_responses/' . $safeMetaFilename;
+    return $cacheRootDir . '/api_responses/' . $safeMetaFilename;
+}
+
+if ($ctx['method'] === 'GET' && !$hasAuthorization) {
+    $safeMetaFile = getLumaMetaCacheFile($cacheFile, $ctx['cacheRootDir']);
     $cachedContentType = file_exists($safeMetaFile) ? file_get_contents($safeMetaFile) : JSON_CONTENT_TYPE;
     proxyServeCache($cacheFile, $cacheTTL, $cachedContentType);
 }
@@ -84,8 +88,7 @@ header('X-Cache: ' . ($hasAuthorization ? 'BYPASS' : 'MISS'));
 if ($ctx['method'] === 'GET' && !$hasAuthorization && $http_code === 200) {
     proxyWriteCache($cacheFile, $response);
     if ($contentType) {
-        $safeMetaFilename = basename($cacheFile . '.meta');
-        $safeMetaFile = $ctx['cacheRootDir'] . '/api_responses/' . $safeMetaFilename;
+        $safeMetaFile = getLumaMetaCacheFile($cacheFile, $ctx['cacheRootDir']);
         file_put_contents($safeMetaFile, $contentType);
     }
 }
