@@ -46,8 +46,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const title = context.payload.pull_request.title;
-            const { owner, repo } = context.repo;
-            const number = context.payload.pull_request.number;
+            const { owner, repo, number } = context.issue;
             
             const body = [
               'Thanks for opening this PR! The title doesn\'t match our required format.',
