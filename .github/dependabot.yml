@@ -28,6 +28,7 @@ updates:
         update-types: ["version-update:semver-major"]
     groups:
       frontend-dependencies:
+        update-types: ["minor", "patch"]
         patterns:
           - "@radix-ui/*"
           - "@tanstack/*"
@@ -91,3 +92,12 @@ updates:
           - "tsx"
           - "esbuild"
           - "terser"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"

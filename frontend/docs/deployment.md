@@ -4,7 +4,7 @@ This document describes the deployment implementation for the NDC Redesign Websi
 
 ## Overview
 
-The project uses GitHub Actions for CI/CD, deploying to a cPanel-hosted server via SSH and RSync. The deployment process is designed to be **atomic**, ensuring zero downtime and easy rollbacks.
+The project uses GitHub Actions for CI/CD, deploying to a cPanel-hosted server via SSH and Rsync. The deployment process is designed to be **atomic**, ensuring zero downtime and easy rollbacks.
 
 ## Deployment Workflow
 

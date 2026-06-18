@@ -22,6 +22,8 @@ jobs:
           types: |
             feat
             fix
+            style
+            content
             chore
             docs
             refactor

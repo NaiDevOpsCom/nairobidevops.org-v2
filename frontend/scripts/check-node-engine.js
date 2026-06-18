@@ -61,7 +61,6 @@ async function npmViewEngines(packageName, versionSpec) {
 }
 
 async function semverSatisfies(version, range) {
-  if (!version || !range) return false
   try {
     return semver.satisfies(version, range)
   } catch {

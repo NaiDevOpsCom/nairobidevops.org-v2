@@ -10,7 +10,7 @@ bug:
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          ["frontend/docs/**", "*.md", "frontend/CONTENT_GUIDE.md"]
+          ["frontend/docs/**", "**/*.md", "frontend/CONTENT_GUIDE.md"]
   - head-branch: ["^docs", "^doc"]
 
 ci/cd:

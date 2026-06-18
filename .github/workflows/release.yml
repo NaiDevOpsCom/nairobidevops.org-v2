@@ -337,9 +337,9 @@ jobs:
             // Write release notes to file (avoids shell escaping issues)
             fs.writeFileSync('.release-notes.md', md);
 
-       - name: Commit CHANGELOG.md
-         if: steps.guard.outputs.skip == 'false'
-         run: |
+      - name: Commit CHANGELOG.md
+        if: steps.guard.outputs.skip == 'false'
+        run: |
            # Detect which branch triggered the release
            REF="${{ github.ref }}"
            if [[ $REF == refs/heads/hotfix/* ]]; then

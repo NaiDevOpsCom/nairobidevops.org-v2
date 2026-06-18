@@ -33,4 +33,4 @@ All data files in `client/src/data/` are typed TypeScript files. When adding or 
 
 ### 6. Environment Variables
 
-- If your content changes introduce new third-party services or APIs requiring credentials, update `.env.example` accordingly.
+- If your content changes introduce new third-party services or APIs requiring credentials, update `client/.env.example` accordingly.
