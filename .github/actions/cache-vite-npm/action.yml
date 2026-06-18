@@ -8,7 +8,7 @@ runs:
   using: composite
   steps:
     - name: Setup Node.js (with npm cache)
-      uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
         node-version: ${{ inputs.node-version }}
         cache: "npm"
@@ -16,7 +16,7 @@ runs:
           frontend/package-lock.json
 
     - name: Cache Vite build cache
-      uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: |
           frontend/node_modules/.vite

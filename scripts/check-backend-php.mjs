@@ -42,7 +42,8 @@ function collectPhpFiles(dir, visited = new Set()) {
   let realDir;
   try {
     realDir = realpathSync(dir);
-  } catch {
+  } catch (err) {
+    console.warn(`Warning: could not resolve real path for "${dir}": ${err.message}`);
     return [];
   }
   if (visited.has(realDir)) return [];
@@ -89,9 +90,13 @@ function collectPhpFiles(dir, visited = new Set()) {
 
 const phpVersion = spawnSync(phpBin, ["--version"], {
   encoding: "utf8",
+  timeout: 10_000,
 });
 
-if (phpVersion.error || phpVersion.status !== 0) {
+if (phpVersion.error?.code === "ETIMEDOUT") {
+  console.error("PHP is required for backend checks, but `php --version` timed out (10s).");
+  process.exit(1);
+} else if (phpVersion.error || phpVersion.status !== 0) {
   console.error("PHP is required for backend checks, but `php --version` failed.");
   console.error("Install PHP locally or ensure the CI runner sets it up before `npm run check`.");
   process.exit(1);
@@ -109,10 +114,14 @@ let failed = false;
 for (const file of phpFiles) {
   const result = spawnSync(phpBin, ["-l", file], {
     encoding: "utf8",
+    timeout: 30_000,
   });
 
   const label = relative(process.cwd(), file);
-  if (result.status === 0) {
+  if (result.error && result.error.code === "ETIMEDOUT") {
+    failed = true;
+    console.error(`Timeout: PHP lint exceeded 30s for ${label}`);
+  } else if (result.status === 0) {
     console.log(`OK ${label}`);
   } else {
     failed = true;
