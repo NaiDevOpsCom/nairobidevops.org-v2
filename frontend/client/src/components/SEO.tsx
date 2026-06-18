@@ -19,7 +19,6 @@ interface SEOProps {
   ogLocale?: string;
   ogLocaleAlternate?: string[];
   structuredData?: Record<string, unknown> | Record<string, unknown>[];
-  keywords?: string;
 }
 
 export const SITE_NAME = import.meta.env.VITE_SITE_NAME || "Nairobi DevOps Community";
@@ -30,9 +29,9 @@ export const DEFAULT_OG_IMAGE_ALT = import.meta.env.VITE_OG_IMAGE_ALT || "Nairob
 // Safe JSON serializer for embedding inside <script type="application/ld+json">
 const safeStringify = (obj: unknown) =>
   JSON.stringify(obj)
-    .replace(/<\//g, "<\\/")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
+    .replaceAll(String.raw`</`, String.raw`<\/`)
+    .replaceAll(String.raw`\u2028`, String.raw`\\u2028`)
+    .replaceAll(String.raw`\u2029`, String.raw`\\u2029`);
 
 const SEO = ({
   title,
@@ -85,11 +84,8 @@ const SEO = ({
   /* -------------------------------------------------------------------------
    * Core fallbacks
    * ------------------------------------------------------------------------- */
-  const fullTitle = title
-    ? title.includes(SITE_NAME)
-      ? title
-      : `${title} | ${SITE_NAME}`
-    : SITE_NAME;
+  const shouldAppendSiteName = title && !title.includes(SITE_NAME);
+  const fullTitle = shouldAppendSiteName ? `${title} | ${SITE_NAME}` : title || SITE_NAME;
 
   const resolvedOgImage = ogImage || DEFAULT_OG_IMAGE;
   const resolvedOgImageAlt = ogImageAlt || DEFAULT_OG_IMAGE_ALT; // [NEW 1]
@@ -102,24 +98,25 @@ const SEO = ({
   /* -------------------------------------------------------------------------
    * Safe structured data rendering
    * ------------------------------------------------------------------------- */
-  const validSchemas = useMemo(() => {
-    const schemas = structuredData
-      ? Array.isArray(structuredData)
-        ? structuredData
-        : [structuredData]
-      : [];
-
-    return schemas.filter((schema) => {
-      try {
-        JSON.stringify(schema); // Test serialization
-        return true;
-      } catch (e) {
-        if (import.meta.env.DEV) {
-          console.error("Invalid structuredData schema skipped:", e);
-        }
-        return false;
+  const isStructuredDataValid = (schema: unknown): boolean => {
+    try {
+      JSON.stringify(schema); // Test serialization
+      return true;
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error("Invalid structuredData schema skipped:", e);
       }
-    });
+      return false;
+    }
+  };
+
+  const validSchemas = useMemo(() => {
+    let schemas: Record<string, unknown>[] = [];
+    if (structuredData) {
+      schemas = Array.isArray(structuredData) ? structuredData : [structuredData];
+    }
+
+    return schemas.filter(isStructuredDataValid);
   }, [structuredData]);
 
   /* -------------------------------------------------------------------------
@@ -155,10 +152,7 @@ const SEO = ({
       {twitterCreator && <meta name="twitter:creator" content={twitterCreator} />}
       {/* ── Structured Data ──────────────────────���──────────────────── */}
       {validSchemas.map((schema, index) => {
-        const key =
-          ((schema as Record<string, unknown>)["@id"] as string) ||
-          ((schema as Record<string, unknown>)["@type"] as string) ||
-          String(index);
+        const key = (schema["@id"] || schema["@type"] || String(index)) as string;
         return (
           <script
             key={key}
