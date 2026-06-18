@@ -2,7 +2,7 @@ name: Release Automation
 
 on:
   push:
-    branches: [main, 'hotfix/**']
+    branches: [main, "hotfix/**"]
   workflow_dispatch:
     inputs:
       bump:
@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -111,7 +111,7 @@ jobs:
         if: steps.verify-merge.outputs.result == 'true'
         run: |
           LAST_TAG=$(git tag --sort=-version:refname | head -1)
-          echo "last_tag=${LAST_TAG:-none}" >> $GITHUB_OUTPUT
+          echo "last_tag=${LAST_TAG:-none}" >> "$GITHUB_OUTPUT"
 
           if [ -z "$LAST_TAG" ]; then
             CURRENT=$(node -e "try { console.log(require('./frontend/package.json').version || '0.0.0') } catch { console.log('0.0.0') }")
@@ -119,21 +119,21 @@ jobs:
           else
             CURRENT="${LAST_TAG#v}"; RANGE="${LAST_TAG}..HEAD"
           fi
-          echo "current_version=${CURRENT}" >> $GITHUB_OUTPUT
-          echo "changelog_range=${RANGE}" >> $GITHUB_OUTPUT
+          echo "current_version=${CURRENT}" >> "$GITHUB_OUTPUT"
+          echo "changelog_range=${RANGE}" >> "$GITHUB_OUTPUT"
 
           # Manual override takes priority
           MANUAL_BUMP="${{ github.event.inputs.bump }}"
           MANUAL_VER="${{ github.event.inputs.version }}"
 
           if [ -n "$MANUAL_VER" ]; then
-            echo "bump=manual" >> $GITHUB_OUTPUT
-            echo "manual_version=${MANUAL_VER}" >> $GITHUB_OUTPUT
+            echo "bump=manual" >> "$GITHUB_OUTPUT"
+            echo "manual_version=${MANUAL_VER}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           if [ "$MANUAL_BUMP" != "" ] && [ "$MANUAL_BUMP" != "auto" ]; then
-            echo "bump=${MANUAL_BUMP}" >> $GITHUB_OUTPUT
+            echo "bump=${MANUAL_BUMP}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -148,7 +148,7 @@ jobs:
           if [ "${{ steps.verify-merge.outputs.hotfix }}" = "true" ] && [ -z "$MANUAL_VER" ]; then
             BUMP="patch"
           fi
-          echo "bump=${BUMP}" >> $GITHUB_OUTPUT
+          echo "bump=${BUMP}" >> "$GITHUB_OUTPUT"
 
       - name: Validate and calculate new version
         id: semver
@@ -168,7 +168,7 @@ jobs:
                 process.exit(1);
               }
             " "${MANUAL_VER}"
-            echo "new_version=${MANUAL_VER}" >> $GITHUB_OUTPUT
+            echo "new_version=${MANUAL_VER}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -178,7 +178,7 @@ jobs:
             major) echo "new_version=$((P[0]+1)).0.0" ;;
             minor) echo "new_version=${P[0]}.$((P[1]+1)).0" ;;
             patch) echo "new_version=${P[0]}.${P[1]}.$((P[2]+1))" ;;
-          esac >> $GITHUB_OUTPUT
+          esac >> "$GITHUB_OUTPUT"
 
       - name: Guard — check for existing tag & release
         id: guard
@@ -200,14 +200,14 @@ jobs:
 
           if [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "true" ]; then
             echo "Tag and release v${V} both exist — skipping."
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           elif [ "$TAG_EXISTS" = "true" ] && [ "$RELEASE_EXISTS" = "false" ]; then
             echo "::warning::Tag v${V} exists but release is missing — will create release."
-            echo "skip=false" >> $GITHUB_OUTPUT
-            echo "tag_only=true" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "tag_only=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
-            echo "tag_only=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "tag_only=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Guard — reject rollback (older than latest tag)
@@ -239,7 +239,7 @@ jobs:
           git push origin HEAD
           git tag "v${V}"
           git push origin "v${V}"
-          echo "new_version=${V}" >> $GITHUB_OUTPUT
+          echo "new_version=${V}" >> "$GITHUB_OUTPUT"
 
       # When recovering from a partial run (tag exists, release missing),
       # propagate new_version so changelog + release steps can proceed.
@@ -247,7 +247,7 @@ jobs:
         id: update-version-recovery
         if: steps.guard.outputs.skip == 'false' && steps.guard.outputs.tag_only == 'true'
         run: |
-          echo "new_version=${{ steps.semver.outputs.new_version }}" >> $GITHUB_OUTPUT
+          echo "new_version=${{ steps.semver.outputs.new_version }}" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
         id: changelog
@@ -345,23 +345,23 @@ jobs:
         # the git tag and GitHub Release (below) are the critical artefacts.
         continue-on-error: true
         run: |
-           # Detect which branch triggered the release
-           REF="${{ github.ref }}"
-           if [[ $REF == refs/heads/hotfix/* ]]; then
-             # Extract branch name from refs/heads/hotfix/... format
-             TARGET_BRANCH="${REF#refs/heads/}"
-           else
-             # Default to main for regular releases
-             TARGET_BRANCH="main"
-           fi
-           
-           git add CHANGELOG.md
-           if git diff --cached --quiet; then
-             echo "No CHANGELOG changes"
-           else
-             git commit -m "chore: update CHANGELOG for v${{ steps.semver.outputs.new_version }}"
-             git push origin "$TARGET_BRANCH"
-           fi
+          # Detect which branch triggered the release
+          REF="${{ github.ref }}"
+          if [[ "$REF" == refs/heads/hotfix/* ]]; then
+            # Extract branch name from refs/heads/hotfix/... format
+            TARGET_BRANCH="${REF#refs/heads/}"
+          else
+            # Default to main for regular releases
+            TARGET_BRANCH="main"
+          fi
+
+          git add CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "No CHANGELOG changes"
+          else
+            git commit -m "chore: update CHANGELOG for v${{ steps.semver.outputs.new_version }}"
+            git push origin "$TARGET_BRANCH"
+          fi
 
       - name: Create GitHub Release
         if: steps.guard.outputs.skip == 'false'
