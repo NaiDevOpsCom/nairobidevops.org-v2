@@ -86,9 +86,10 @@ jobs:
                 p.merged_at
               );
               if (match) {
+                const promotionBranches = new Set(['staging', 'pre-staging']);
                 core.setOutput('pr_number', String(match.number));
                 core.setOutput('pr_title', match.title);
-                if (match.head.ref !== 'pre-staging') {
+                if (!promotionBranches.has(match.head.ref)) {
                   core.notice(`Hotfix PR #${match.number} from ${match.head.ref}`);
                   core.setOutput('hotfix', 'true');
                 }
@@ -98,7 +99,7 @@ jobs:
               core.warning('Failed to query PRs: ' + e.message);
             }
 
-            core.notice('Not a pre-staging or hotfix merge — skipping');
+            core.notice('Not a staging promotion or hotfix merge — skipping');
             return 'false';
 
       - name: Fetch tags
@@ -113,7 +114,8 @@ jobs:
           echo "last_tag=${LAST_TAG:-none}" >> $GITHUB_OUTPUT
 
           if [ -z "$LAST_TAG" ]; then
-            CURRENT="0.0.0"; RANGE="HEAD"
+            CURRENT=$(node -e "try { console.log(require('./frontend/package.json').version || '0.0.0') } catch { console.log('0.0.0') }")
+            RANGE="HEAD"
           else
             CURRENT="${LAST_TAG#v}"; RANGE="${LAST_TAG}..HEAD"
           fi

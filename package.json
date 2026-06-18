@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "check": "npm run check:repo && npm run check:frontend && npm run check:backend",
+    "fix": "npm run fix:repo && npm run fix:frontend",
+    "check:repo": "node frontend/node_modules/prettier/bin/prettier.cjs --config frontend/.prettierrc --ignore-path .prettierignore --ignore-unknown --check package.json .prettierignore .github/workflows/actionlint.yml .github/workflows/project-checks.yml",
+    "fix:repo": "node frontend/node_modules/prettier/bin/prettier.cjs --config frontend/.prettierrc --ignore-path .prettierignore --ignore-unknown --write package.json .prettierignore .github/workflows/actionlint.yml .github/workflows/project-checks.yml",
+    "check:frontend": "npm --prefix frontend run check",
+    "fix:frontend": "npm --prefix frontend run lint:fix && npm --prefix frontend run format",
+    "check:backend": "node scripts/check-backend-php.mjs",
+    "build:frontend": "npm --prefix frontend run build"
+  }
+}
