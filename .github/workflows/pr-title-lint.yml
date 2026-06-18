@@ -13,8 +13,51 @@ jobs:
     name: Validate Conventional Commit
     runs-on: ubuntu-latest
     steps:
+      - id: generate_title
+        name: Auto-generate title for pre-staging -> main PRs
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = context.payload.pull_request || {};
+            if (!pr.base || !pr.head) return 'skipped';
+            if (pr.base.ref !== 'main' || pr.head.ref !== 'pre-staging') return 'skipped';
+
+            const title = (pr.title || '').trim();
+            const branchLike = /^pre-staging(\/.*)?$/i.test(title);
+            const ccPattern = /^(feat|fix|style|content|chore|docs|refactor|ci|build|test|security)(\([^\)]*\))?(!)?:\s+[a-z].*/;
+            if (!title || branchLike || !ccPattern.test(title)) {
+              const newTitle = 'chore: promote pre-staging to main';
+              try {
+                await github.rest.pulls.update({ owner, repo, pull_number: number, title: newTitle });
+                console.log(`Updated PR #${number} title to: ${newTitle}`);
+                return 'updated';
+              } catch (e) {
+                console.error('Failed to update PR title:', e.message);
+                throw e;
+              }
+            }
+            return 'unchanged';
+
+      # -----------------------------------------------------------------------
+      # IMPORTANT: Skip this step when generate_title just updated the title.
+      #
+      # WHY: `amannn/action-semantic-pull-request` reads the PR title from the
+      # webhook event payload, which is snapshotted at workflow start and is
+      # NEVER refreshed mid-run — even after a successful `pulls.update` API
+      # call. If we let lint run after an update it reads the stale
+      # "pre-staging" title and fails, producing a false-positive lint error.
+      #
+      # When generate_title returns 'updated', the new title is always the
+      # valid Conventional Commit "chore: promote pre-staging to main", so
+      # skipping lint is entirely safe — there is nothing to validate.
+      # -----------------------------------------------------------------------
       - name: Lint PR Title
         id: lint
+        if: steps.generate_title.outputs.result != 'updated'
         uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,7 +85,7 @@ jobs:
             dependencies
 
       - name: Post help comment on failure
-        if: failure() && steps.lint.outcome == 'failure'
+        if: failure() && steps.lint.outcome == 'failure' && steps.generate_title.outputs.result != 'updated'
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

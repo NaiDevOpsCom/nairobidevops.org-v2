@@ -277,14 +277,14 @@ jobs:
             let raw = '';
             try {
               raw = require('child_process')
-                .execSync(`git log ${range} --merges --format="%s|||%b"`, {
+                .execSync(`git log ${range} --format="%s|||%b"`, {
                   encoding: 'utf8', maxBuffer: 10 * 1024 * 1024
                 }).trim();
             } catch {}
 
             for (const line of raw.split('\n').filter(Boolean)) {
               const [s] = line.split('|||');
-              if (!s || /bump version|release \d/i.test(s)) continue;
+              if (!s || /bump version|release \d|^chore: release v/i.test(s)) continue;
 
               const t = s.trim();
               const strip = (re) => t.replace(re, '').replace(/^[a-z]/, c => c.toUpperCase()).trim();
@@ -339,6 +339,9 @@ jobs:
 
       - name: Commit CHANGELOG.md
         if: steps.guard.outputs.skip == 'false'
+        # continue-on-error: branch protection may reject a direct push to main;
+        # the git tag and GitHub Release (below) are the critical artefacts.
+        continue-on-error: true
         run: |
            # Detect which branch triggered the release
            REF="${{ github.ref }}"
