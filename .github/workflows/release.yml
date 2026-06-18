@@ -119,6 +119,9 @@ jobs:
           else
             CURRENT="${LAST_TAG#v}"; RANGE="${LAST_TAG}..HEAD"
           fi
+          # Strip any prerelease/build suffix (e.g. 1.2.3-beta.1 → 1.2.3)
+          # to ensure IFS-based integer arithmetic below never fails.
+          CURRENT="${CURRENT%%[-+]*}"
           echo "current_version=${CURRENT}" >> "$GITHUB_OUTPUT"
           echo "changelog_range=${RANGE}" >> "$GITHUB_OUTPUT"
 

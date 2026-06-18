@@ -31,7 +31,7 @@ jobs:
             if (pr.base.ref !== 'main' || !promotionBranches.has(pr.head.ref)) return 'skipped';
 
             const parseVersion = (tag) => {
-              const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(tag || '');
+              const match = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(tag || '');
               return match ? match.slice(1).map(Number) : null;
             };
 

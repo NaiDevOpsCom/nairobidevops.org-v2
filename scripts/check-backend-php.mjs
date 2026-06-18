@@ -1,23 +1,85 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { delimiter, join, relative } from "node:path";
 
 const backendDir = "backend";
 const ignoredDirs = new Set(["vendor"]);
 const ignoredFiles = new Set(["config.local.php"]);
 
-function collectPhpFiles(dir) {
+/**
+ * Resolve the absolute path of the PHP binary by scanning PATH directories.
+ * Uses fs checks only — no shell or child_process PATH resolution involved.
+ * Respects the PHP_PATH environment variable as an explicit override.
+ */
+function resolvePhpBinary() {
+  if (process.env.PHP_PATH) return process.env.PHP_PATH;
+
+  const pathDirs = (process.env.PATH || "").split(delimiter).filter(Boolean);
+  const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
+
+  for (const dir of pathDirs) {
+    for (const ext of extensions) {
+      const candidate = join(dir, `php${ext}`);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+
+  return null;
+}
+
+const phpBin = resolvePhpBinary();
+
+if (!phpBin) {
+  console.error("PHP is required for backend checks, but `php` was not found in PATH.");
+  console.error("Install PHP locally or set the PHP_PATH environment variable.");
+  process.exit(1);
+}
+
+function collectPhpFiles(dir, visited = new Set()) {
   if (!existsSync(dir)) return [];
+
+  // Resolve real path to detect symlink loops
+  let realDir;
+  try {
+    realDir = realpathSync(dir);
+  } catch {
+    return [];
+  }
+  if (visited.has(realDir)) return [];
+  visited.add(realDir);
 
   return readdirSync(dir).flatMap((entry) => {
     const path = join(dir, entry);
-    const stat = statSync(path);
 
-    if (stat.isDirectory()) {
-      return ignoredDirs.has(entry) ? [] : collectPhpFiles(path);
+    let stat;
+    try {
+      stat = lstatSync(path);
+    } catch {
+      return [];
     }
 
-    if (!entry.endsWith(".php") || ignoredFiles.has(entry)) {
+    if (stat.isSymbolicLink()) {
+      // Resolve symlink target; skip broken or looping links
+      let targetStat;
+      try {
+        targetStat = statSync(path);
+      } catch {
+        return [];
+      }
+      if (targetStat.isDirectory()) {
+        return ignoredDirs.has(entry) ? [] : collectPhpFiles(path, visited);
+      }
+      if (!targetStat.isFile() || !entry.endsWith(".php") || ignoredFiles.has(entry)) {
+        return [];
+      }
+      return [path];
+    }
+
+    if (stat.isDirectory()) {
+      return ignoredDirs.has(entry) ? [] : collectPhpFiles(path, visited);
+    }
+
+    if (!stat.isFile() || !entry.endsWith(".php") || ignoredFiles.has(entry)) {
       return [];
     }
 
@@ -25,9 +87,8 @@ function collectPhpFiles(dir) {
   });
 }
 
-const phpVersion = spawnSync("php", ["--version"], {
+const phpVersion = spawnSync(phpBin, ["--version"], {
   encoding: "utf8",
-  shell: process.platform === "win32",
 });
 
 if (phpVersion.error || phpVersion.status !== 0) {
@@ -46,9 +107,8 @@ if (phpFiles.length === 0) {
 let failed = false;
 
 for (const file of phpFiles) {
-  const result = spawnSync("php", ["-l", file], {
+  const result = spawnSync(phpBin, ["-l", file], {
     encoding: "utf8",
-    shell: process.platform === "win32",
   });
 
   const label = relative(process.cwd(), file);
