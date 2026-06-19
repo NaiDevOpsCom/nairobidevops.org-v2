@@ -9,7 +9,8 @@ bug:
 
 documentation:
   - changed-files:
-      - any-glob-to-any-file: ["docs/**", "*.md", "CONTENT_GUIDE.md"]
+      - any-glob-to-any-file:
+          ["frontend/docs/**", "**/*.md", "frontend/CONTENT_GUIDE.md"]
   - head-branch: ["^docs", "^doc"]
 
 ci/cd:
@@ -19,7 +20,8 @@ ci/cd:
 dependencies:
   - head-branch: ["^dependabot"]
   - changed-files:
-      - any-glob-to-any-file: ["package.json", "package-lock.json"]
+      - any-glob-to-any-file:
+          ["frontend/package.json", "frontend/package-lock.json"]
 
 refactor:
   - head-branch: ["^refactor", "^chore"]
@@ -35,6 +37,14 @@ tests:
 security:
   - changed-files:
       - any-glob-to-any-file:
-          - "**/security/**"
+          - "frontend/docs/security/**"
           - "**/*security*"
-          - "security-policy.json"
+          - "frontend/security-policy.json"
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: ["backend/**"]
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: ["frontend/**"]

@@ -15,12 +15,25 @@ if (!in_array($folder, $allowedFolders, true)) {
     proxyJsonError('Invalid folder', 400);
 }
 
+// Map to an untainted string literal to break the static analysis taint flow.
+$folderClean = '';
+foreach ($allowedFolders as $allowed) {
+    if ($folder === $allowed) {
+        $folderClean = $allowed;
+        break;
+    }
+}
+
+if ($folderClean === '') {
+    proxyJsonError('Invalid folder', 400);
+}
+
 if ($nextCursor && !preg_match('/^[a-zA-Z0-9_\-\/=+]+$/', $nextCursor)) {
     proxyJsonError('Invalid cursor', 400);
 }
 
 $cursorHash = $nextCursor ? '_' . md5($nextCursor) : '_page1';
-$cacheFile = $ctx['cacheRootDir'] . '/api_responses/cld_' . $folder . $cursorHash . '.json';
+$cacheFile = $ctx['cacheRootDir'] . '/api_responses/cld_' . $folderClean . $cursorHash . '.json';
 $cacheTTL = 300;
 
 if ($ctx['method'] === 'GET') {
@@ -38,7 +51,7 @@ if (!$cloudName || !$apiKey || !$apiSecret) {
 $auth = base64_encode($apiKey . ':' . $apiSecret);
 $queryParams = [
     'max_results' => 12,
-    'prefix'      => $folder . '/',
+    'prefix'      => $folderClean . '/',
     'type'        => 'upload',
 ];
 if ($nextCursor) {
@@ -81,7 +94,7 @@ foreach ($data['resources'] as $r) {
 }
 
 $shaped = [
-    'folder'      => $folder,
+    'folder'      => $folderClean,
     'images'      => $shapedResources,
     'nextCursor'  => $data['next_cursor'] ?? null,
     'hasMore'     => !empty($data['next_cursor']),

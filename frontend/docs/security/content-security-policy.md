@@ -44,7 +44,7 @@ The CSP is defined centrally in the security policy file:
 **[`security-policy.json`](../../security-policy.json)**
 
 During the build process, the generator script compiles this policy into the Apache configuration file:
-**`client/public/.htaccess`**
+**`frontend/client/public/.htaccess`**
 
 The entire policy is contained within the `Content-Security-Policy` directive in the `.htaccess` file.
 

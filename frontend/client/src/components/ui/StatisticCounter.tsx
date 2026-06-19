@@ -1,6 +1,13 @@
-import { useMemo } from "react";
-import CountUp from "react-countup";
+import { useMemo, type ComponentType } from "react";
+import CountUpImport, { type CountUpProps } from "react-countup";
 import { useInView } from "react-intersection-observer";
+
+type CountUpRuntimeExport = ComponentType<CountUpProps> & {
+  default?: ComponentType<CountUpProps>;
+};
+
+const countUpRuntime: CountUpRuntimeExport = CountUpImport;
+const CountUp = countUpRuntime.default ?? countUpRuntime;
 
 interface StatisticCounterProps {
   endValue: string | number;
