@@ -14,14 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: File- and branch-based labels
-        uses: actions/labeler@8558fd74291d67161a8a78ce36a881fa63b766a9 # v5.0.0
+        uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213 # v6.1.0
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           configuration-path: .github/labeler.yml
           sync-labels: false
 
       - name: Title-based labels
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -76,5 +76,77 @@ jobs:
               } catch (e) {
                 // Label may have already been removed manually — ignore 404s.
                 if (e.status !== 404) throw e;
+              }
+            }
+
+      - name: Comment if primary label is missing
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo, number } = context.issue;
+
+            // Fetch fresh labels after the labeling steps above
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            const labelNames = pr.labels.map(l => l.name);
+
+            const primaryLabels = ['feature', 'bug', 'documentation', 'refactor', 'tests', 'security', 'ci/cd', 'dependencies', 'breaking-change', 'backend', 'frontend'];
+
+            const found = primaryLabels.filter(l => labelNames.includes(l));
+
+              if (found.length === 0) {
+               const commentBody = `## 🏷️ Label Required\n\nThis pull request doesn't have any of the primary labels yet. Please add one of the following labels so it can be properly categorised:\n\n${primaryLabels.map(l => `- \`${l}\``).join('\n')}\n\n_You can add a label by clicking the "Labels" section to the right._`;
+
+               // Find existing bot comment to update (avoid spam)
+               // Must fetch all pages since default pagination only returns 30 items
+               let botComment = null;
+               let page = 1;
+               let hasMore = true;
+               while (hasMore) {
+                 const { data: comments } = await github.rest.issues.listComments({
+                   owner, repo, issue_number: number, per_page: 100, page
+                 });
+                 botComment = comments.find(c =>
+                   c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
+                 );
+                 if (botComment || comments.length < 100) {
+                   hasMore = false;
+                 } else {
+                   page++;
+                 }
+               }
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: botComment.id, body: commentBody
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: number, body: commentBody
+                });
+              }
+            } else {
+              // If labels now exist, remove any previous bot reminder comment
+              // Must fetch all pages since default pagination only returns 30 items
+              let botComment = null;
+              let page = 1;
+              let hasMore = true;
+              while (hasMore) {
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner, repo, issue_number: number, per_page: 100, page
+                });
+                botComment = comments.find(c =>
+                  c.user.type === 'Bot' && c.body.includes('🏷️ Label Required')
+                );
+                if (botComment || comments.length < 100) {
+                  hasMore = false;
+                } else {
+                  page++;
+                }
+              }
+              if (botComment) {
+                await github.rest.issues.deleteComment({
+                  owner, repo, comment_id: botComment.id
+                });
               }
             }

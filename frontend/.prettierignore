@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+coverage
+.vite
+*.min.js
+vercel.json
+scripts/
+luma.ics
+*.log
+client/public/.htaccess

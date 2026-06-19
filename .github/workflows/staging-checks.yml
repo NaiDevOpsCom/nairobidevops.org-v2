@@ -17,7 +17,7 @@ on:
 
 # Global environment variables for all jobs
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   CACHE_VERSION: "v1"
   BUNDLE_SIZE_LIMIT_MB: "10"
   BUNDLE_SIZE_WARNING_MB: "8"
@@ -28,10 +28,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.actor == 'dependabot[bot]' || github.actor == 'renovate[bot]'
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Node.js
         uses: ./.github/actions/cache-vite-npm
@@ -46,11 +49,11 @@ jobs:
           echo "🔷 Checking dependency type compatibility..."
           if npm run typecheck 2>&1; then
             echo "✅ Types compatible with updated dependencies"
-            echo "compat-status=success" >> $GITHUB_ENV
+            echo "compat-status=success" >> "$GITHUB_ENV"
           else
             echo "::error::Dependency update introduces type errors. The updated package may have breaking API changes."
             echo "::error::Fix the type errors in the source code, or manually review the dependency update."
-            echo "compat-status=failed" >> $GITHUB_ENV
+            echo "compat-status=failed" >> "$GITHUB_ENV"
             exit 1
           fi
 
@@ -66,6 +69,9 @@ jobs:
     name: Comprehensive Quality Validation
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
 
     strategy:
       matrix:
@@ -75,7 +81,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1 # Shallow for faster checkout
 
@@ -97,8 +103,8 @@ jobs:
           npm run check:format
 
           # Output summary for reporting
-          echo "lint-status=success" >> $GITHUB_ENV
-          echo "lint-details=All linting checks passed" >> $GITHUB_ENV
+          echo "lint-status=success" >> "$GITHUB_ENV"
+          echo "lint-details=All linting checks passed" >> "$GITHUB_ENV"
 
       - name: TypeScript Validation
         if: matrix.check == 'types'
@@ -115,11 +121,11 @@ jobs:
           ERROR_COUNT=$(echo "$ERROR_COUNT" | sed 's/[^0-9]*//g' | xargs printf "%d" 2>/dev/null || echo "0")
 
           if [ "${ERROR_COUNT:-0}" -eq 0 ]; then
-            echo "type-status=success" >> $GITHUB_ENV
+            echo "type-status=success" >> "$GITHUB_ENV"
           else
-            echo "type-status=failed" >> $GITHUB_ENV
+            echo "type-status=failed" >> "$GITHUB_ENV"
           fi
-          echo "type-errors=${ERROR_COUNT:-0}" >> $GITHUB_ENV
+          echo "type-errors=${ERROR_COUNT:-0}" >> "$GITHUB_ENV"
 
       - name: Unit Tests
         if: matrix.check == 'tests'
@@ -133,7 +139,7 @@ jobs:
           if [ -z "$TEST_FILES" ]; then
             echo "::warning::No test files found in client directory"
             echo "::warning::Expected patterns: **/*.test.ts, **/*.spec.ts, **/__tests__/*.ts"
-            echo "test-status=skipped" >> $GITHUB_ENV
+            echo "test-status=skipped" >> "$GITHUB_ENV"
             exit 0
           fi
 
@@ -153,11 +159,11 @@ jobs:
           TEST_EXIT_CODE=$?
 
           # Report test results
-          if [ $TEST_EXIT_CODE -eq 0 ]; then
-            echo "test-status=success" >> $GITHUB_ENV
+          if [ "$TEST_EXIT_CODE" -eq 0 ]; then
+            echo "test-status=success" >> "$GITHUB_ENV"
             echo "✅ All tests passed"
           else
-            echo "test-status=failed" >> $GITHUB_ENV
+            echo "test-status=failed" >> "$GITHUB_ENV"
             echo "::error::Unit tests failed with exit code $TEST_EXIT_CODE"
             exit 1
           fi
@@ -184,25 +190,25 @@ jobs:
 
           # STRICT: Fail on critical or high vulnerabilities
           if [ $((CRITICAL_VULNS + HIGH_VULNS)) -gt 0 ]; then
-            echo "security-status=failed" >> $GITHUB_ENV
-            echo "security-details=${CRITICAL_VULNS} critical, ${HIGH_VULNS} high vulnerabilities" >> $GITHUB_ENV
+            echo "security-status=failed" >> "$GITHUB_ENV"
+            echo "security-details=${CRITICAL_VULNS} critical, ${HIGH_VULNS} high vulnerabilities" >> "$GITHUB_ENV"
             echo "::error::CRITICAL/HIGH security vulnerabilities detected: ${CRITICAL_VULNS} critical, ${HIGH_VULNS} high"
             exit 1
           fi
 
           # LENIENT: Warn on moderate vulnerabilities but don't fail
           # This allows dev dependencies like ESLint to have moderate issues
-          if [ $MODERATE_VULNS -gt 0 ]; then
-            echo "security-status=warning" >> $GITHUB_ENV
-            echo "security-details=${MODERATE_VULNS} moderate vulnerabilities (prod deps)" >> $GITHUB_ENV
+          if [ "$MODERATE_VULNS" -gt 0 ]; then
+            echo "security-status=warning" >> "$GITHUB_ENV"
+            echo "security-details=${MODERATE_VULNS} moderate vulnerabilities (prod deps)" >> "$GITHUB_ENV"
             echo "::warning::${MODERATE_VULNS} moderate vulnerabilities detected in production dependencies - please review and update when possible"
             
             # Show details for tracking
             echo "📋 Moderate vulnerability details:"
             npm audit --audit-level=moderate --omit=dev || true
           else
-            echo "security-status=success" >> $GITHUB_ENV
-            echo "security-details=No vulnerabilities found" >> $GITHUB_ENV
+            echo "security-status=success" >> "$GITHUB_ENV"
+            echo "security-details=No vulnerabilities found" >> "$GITHUB_ENV"
           fi
 
           # 2) Optional visibility into dev dependency issues (do not fail the job)
@@ -250,7 +256,7 @@ jobs:
             # Don't fail for staging, but log for awareness
           fi
 
-          echo "build-status=success" >> $GITHUB_ENV
+          echo "build-status=success" >> "$GITHUB_ENV"
 
       - name: Bundle Size Analysis
         if: matrix.check == 'bundle'
@@ -290,18 +296,18 @@ jobs:
           WARNING_BYTES=$(( BUNDLE_SIZE_WARNING_MB * 1024 * 1024 ))
           LIMIT_BYTES=$(( BUNDLE_SIZE_LIMIT_MB * 1024 * 1024 ))
 
-          if [ $DIST_SIZE_BYTES -gt $LIMIT_BYTES ]; then
-            echo "bundle-status=failed" >> $GITHUB_ENV
-            echo "bundle-details=${DIST_SIZE_MB}MB exceeds ${BUNDLE_SIZE_LIMIT_MB}MB limit" >> $GITHUB_ENV
+          if [ "$DIST_SIZE_BYTES" -gt "$LIMIT_BYTES" ]; then
+            echo "bundle-status=failed" >> "$GITHUB_ENV"
+            echo "bundle-details=${DIST_SIZE_MB}MB exceeds ${BUNDLE_SIZE_LIMIT_MB}MB limit" >> "$GITHUB_ENV"
             echo "::error::Bundle size too large: ${DIST_SIZE_MB}MB > ${BUNDLE_SIZE_LIMIT_MB}MB"
             exit 1
-          elif [ $DIST_SIZE_BYTES -gt $WARNING_BYTES ]; then
-            echo "bundle-status=warning" >> $GITHUB_ENV
-            echo "bundle-details=${DIST_SIZE_MB}MB approaching limit (${BUNDLE_SIZE_WARNING_MB}MB warning threshold)" >> $GITHUB_ENV
+          elif [ "$DIST_SIZE_BYTES" -gt "$WARNING_BYTES" ]; then
+            echo "bundle-status=warning" >> "$GITHUB_ENV"
+            echo "bundle-details=${DIST_SIZE_MB}MB approaching limit (${BUNDLE_SIZE_WARNING_MB}MB warning threshold)" >> "$GITHUB_ENV"
             echo "::warning::Bundle size ${DIST_SIZE_MB}MB is approaching the ${BUNDLE_SIZE_WARNING_MB}MB warning threshold"
           else
-            echo "bundle-status=success" >> $GITHUB_ENV
-            echo "bundle-details=${DIST_SIZE_MB}MB well within limits" >> $GITHUB_ENV
+            echo "bundle-status=success" >> "$GITHUB_ENV"
+            echo "bundle-details=${DIST_SIZE_MB}MB well within limits" >> "$GITHUB_ENV"
           fi
 
       - name: Sitemap Validation
@@ -321,17 +327,17 @@ jobs:
           # 3. Strict validation tests
           npm run sitemap:test
 
-          echo "sitemap-status=success" >> $GITHUB_ENV
+          echo "sitemap-status=success" >> "$GITHUB_ENV"
 
       - name: Upload Check Results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: quality-results-${{ matrix.check }}
           path: |
-            dist/
-            coverage/
-            reports/
+            frontend/dist/
+            frontend/coverage/
+            frontend/reports/
           retention-days: 7
 
   quality-summary:

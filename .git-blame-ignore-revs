@@ -12,3 +12,7 @@
 # Formatting commit (Prettier/ESLint auto-fix)
 # TODO: Replace with the actual commit hash after merging this PR
 # <commit-hash-here>
+
+# Structural refactor / file relocation commit
+# TODO: Replace with the actual commit hash after the refactor is committed
+# <refactor-commit-hash-here>

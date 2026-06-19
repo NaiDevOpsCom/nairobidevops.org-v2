@@ -16,15 +16,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -44,10 +48,10 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if ! git diff --quiet -- vercel.json client/public/.htaccess; then
-            echo "::error::Security policy files (vercel.json, .htaccess) do not match security-policy.json. Please run 'npm run security:generate' locally and commit the changes."
-            git status
-            git diff
+          if ! git -C "$GITHUB_WORKSPACE" diff --quiet -- frontend/client/public/.htaccess; then
+            echo "::error::Generated security files do not match frontend/security-policy.json. Please run 'npm run security:generate' from frontend/ and commit the changes."
+            git -C "$GITHUB_WORKSPACE" status
+            git -C "$GITHUB_WORKSPACE" diff -- frontend/client/public/.htaccess
             exit 1
           else
             echo "SUCCESS: Generated security files match the policy."
