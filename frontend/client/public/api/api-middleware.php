@@ -92,6 +92,9 @@ function proxyRunMiddleware($allowedMethods = ['GET', 'POST', 'OPTIONS']) {
     ];
 }
 
+<<<<<<< HEAD:client/public/api/api-middleware.php
+function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json; charset=utf-8') {
+=======
 /**
  * Check if a path resides within a trusted root directory.
  * Normalizes all path separators to '/' and resolves relative directory segments ('.' and '..').
@@ -222,6 +225,7 @@ function proxySafeCachePath($cacheFile) {
 
 function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json; charset=utf-8') {
     $cacheFile = proxySafeCachePath($cacheFile);
+>>>>>>> pre-staging:frontend/client/public/api/api-middleware.php
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
         $data = file_get_contents($cacheFile);
         if ($data) {
@@ -234,8 +238,17 @@ function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json
 }
 
 function proxyWriteCache($cacheFile, $data) {
+<<<<<<< HEAD:client/public/api/api-middleware.php
+    if (!is_dir(dirname($cacheFile))) {
+        mkdir(dirname($cacheFile), 0700, true);
+    }
+    file_put_contents($cacheFile . '.tmp', $data, LOCK_EX);
+    rename($cacheFile . '.tmp', $cacheFile);
+}
+=======
     $cacheFile = proxySafeCachePath($cacheFile);
     file_put_contents($cacheFile . '.tmp', $data, LOCK_EX);
     rename($cacheFile . '.tmp', $cacheFile);
 }
 
+>>>>>>> pre-staging:frontend/client/public/api/api-middleware.php

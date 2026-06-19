@@ -228,8 +228,13 @@ jobs:
       - name: Bump frontend package.json & create tag
         id: update-version
         if: steps.guard.outputs.skip == 'false' && steps.guard.outputs.tag_only != 'true'
+        # continue-on-error: only git push failures are tolerated (via explicit exit 1
+        # below). Setup failures (node, git config) propagate normally and fail the step
+        # without triggering the push-blocked recovery path.
+        continue-on-error: true
         run: |
           V="${{ steps.semver.outputs.new_version }}"
+
           node -e "
             const pkg = JSON.parse(require('fs').readFileSync('frontend/package.json','utf8'));
             pkg.version = '${V}';
@@ -238,17 +243,31 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add frontend/package.json
-          git commit -m "chore: release v${V}"
-          git push origin HEAD
+          # Only commit when there are actual staged changes; let real commit errors propagate.
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: release v${V}"
+          fi
+          # Let push failures propagate so continue-on-error and recovery logic work as intended.
+          if ! git push origin HEAD; then
+            echo "::warning::Could not push version bump to protected branch — tag and release will still be created."
+            exit 1
+          fi
           git tag "v${V}"
-          git push origin "v${V}"
+          if ! git push origin "v${V}"; then
+            echo "::warning::Could not push tag v${V} — GitHub Release will still be created."
+            exit 1
+          fi
           echo "new_version=${V}" >> "$GITHUB_OUTPUT"
 
-      # When recovering from a partial run (tag exists, release missing),
-      # propagate new_version so changelog + release steps can proceed.
-      - name: Propagate version (tag-only recovery)
+      # Propagate new_version when:
+      #   (a) recovering from a partial run where the tag exists but the release is missing, or
+      #   (b) the version-bump push was blocked by branch protection (continue-on-error)
+      #       so the output from update-version was never written.
+      - name: Propagate version (tag-only recovery or push-blocked)
         id: update-version-recovery
-        if: steps.guard.outputs.skip == 'false' && steps.guard.outputs.tag_only == 'true'
+        if: |
+          steps.guard.outputs.skip == 'false' &&
+          (steps.guard.outputs.tag_only == 'true' || steps.update-version.outcome == 'failure')
         run: |
           echo "new_version=${{ steps.semver.outputs.new_version }}" >> "$GITHUB_OUTPUT"
 
