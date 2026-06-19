@@ -86,7 +86,7 @@ Closes #<!-- issue number -->
   Examples:
   - Navigated to /past-summits, toggled between 2024 and 2025 tabs — both years load correctly
   - Verified speaker card renders with null imageUrl (shows placeholder avatar)
-  - Ran npm run build — no TypeScript or build errors
+  - Ran npm run build from frontend/ — no TypeScript or build errors
   - Checked keyboard navigation on the new accordion component
 -->
 
@@ -96,10 +96,10 @@ Closes #<!-- issue number -->
 
 ### Required for all PRs
 
-- [ ] `npm run format` has been run to format all code
-- [ ] `npm run build` passes with no errors
-- [ ] `npm run lint` passes with no new warnings
-- [ ] `npm run typecheck` passes with no TypeScript errors
+- [ ] `npm run format` has been run from `frontend/` to format all frontend code
+- [ ] `npm run build` passes from `frontend/` with no errors
+- [ ] `npm run lint` passes from `frontend/` with no new warnings
+- [ ] `npm run typecheck` passes from `frontend/` with no TypeScript errors
 - [ ] No `console.log`, commented-out code, or debug artifacts left in
 - [ ] Branch is up to date with `main`
 - [ ] PR title follows Conventional Commits format (e.g. `feat: add speaker search filter`)
@@ -111,9 +111,9 @@ Closes #<!-- issue number -->
 - [ ] Before/after screenshots included above
 - [ ] `prefers-reduced-motion` not broken (Framer Motion animations still respect this)
 
-### Required for content changes (`client/src/data/`)
+### Required for content changes (`frontend/client/src/data/`)
 
-- [ ] All new entries follow the field format documented in [CONTENT_GUIDE.md](../CONTENT_GUIDE.md)
+- [ ] All new entries follow the field format documented in [CONTENT_GUIDE.md](../frontend/CONTENT_GUIDE.md)
 - [ ] Speaker IDs are unique and follow the correct format (`"2026-s9"`, `"2025-18"`, etc.)
 - [ ] Image URLs are full Cloudinary URLs (not relative paths, not Unsplash placeholders for real speakers)
 - [ ] Social handles use `"@handle"` / `"in/handle"` format, not full URLs
@@ -122,7 +122,7 @@ Closes #<!-- issue number -->
 
 ### Required for new components
 
-- [ ] Component lives in the correct folder (`client/src/components/ui/` for primitives, `client/src/components/` for shared/custom, `client/src/components/landing/` or `client/src/components/events/` for feature sections)
+- [ ] Component lives in the correct folder (`frontend/client/src/components/ui/` for primitives, `frontend/client/src/components/` for shared/custom, `frontend/client/src/components/landing/` or `frontend/client/src/components/events/` for feature sections)
 - [ ] Props are typed with a named interface (not inline, not `any`)
 - [ ] Uses plain function declaration, not `React.FC`
 - [ ] shadcn/ui components added via CLI (`npx shadcn@latest add`), not manually created in `components/ui/`

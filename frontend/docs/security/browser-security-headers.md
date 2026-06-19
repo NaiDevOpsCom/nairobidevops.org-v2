@@ -33,7 +33,7 @@ Security headers are defined centrally in the security policy file:
 **[`security-policy.json`](../../security-policy.json)**
 
 During the build process, the generator script compiles this policy into an Apache configuration file:
-**`client/public/.htaccess`**
+**`frontend/client/public/.htaccess`**
 
 ### Relevant Sections Explained
 

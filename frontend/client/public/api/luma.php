@@ -8,7 +8,7 @@ require_once __DIR__ . '/api-middleware.php';
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const CONTENT_TYPE_HEADER = 'Content-Type: ';
 
-$ctx = proxyRunMiddleware(['GET', 'POST', 'PUT', 'PATCH', 'OPTIONS', 'HEAD']);
+$ctx = proxyRunMiddleware(['GET', 'OPTIONS', 'HEAD']);
 
 $base_url = 'https://api.luma.com';
 $path = isset($_GET['path']) ? (string)$_GET['path'] : '';
@@ -32,9 +32,14 @@ $cacheKey = md5($target_url . '|' . $authContext);
 $cacheFile = $ctx['cacheRootDir'] . '/api_responses/luma_' . $cacheKey . '.json';
 $cacheTTL = 300;
 
+function getLumaMetaCacheFile($cacheFile, $cacheRootDir) {
+    $safeMetaFilename = basename($cacheFile . '.meta');
+    return $cacheRootDir . '/api_responses/' . $safeMetaFilename;
+}
+
 if ($ctx['method'] === 'GET' && !$hasAuthorization) {
-    $cacheMetaFile = $cacheFile . '.meta';
-    $cachedContentType = file_exists($cacheMetaFile) ? file_get_contents($cacheMetaFile) : JSON_CONTENT_TYPE;
+    $safeMetaFile = getLumaMetaCacheFile($cacheFile, $ctx['cacheRootDir']);
+    $cachedContentType = file_exists($safeMetaFile) ? file_get_contents($safeMetaFile) : JSON_CONTENT_TYPE;
     proxyServeCache($cacheFile, $cacheTTL, $cachedContentType);
 }
 
@@ -83,7 +88,8 @@ header('X-Cache: ' . ($hasAuthorization ? 'BYPASS' : 'MISS'));
 if ($ctx['method'] === 'GET' && !$hasAuthorization && $http_code === 200) {
     proxyWriteCache($cacheFile, $response);
     if ($contentType) {
-        file_put_contents($cacheFile . '.meta', $contentType);
+        $safeMetaFile = getLumaMetaCacheFile($cacheFile, $ctx['cacheRootDir']);
+        file_put_contents($safeMetaFile, $contentType);
     }
 }
 
