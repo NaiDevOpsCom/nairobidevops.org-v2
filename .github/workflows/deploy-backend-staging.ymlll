@@ -1,0 +1,159 @@
+name: Deploy Backend to Staging
+
+  concurrency:
+    group: deploy-backend-staging
+    cancel-in-progress: false
+
+  on:
+    workflow_dispatch:
+    push:
+      branches:
+        - pre-staging
+      paths:
+        - "backend/**"
+        - ".github/workflows/deploy-backend-staging.yml"
+
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      environment: staging
+      permissions: {}
+
+      outputs:
+        release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
+
+      steps:
+        - name: Checkout Code
+          uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+
+        - name: Generate Release Timestamp
+          id: timestamp
+          run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+
+        - name: Setup SSH
+          env:
+            KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
+            SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+            SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
+          run: |
+            mkdir -p ~/.ssh
+            printf '%s\n' "$KNOWN_HOSTS" | sed 's/\r$//' > ~/.ssh/known_hosts
+            if [ -n "$SSH_PRIVATE_KEY_B64" ]; then
+              printf '%s' "$SSH_PRIVATE_KEY_B64" | tr -d '\r\n ' | base64 -d > ~/.ssh/id_rsa
+            else
+              printf '%s\n' "$SSH_PRIVATE_KEY" | sed 's/\r$//' > ~/.ssh/id_rsa
+            fi
+            chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
+
+        - name: Create Release Directory
+          uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key_path: /home/runner/.ssh/id_rsa
+            port: ${{ secrets.REMOTE_PORT || 22 }}
+            script: |
+              mkdir -p "/home/${{ secrets.REMOTE_USER }}/backend-staging-releases/${{ steps.timestamp.outputs.timestamp }}"
+
+        - name: Package and Sync Backend
+          run: |
+            tar --exclude='./config.php' \
+                --exclude='./config.local.php' \
+                --exclude='./config.staging.php' \
+                --exclude='./.git' \
+                -czf backend-release.tar.gz -C backend .
+
+            scp -P ${{ secrets.REMOTE_PORT || 22 }} \
+              -o StrictHostKeyChecking=yes \
+              backend-release.tar.gz \
+              ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:"/home/${{ secrets.REMOTE_USER }}/backend-staging-releases/${{ steps.timestamp.outputs.timestamp }}/"
+
+        - name: Extract and Link Config
+          uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key_path: /home/runner/.ssh/id_rsa
+            port: ${{ secrets.REMOTE_PORT || 22 }}
+            script: |
+              RELEASE_DIR="/home/${{ secrets.REMOTE_USER }}/backend-staging-releases/${{ steps.timestamp.outputs.timestamp }}"
+              tar -xzf "$RELEASE_DIR/backend-release.tar.gz" -C "$RELEASE_DIR"
+              rm "$RELEASE_DIR/backend-release.tar.gz"
+
+              # Link staging config (separate file from production config)
+              ln -sf "/home/${{ secrets.REMOTE_USER }}/config/backend-config-staging.php" \
+                     "$RELEASE_DIR/config.php"
+
+        - name: Atomically Switch Symlink & Clean Old Releases
+          uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key_path: /home/runner/.ssh/id_rsa
+            port: ${{ secrets.REMOTE_PORT || 22 }}
+            script: |
+              set -euo pipefail
+
+              RELEASE_DIR="/home/${{ secrets.REMOTE_USER }}/backend-staging-releases/${{ steps.timestamp.outputs.timestamp }}"
+              TARGET_LINK="${{ secrets.BACKEND_STAGING_REMOTE_PATH }}"
+              TMP_LINK="${TARGET_LINK}.tmp"
+
+              if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
+                echo "CRITICAL ERROR: $TARGET_LINK is not a symlink — aborting."
+                exit 1
+              fi
+
+              ln -sfn "$RELEASE_DIR" "$TMP_LINK"
+              mv -Tf "$TMP_LINK" "$TARGET_LINK"
+
+              # Staging: wipe ALL previous releases (matches your staging frontend pattern)
+              RELEASES_DIR="/home/${{ secrets.REMOTE_USER }}/backend-staging-releases"
+              CURRENT="${{ steps.timestamp.outputs.timestamp }}"
+              cd "$RELEASES_DIR"
+              for dir in */; do
+                dir="${dir%/}"
+                if [ "$dir" != "$CURRENT" ]; then
+                  rm -rf "$dir"
+                fi
+              done
+
+              echo "✅ Staging backend deployment successful."
+
+    notify:
+      needs: deploy
+      if: always()
+      runs-on: ubuntu-latest
+      permissions: {}
+      steps:
+        - name: Send Success Email
+          if: ${{ needs.deploy.result == 'success' }}
+          continue-on-error: true
+          uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c
+          with:
+            server_address: ${{ secrets.MAIL_SERVER }}
+            server_port: ${{ secrets.MAIL_PORT }}
+            username: ${{ secrets.MAIL_USERNAME }}
+            password: ${{ secrets.MAIL_PASSWORD }}
+            subject: "✅ Backend Staging Deploy Successful"
+            to: ${{ secrets.NOTIFICATION_EMAIL }}
+            from: ${{ secrets.MAIL_FROM }}
+            body: |
+              Backend deployed to staging successfully.
+              Test at: ${{ secrets.STAGING_URL }}
+              Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+        - name: Send Failure Email
+          if: ${{ needs.deploy.result != 'success' }}
+          continue-on-error: true
+          uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c
+          with:
+            server_address: ${{ secrets.MAIL_SERVER }}
+            server_port: ${{ secrets.MAIL_PORT }}
+            username: ${{ secrets.MAIL_USERNAME }}
+            password: ${{ secrets.MAIL_PASSWORD }}
+            subject: "❌ Backend Staging Deploy Failed"
+            to: ${{ secrets.NOTIFICATION_EMAIL }}
+            from: ${{ secrets.MAIL_FROM }}
+            body: |
+              Backend staging deployment FAILED.
+              Review logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

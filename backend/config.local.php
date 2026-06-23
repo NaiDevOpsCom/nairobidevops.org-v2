@@ -2,7 +2,7 @@
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'nairobidevops_jobs_local');
 define('DB_USER', 'root');
-define('DB_PASS', '');            // blank for local MySQL default
+define('DB_PASS', 'jumalaw98');            // blank for local MySQL default
 define('APP_ENV', 'local');
 
 define('TELEGRAM_BOT_TOKEN', '');

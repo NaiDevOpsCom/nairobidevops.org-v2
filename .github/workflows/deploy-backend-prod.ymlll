@@ -1,0 +1,173 @@
+name: Deploy Backend to Production
+
+  concurrency:
+    group: deploy-backend-production
+    cancel-in-progress: false
+
+  on:
+    workflow_dispatch:
+    push:
+      branches:
+        - main
+      paths:
+        - "backend/**"
+        - ".github/workflows/deploy-backend-prod.yml"
+
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      environment: production
+      permissions: {}
+
+      outputs:
+        release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
+
+      steps:
+        - name: Checkout Code
+          uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+
+        - name: Generate Release Timestamp
+          id: timestamp
+          run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+
+        - name: Setup SSH
+          env:
+            KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
+            SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+            SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
+          run: |
+            mkdir -p ~/.ssh
+
+            if [ -z "$KNOWN_HOSTS" ]; then
+              echo "❌ KNOWN_HOSTS is empty."
+              exit 1
+            fi
+
+            if [ -z "$SSH_PRIVATE_KEY" ] && [ -z "$SSH_PRIVATE_KEY_B64" ]; then
+              echo "❌ SSH_PRIVATE_KEY and SSH_PRIVATE_KEY_B64 are both empty."
+              exit 1
+            fi
+
+            printf '%s\n' "$KNOWN_HOSTS" | sed 's/\r$//' > ~/.ssh/known_hosts
+
+            if [ -n "$SSH_PRIVATE_KEY_B64" ]; then
+              printf '%s' "$SSH_PRIVATE_KEY_B64" | tr -d '\r\n ' | base64 -d > ~/.ssh/id_rsa
+            else
+              KEY_CONTENT="$SSH_PRIVATE_KEY"
+              if printf '%s' "$KEY_CONTENT" | grep -q '\\n'; then
+                KEY_CONTENT="$(printf '%s' "$KEY_CONTENT" | sed 's/\\n/\n/g')"
+              fi
+              printf '%s\n' "$KEY_CONTENT" | sed 's/\r$//' > ~/.ssh/id_rsa
+            fi
+
+            chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
+
+        - name: Create Release Directory on Server
+          uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key_path: /home/runner/.ssh/id_rsa
+            port: ${{ secrets.REMOTE_PORT || 22 }}
+            script: |
+              mkdir -p "/home/${{ secrets.REMOTE_USER }}/backend-releases/${{ steps.timestamp.outputs.timestamp }}"
+
+        - name: Package and Sync Backend
+          run: |
+            # Exclude secrets — they live permanently on the server
+            tar --exclude='./config.php' \
+                --exclude='./config.local.php' \
+                --exclude='./config.staging.php' \
+                --exclude='./.git' \
+                -czf backend-release.tar.gz -C backend .
+
+            scp -P ${{ secrets.REMOTE_PORT || 22 }} \
+              -o StrictHostKeyChecking=yes \
+              backend-release.tar.gz \
+              ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:"/home/${{ secrets.REMOTE_USER }}/backend-releases/${{ steps.timestamp.outputs.timestamp }}/"
+
+        - name: Extract Release on Server
+          uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key_path: /home/runner/.ssh/id_rsa
+            port: ${{ secrets.REMOTE_PORT || 22 }}
+            script: |
+              RELEASE_DIR="/home/${{ secrets.REMOTE_USER }}/backend-releases/${{ steps.timestamp.outputs.timestamp }}"
+              tar -xzf "$RELEASE_DIR/backend-release.tar.gz" -C "$RELEASE_DIR"
+              rm "$RELEASE_DIR/backend-release.tar.gz"
+
+              # Re-link the shared config.php into this release
+              # config.php lives permanently at ~/config/backend-config.php
+              ln -sf "/home/${{ secrets.REMOTE_USER }}/config/backend-config.php" \
+                     "$RELEASE_DIR/config.php"
+
+        - name: Atomically Switch Symlink
+          uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key_path: /home/runner/.ssh/id_rsa
+            port: ${{ secrets.REMOTE_PORT || 22 }}
+            script: |
+              set -euo pipefail
+
+              RELEASE_DIR="/home/${{ secrets.REMOTE_USER }}/backend-releases/${{ steps.timestamp.outputs.timestamp }}"
+              TARGET_LINK="${{ secrets.BACKEND_REMOTE_PATH }}"
+              TMP_LINK="${TARGET_LINK}.tmp"
+
+              if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
+                echo "CRITICAL ERROR: $TARGET_LINK is not a symlink — aborting."
+                exit 1
+              fi
+
+              ln -sfn "$RELEASE_DIR" "$TMP_LINK"
+              mv -Tf "$TMP_LINK" "$TARGET_LINK"
+
+              # Keep last 5 backend releases (matches frontend pattern)
+              cd "/home/${{ secrets.REMOTE_USER }}/backend-releases"
+              ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
+
+              echo "✅ Backend deployment successful."
+
+    notify:
+      needs: deploy
+      if: always()
+      runs-on: ubuntu-latest
+      permissions: {}
+      steps:
+        - name: Send Success Email
+          if: ${{ needs.deploy.result == 'success' }}
+          continue-on-error: true
+          uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c
+          with:
+            server_address: ${{ secrets.MAIL_SERVER }}
+            server_port: ${{ secrets.MAIL_PORT }}
+            username: ${{ secrets.MAIL_USERNAME }}
+            password: ${{ secrets.MAIL_PASSWORD }}
+            subject: "✅ Backend Production Deploy Successful - ${{ github.repository }}"
+            to: ${{ secrets.NOTIFICATION_EMAIL }}
+            from: ${{ secrets.MAIL_FROM }}
+            body: |
+              Backend deployed to production successfully.
+              Branch: ${{ github.ref_name }}
+              Commit: ${{ github.sha }}
+              Triggered by: ${{ github.actor }}
+              Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+        - name: Send Failure Email
+          if: ${{ needs.deploy.result != 'success' }}
+          continue-on-error: true
+          uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c
+          with:
+            server_address: ${{ secrets.MAIL_SERVER }}
+            server_port: ${{ secrets.MAIL_PORT }}
+            username: ${{ secrets.MAIL_USERNAME }}
+            password: ${{ secrets.MAIL_PASSWORD }}
+            subject: "❌ Backend Production Deploy Failed - ${{ github.repository }}"
+            to: ${{ secrets.NOTIFICATION_EMAIL }}
+            from: ${{ secrets.MAIL_FROM }}
+            body: |
+              Backend production deployment FAILED.
+              Review logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
