@@ -670,27 +670,19 @@ function classifyAfricaEligibility(string $locationDetail, string $titleHint = '
     $loc  = strtolower(trim($locationDetail));
     $hint = strtolower(trim($titleHint));
 
-    // Empty on both signals — no location restriction stated
-    if ($loc === '' && $hint === '') {
-        return 'neutral';
+    $result = 'neutral';
+
+    if ($loc !== '' || $hint !== '') {
+        if (matchesPositiveSignal($loc) || matchesPositiveSignal($hint)) {
+            $result = 'africa_friendly';
+        } elseif (matchesExactCountry($loc) || matchesExactCountry($hint)) {
+            $result = 'exclude_africa';
+        } elseif (matchesExcludeSignal($loc) || matchesExcludeSignal($hint)) {
+            $result = 'exclude_africa';
+        }
     }
 
-    // Positive signals take absolute priority
-    if (matchesPositiveSignal($loc) || matchesPositiveSignal($hint)) {
-        return 'africa_friendly';
-    }
-
-    // Exact country/city match on either signal
-    if (matchesExactCountry($loc) || matchesExactCountry($hint)) {
-        return 'exclude_africa';
-    }
-
-    // Phrase-based exclusion on either signal
-    if (matchesExcludeSignal($loc) || matchesExcludeSignal($hint)) {
-        return 'exclude_africa';
-    }
-
-    return 'neutral';
+    return $result;
 }
 
 // ── Helper: DevOps relevance gate ────────────────────────────────────────────

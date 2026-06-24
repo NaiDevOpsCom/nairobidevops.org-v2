@@ -377,14 +377,22 @@ function FilterSidebar({
   );
 }
 
+// Simple string hash for deterministic tag rotation
+const simpleHash = (s: string): number => {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = Math.trunc(hash * 31 + (s.codePointAt(i) ?? 0));
+  }
+  return Math.abs(hash);
+};
+
 // Render tags for a job (extracted to reduce cognitive complexity / nesting)
-function JobTags({ job, tagSeeds }: Readonly<{ job: Job; tagSeeds: Record<string, number> }>) {
+function JobTags({ job }: Readonly<{ job: Job }>) {
   const MAX_TAGS = 3;
   const allTags = job.tags;
   let displayed = allTags;
   if (allTags.length > MAX_TAGS) {
-    const seed = tagSeeds[job.id] ?? 0;
-    const offset = Math.floor(seed * allTags.length);
+    const offset = simpleHash(job.id) % allTags.length;
     const rotated = [...allTags.slice(offset), ...allTags.slice(0, offset)];
     displayed = rotated.slice(0, MAX_TAGS);
   }
@@ -410,11 +418,9 @@ function JobTags({ job, tagSeeds }: Readonly<{ job: Job; tagSeeds: Record<string
 
 function JobCard({
   job,
-  tagSeeds,
   renderUrgencyIndicator,
 }: Readonly<{
   job: Job;
-  tagSeeds: Record<string, number>;
   renderUrgencyIndicator: (job: Job) => React.ReactNode;
 }>) {
   return (
@@ -469,7 +475,7 @@ function JobCard({
               </span>
             )}
 
-            <JobTags job={job} tagSeeds={tagSeeds} />
+            <JobTags job={job} />
           </div>
         </div>
       </div>
@@ -513,8 +519,7 @@ export default function Jobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Per-job random seed for tag rotation — regenerated on each page load/fetch
-  const [tagSeeds, setTagSeeds] = useState<Record<string, number>>({});
+
   // Capture timestamp via lazy initializer (permitted to be impure at init time, not during render)
   const [nowMs] = useState<number>(() => Date.now());
 
@@ -632,13 +637,6 @@ export default function Jobs() {
         const mapped: Job[] = (payload.jobs || []).map(mapBackendJobToFrontendJob);
         if (!cancelled) {
           setJobs(mapped);
-          // Assign a random seed per job so tag rotation is stable within a render
-          // but changes on every page refresh / data fetch.
-          const seeds: Record<string, number> = {};
-          mapped.forEach((j) => {
-            seeds[j.id] = Math.random();
-          });
-          setTagSeeds(seeds);
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -731,11 +729,10 @@ export default function Jobs() {
                     handleQuickFilterToggle(filter);
                     setVisibleCount(12);
                   }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${
-                    isActive
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
-                  }`}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${isActive
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
+                    }`}
                 >
                   {filter}
                 </button>
@@ -900,7 +897,6 @@ export default function Jobs() {
                     <JobCard
                       key={job.id}
                       job={job}
-                      tagSeeds={tagSeeds}
                       renderUrgencyIndicator={renderUrgencyIndicator}
                     />
                   ))}

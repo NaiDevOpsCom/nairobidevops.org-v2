@@ -19,18 +19,20 @@
   }
 
   require_once __DIR__ . '/db.php';
-
-  function respond(int $status, array $data): void {
-      http_response_code($status);
-      echo json_encode($data);
-      exit;
-  }
+  require_once __DIR__ . '/helpers.php';
 
   $action = $_GET['action'] ?? '';
+  $method = $_SERVER['REQUEST_METHOD'];
+
+  $postActions = ['submit', 'track'];
+
+  if (in_array($action, $postActions, true) && $method !== 'POST') {
+      respondJson(405, ['error' => 'Method not allowed']);
+  }
 
   match($action) {
       'jobs'   => require_once __DIR__ . '/endpoints/get_jobs.php',
       'submit' => require_once __DIR__ . '/endpoints/submit_job.php',
       'track'  => require_once __DIR__ . '/endpoints/track_click.php',
-      default  => respond(404, ['error' => 'Unknown action'])
+      default  => respondJson(404, ['error' => 'Unknown action'])
   };
