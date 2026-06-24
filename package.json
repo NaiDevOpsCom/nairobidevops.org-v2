@@ -1,8 +1,5 @@
 {
-  "name": "nairobi-devops",
-  "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
+  "private": true,
   "scripts": {
     "security:generate": "node scripts/generate-security-headers.js",
     "dev": "npm run security:generate && vite",

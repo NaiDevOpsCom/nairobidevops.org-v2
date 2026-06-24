@@ -12,19 +12,10 @@ on:
     branches:
       - pre-staging
     paths:
-      - "client/src/**"
-      - "client/public/**"
-      - "scripts/**"
-      - "package.json"
-      - "package-lock.json"
-      - "vite.config.ts"
-      - "tsconfig.json"
-      - "postcss.config.js"
-      - "tailwind.config.ts"
-      - "security-policy.json"
-      - "index.html"
-      - "components.json"
+      - "frontend/**"
+      - "backend/**"
       - ".github/workflows/staging-deploy.yml"
+      - ".github/actions/cache-vite-npm/action.yml"
 
 jobs:
   build:
@@ -32,27 +23,30 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       # 1. Check out the code
       - name: Checkout Code
-        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       # 2. Install Node.js & restore cache
       - name: Setup Node.js and Cache
         uses: ./.github/actions/cache-vite-npm
         with:
-          node-version: 20
+          node-version: 22
 
       # 3. Install dependencies and build in staging mode
       #
-      # Vite automatically copies everything in client/public/ into dist/ verbatim.
+      # Vite automatically copies everything in frontend/client/public/ into dist/ verbatim.
       # This means these files land in dist/ as part of the build:
-      #   client/public/api/imagesCloudinary.php  →  dist/api/imagesCloudinary.php
-      #   client/public/api/luma.php              →  dist/api/luma.php
-      #   client/public/.htaccess                 →  dist/.htaccess
-      #   client/public/analytics.js              →  dist/analytics.js
-      #   client/public/robots.txt                →  dist/robots.txt
+      #   frontend/client/public/api/imagesCloudinary.php  →  dist/api/imagesCloudinary.php
+      #   frontend/client/public/api/luma.php              →  dist/api/luma.php
+      #   frontend/client/public/.htaccess                 →  dist/.htaccess
+      #   frontend/client/public/analytics.js              →  dist/analytics.js
+      #   frontend/client/public/robots.txt                →  dist/robots.txt
       #
       - name: Install and Build (Staging)
         run: |
@@ -85,10 +79,10 @@ jobs:
 
       # 5. Upload build artifact
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist-staging
-          path: dist
+          path: frontend/dist
           retention-days: 1
           include-hidden-files: true # Required — ensures .htaccess is included
 
@@ -113,7 +107,7 @@ jobs:
       # 2. Generate release timestamp
       - name: Generate Release Timestamp
         id: timestamp
-        run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+        run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
 
       # 3. Setup SSH
       - name: Setup SSH
@@ -371,7 +365,7 @@ jobs:
           RETRY_COUNT=0
           SUCCESS=false
 
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
             read -r HTTP_CODE FINAL_URL <<< "$(curl -L -s -o /dev/null \
               --connect-timeout 10 \
               --max-time 30 \
@@ -397,10 +391,10 @@ jobs:
                 ;;
               *)
                 RETRY_COUNT=$((RETRY_COUNT + 1))
-                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
                   SLEEP_TIME=$((2 ** RETRY_COUNT))
                   echo "⏳ Retrying in ${SLEEP_TIME}s..."
-                  sleep $SLEEP_TIME
+                  sleep "$SLEEP_TIME"
                 fi
                 ;;
             esac
@@ -423,7 +417,7 @@ jobs:
         run: |
           TS="${{ needs.deploy.outputs.release_timestamp }}"
           if [ -z "$TS" ]; then TS="${{ github.run_id }}"; fi
-          echo "RELEASE_TIMESTAMP=$TS" >> $GITHUB_ENV
+          echo "RELEASE_TIMESTAMP=$TS" >> "$GITHUB_ENV"
 
       - name: Send Success Email
         if: ${{ needs.build.result == 'success' && needs.deploy.result == 'success' }}
