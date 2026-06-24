@@ -729,10 +729,11 @@ export default function Jobs() {
                     handleQuickFilterToggle(filter);
                     setVisibleCount(12);
                   }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${isActive
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
-                    }`}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
+                  }`}
                 >
                   {filter}
                 </button>
