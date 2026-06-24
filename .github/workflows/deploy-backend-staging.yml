@@ -1,0 +1,263 @@
+name: Deploy Backend to Staging
+
+concurrency:
+  group: ndc-redesign-backend-staging
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - pre-staging
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend-staging.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions: {}
+
+    outputs:
+      release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+
+      - name: Generate Release Timestamp
+        id: timestamp
+        run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup SSH
+        env:
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+
+          if [ -z "$KNOWN_HOSTS" ]; then
+            echo "KNOWN_HOSTS is empty — set it in staging environment secrets."
+            exit 1
+          fi
+
+          if [ -z "$SSH_PRIVATE_KEY" ] && [ -z "$SSH_PRIVATE_KEY_B64" ]; then
+            echo "SSH_PRIVATE_KEY and SSH_PRIVATE_KEY_B64 are both empty."
+            exit 1
+          fi
+
+          printf '%s\n' "$KNOWN_HOSTS" | sed 's/\r$//' > ~/.ssh/known_hosts
+
+          if [ -n "$SSH_PRIVATE_KEY_B64" ]; then
+            if ! printf '%s' "$SSH_PRIVATE_KEY_B64" | tr -d '\r\n ' | base64 -d > ~/.ssh/id_rsa; then
+              echo "SSH_PRIVATE_KEY_B64 could not be base64-decoded."
+              exit 1
+            fi
+          else
+            KEY_CONTENT="$SSH_PRIVATE_KEY"
+            if printf '%s' "$KEY_CONTENT" | grep -q '\\n'; then
+              KEY_CONTENT="$(printf '%s' "$KEY_CONTENT" | sed 's/\\n/\n/g')"
+            fi
+            printf '%s\n' "$KEY_CONTENT" | sed 's/\r$//' > ~/.ssh/id_rsa
+          fi
+
+          chmod 600 ~/.ssh/id_rsa ~/.ssh/known_hosts
+
+          if grep -qE '^(ssh-rsa|ssh-ed25519|ecdsa-sha2-)' ~/.ssh/id_rsa; then
+            echo "The deploy key secret contains a public key, not a private key."
+            exit 1
+          fi
+
+          if ! grep -qE '^-----BEGIN .+PRIVATE KEY-----$' ~/.ssh/id_rsa; then
+            echo "The deploy key secret is not a valid private key file."
+            exit 1
+          fi
+
+          if ! ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null 2>&1; then
+            echo "The deploy key secret could not be parsed by ssh-keygen."
+            exit 1
+          fi
+
+      - name: Create Release Directory
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+            mkdir -p "/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
+
+      - name: Package and Sync Backend
+        env:
+          REMOTE_PORT: ${{ secrets.REMOTE_PORT || 22 }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -d "backend" ]; then
+            echo "backend/ directory not found"
+            exit 1
+          fi
+
+          tar --exclude='./config.php' \
+              --exclude='./config.local.php' \
+              --exclude='./config.staging.php' \
+              --exclude='./.git' \
+              -czf backend-release.tar.gz -C backend .
+
+          scp -P "${REMOTE_PORT:-22}" \
+            -o StrictHostKeyChecking=yes \
+            backend-release.tar.gz \
+            "${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/backend-staging-releases/${RELEASE_TIMESTAMP}/"
+
+      - name: Extract and Link Config
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+            RELEASE_DIR="/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
+            tar -xzf "$RELEASE_DIR/backend-release.tar.gz" -C "$RELEASE_DIR"
+            rm "$RELEASE_DIR/backend-release.tar.gz"
+            ln -sf "/home/$REMOTE_USER/config/backend-config-staging.php" \
+                   "$RELEASE_DIR/config.php"
+
+      - name: Atomically Switch Symlink
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          TARGET_LINK: ${{ secrets.BACKEND_STAGING_REMOTE_PATH }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,TARGET_LINK,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+
+            RELEASE_DIR="/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
+            TMP_LINK="${TARGET_LINK}.tmp"
+
+            if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
+              echo "CRITICAL ERROR: $TARGET_LINK is not a symlink — aborting."
+              exit 1
+            fi
+
+            ln -sfn "$RELEASE_DIR" "$TMP_LINK"
+            mv -Tf "$TMP_LINK" "$TARGET_LINK"
+
+            echo "Symlink switched to release $RELEASE_TIMESTAMP."
+
+      - name: Health Check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: |
+          if [ -z "$STAGING_URL" ]; then
+            echo "STAGING_URL is not set — skipping health check"
+            exit 0
+          fi
+
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          SUCCESS=false
+
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            HTTP_CODE=$(curl -L -s -o /dev/null \
+              --connect-timeout 10 \
+              --max-time 30 \
+              -w '%{http_code}' \
+              "$STAGING_URL" 2>/dev/null || echo "000")
+
+            case "$HTTP_CODE" in
+              2* | 3*)
+                echo "Health check passed (HTTP $HTTP_CODE)"
+                SUCCESS=true
+                break
+                ;;
+              *)
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                  sleep "$((2 ** RETRY_COUNT))"
+                fi
+                ;;
+            esac
+          done
+
+          if [ "$SUCCESS" != true ]; then
+            echo "Health check failed after $MAX_RETRIES attempts"
+            exit 1
+          fi
+
+      - name: Clean Old Releases
+        if: success()
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+
+            RELEASES_DIR="/home/$REMOTE_USER/backend-staging-releases"
+            CURRENT="$RELEASE_TIMESTAMP"
+            cd "$RELEASES_DIR"
+            for dir in */; do
+              dir="${dir%/}"
+              if [ "$dir" != "$CURRENT" ]; then
+                rm -rf "$dir"
+              fi
+            done
+
+            echo "Staging backend deployment successful."
+
+  notify:
+    needs: deploy
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+
+    steps:
+      - name: Send Status Email
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: >-
+            ${{ needs.deploy.result == 'success' && '✅' || '❌' }}
+            Backend Staging Deploy
+            ${{ needs.deploy.result == 'success' && 'Successful' || 'Failed' }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            ${{ needs.deploy.result == 'success' && 'Backend deployed to staging successfully.' || 'Backend staging deployment FAILED.' }}
+            Test at: ${{ secrets.STAGING_URL }}
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
