@@ -85,13 +85,28 @@ function mapRoleType(string $title): string {
 
     return match (true) {
         str_contains($lower, 'site reliability'),
-        str_contains($lower, 'sre')                => 'SRE',
+        str_contains($lower, ' sre ')              => 'SRE',
         str_contains($lower, 'cloud architect'),
-        str_contains($lower, 'solutions architect') => 'Cloud Architect',
+        str_contains($lower, 'solutions architect'),
+        str_contains($lower, 'cloud engineer')     => 'Cloud Architect',
         str_contains($lower, 'security'),
         str_contains($lower, 'devsecops')           => 'Security',
-        str_contains($lower, 'platform engineer')   => 'Platform Engineering',
-        default                                     => 'DevOps Engineer',
+        str_contains($lower, 'platform engineer'),
+        str_contains($lower, 'platform eng')        => 'Platform Engineering',
+        str_contains($lower, 'devops'),
+        str_contains($lower, 'infrastructure'),
+        str_contains($lower, 'kubernetes'),
+        str_contains($lower, 'terraform'),
+        str_contains($lower, 'backend engineer'),
+        str_contains($lower, 'software engineer'),
+        str_contains($lower, 'fullstack'),
+        str_contains($lower, 'full stack'),
+        str_contains($lower, 'full-stack'),
+        str_contains($lower, 'data engineer'),
+        str_contains($lower, 'ml engineer'),
+        str_contains($lower, 'mlops'),
+        str_contains($lower, 'ai engineer')         => 'DevOps Engineer',
+        default                                     => 'Other',
     };
 }
 

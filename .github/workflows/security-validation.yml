@@ -119,9 +119,7 @@ jobs:
           base-ref: ${{ github.event.pull_request.base.sha }}
           head-ref: ${{ github.event.pull_request.head.sha }}
           fail-on-severity: ${{ inputs.fail-level }}
-          allow-licenses: >-
-            MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, Unlicense, CC0-1.0,
-            0BSD, MPL-2.0, ISC AND JSON AND MIT
+          allow-licenses: "MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, Unlicense, CC0-1.0, 0BSD, MPL-2.0, ISC AND JSON AND MIT"
           comment-summary-in-pr: never
           license-check: true
           vulnerability-check: true
