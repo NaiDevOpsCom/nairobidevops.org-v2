@@ -1,22 +1,22 @@
-name: Deploy Backend to Production
+name: Deploy Backend to Staging
 
 concurrency:
-  group: ndc-redesign-backend-production
+  group: ndc-redesign-backend-staging
   cancel-in-progress: false
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - pre-staging
     paths:
       - "backend/**"
-      - ".github/workflows/deploy-backend-prod.yml"
+      - ".github/workflows/deploy-backend-staging.yml"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: staging
     permissions: {}
 
     outputs:
@@ -37,10 +37,11 @@ jobs:
           SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
         run: |
           set -euo pipefail
+
           mkdir -p ~/.ssh
 
           if [ -z "$KNOWN_HOSTS" ]; then
-            echo "KNOWN_HOSTS is empty."
+            echo "KNOWN_HOSTS is empty — set it in staging environment secrets."
             exit 1
           fi
 
@@ -81,7 +82,7 @@ jobs:
             exit 1
           fi
 
-      - name: Create Release Directory on Server
+      - name: Create Release Directory
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
@@ -94,7 +95,7 @@ jobs:
           envs: REMOTE_USER,RELEASE_TIMESTAMP
           script: |
             set -euo pipefail
-            mkdir -p "/home/$REMOTE_USER/backend-releases/$RELEASE_TIMESTAMP"
+            mkdir -p "/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
 
       - name: Package and Sync Backend
         env:
@@ -119,9 +120,9 @@ jobs:
           scp -P "${REMOTE_PORT:-22}" \
             -o StrictHostKeyChecking=yes \
             backend-release.tar.gz \
-            "${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/backend-releases/${RELEASE_TIMESTAMP}/"
+            "${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/backend-staging-releases/${RELEASE_TIMESTAMP}/"
 
-      - name: Extract Release on Server
+      - name: Extract and Link Config
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
@@ -134,18 +135,17 @@ jobs:
           envs: REMOTE_USER,RELEASE_TIMESTAMP
           script: |
             set -euo pipefail
-            RELEASE_DIR="/home/$REMOTE_USER/backend-releases/$RELEASE_TIMESTAMP"
+            RELEASE_DIR="/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
             tar -xzf "$RELEASE_DIR/backend-release.tar.gz" -C "$RELEASE_DIR"
             rm "$RELEASE_DIR/backend-release.tar.gz"
-
-            ln -sf "/home/$REMOTE_USER/config/backend-config.php" \
+            ln -sf "/home/$REMOTE_USER/config/backend-config-staging.php" \
                    "$RELEASE_DIR/config.php"
 
       - name: Atomically Switch Symlink & Clean Old Releases
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET_LINK: ${{ secrets.BACKEND_REMOTE_PATH }}
+          TARGET_LINK: ${{ secrets.BACKEND_STAGING_REMOTE_PATH }}
           RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
@@ -156,7 +156,7 @@ jobs:
           script: |
             set -euo pipefail
 
-            RELEASE_DIR="/home/$REMOTE_USER/backend-releases/$RELEASE_TIMESTAMP"
+            RELEASE_DIR="/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
             TMP_LINK="${TARGET_LINK}.tmp"
 
             if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
@@ -167,11 +167,57 @@ jobs:
             ln -sfn "$RELEASE_DIR" "$TMP_LINK"
             mv -Tf "$TMP_LINK" "$TARGET_LINK"
 
-            # Keep last 5 backend releases (matches frontend pattern)
-            cd "/home/$REMOTE_USER/backend-releases"
-            ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
+            RELEASES_DIR="/home/$REMOTE_USER/backend-staging-releases"
+            CURRENT="$RELEASE_TIMESTAMP"
+            cd "$RELEASES_DIR"
+            for dir in */; do
+              dir="${dir%/}"
+              if [ "$dir" != "$CURRENT" ]; then
+                rm -rf "$dir"
+              fi
+            done
 
-            echo "Backend deployment successful."
+            echo "Staging backend deployment successful."
+
+      - name: Health Check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: |
+          if [ -z "$STAGING_URL" ]; then
+            echo "STAGING_URL is not set — skipping health check"
+            exit 0
+          fi
+
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          SUCCESS=false
+
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            HTTP_CODE=$(curl -L -s -o /dev/null \
+              --connect-timeout 10 \
+              --max-time 30 \
+              -w '%{http_code}' \
+              "$STAGING_URL" 2>/dev/null || echo "000")
+
+            case "$HTTP_CODE" in
+              2* | 3*)
+                echo "Health check passed (HTTP $HTTP_CODE)"
+                SUCCESS=true
+                break
+                ;;
+              *)
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                  sleep "$((2 ** RETRY_COUNT))"
+                fi
+                ;;
+            esac
+          done
+
+          if [ "$SUCCESS" != true ]; then
+            echo "Health check failed after $MAX_RETRIES attempts"
+            exit 1
+          fi
 
   notify:
     needs: deploy
@@ -190,14 +236,11 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: >-
             ${{ needs.deploy.result == 'success' && '✅' || '❌' }}
-            Backend Production Deploy
+            Backend Staging Deploy
             ${{ needs.deploy.result == 'success' && 'Successful' || 'Failed' }}
-            - ${{ github.repository }}
           to: ${{ secrets.NOTIFICATION_EMAIL }}
           from: ${{ secrets.MAIL_FROM }}
           body: |
-            ${{ needs.deploy.result == 'success' && 'Backend deployed to production successfully.' || 'Backend production deployment FAILED.' }}
-            Branch: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
-            Triggered by: ${{ github.actor }}
+            ${{ needs.deploy.result == 'success' && 'Backend deployed to staging successfully.' || 'Backend staging deployment FAILED.' }}
+            Test at: ${{ secrets.STAGING_URL }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
