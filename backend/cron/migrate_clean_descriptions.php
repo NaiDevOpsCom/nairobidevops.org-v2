@@ -11,54 +11,25 @@
  */
 
 require_once dirname(__DIR__) . '/db.php';
+require_once dirname(__DIR__) . '/helpers.php'; // provides cleanDescription()
 
 $db = getDB();
 
-/**
- * Convert an HTML job description to clean, readable plain text.
- * Identical to the logic used in sync_remotive.php (keep in sync).
- */
-function cleanDescription(string $rawHtml): string
-{
-    if (trim($rawHtml) === '') {
-        return '';
-    }
-
-    // Step 1: Block-level tags → newline so paragraphs/list-items separate
-    $text = preg_replace(
-        '/<\s*\/?\s*(p|br|li|h[1-6]|div|blockquote|ul|ol|tr|td|th)[^>]*>/i',
-        "\n",
-        $rawHtml
-    );
-
-    // Step 2: Strip all remaining HTML tags (inline: strong, em, a, span, …)
-    $text = strip_tags($text);
-
-    // Step 3: Decode HTML entities (&amp; → &, &#x27; → ', …)
-    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-    // Step 4: Collapse 3+ consecutive newlines → one blank line
-    $text = preg_replace('/\n{3,}/', "\n\n", $text);
-
-    // Step 5: Trim each line, then trim the whole string
-    $lines = array_map('trim', explode("\n", $text));
-    return trim(implode("\n", $lines));
-}
-
-// ── Fetch all jobs that still contain HTML tags ──────────────────────────────
+// ── Stream rows with a forward-only cursor to keep memory bounded ─────────────
 
 $stmt    = $db->query("SELECT id, description FROM jobs");
-$all     = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$stmt->setFetchMode(PDO::FETCH_ASSOC);
 
-$total   = count($all);
+$total   = 0;
 $updated = 0;
 $skipped = 0;
 
 $updateStmt = $db->prepare("UPDATE jobs SET description = :desc WHERE id = :id");
 
-echo "Scanning {$total} jobs for HTML in description…\n\n";
+echo "Scanning jobs for HTML in description…\n\n";
 
-foreach ($all as $row) {
+while (($row = $stmt->fetch()) !== false) {
+    $total++;
     $raw   = $row['description'] ?? '';
     $clean = cleanDescription($raw);
 

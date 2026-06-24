@@ -20,6 +20,9 @@ try {
         respondJson(404, ['error' => 'Job not found']);
     }
 
+    $insert = $db->prepare("INSERT INTO job_clicks (job_id, clicked_at) VALUES (?, NOW())");
+    $insert->execute([$jobId]);
+
     respondJson(200, ['success' => true]);
 } catch (PDOException $e) {
     respondJson(500, ['error' => 'Database query failed']);

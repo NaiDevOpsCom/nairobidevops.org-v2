@@ -61,4 +61,14 @@ CREATE TABLE IF NOT EXISTS jobs (
     status            ENUM('sent','failed') NOT NULL,
     error             TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS job_clicks (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    job_id     INT NOT NULL,
+    clicked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_job_id    (job_id),
+    INDEX idx_clicked   (clicked_at),
+    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+  );
   

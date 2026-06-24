@@ -139,7 +139,7 @@ const PROJECT_MANAGEMENT_KEYWORDS = [
 const PRODUCT_MANAGEMENT_KEYWORDS = [
     'product manager',
     'product lead',
-    'pm',
+    ' pm ',          // word-boundary spacing to avoid false positives (e.g. "npm", "rpm")
     'head of product',
     'senior pm',
     'associate product',
@@ -336,7 +336,7 @@ function shouldDisableSslVerification(): bool
         return false;
     }
 
-    return (bool) getenv('DISABLE_SSL_VERIFY');
+    return filter_var(getenv('DISABLE_SSL_VERIFY'), FILTER_VALIDATE_BOOLEAN);
 }
 
 // ── Transport: cURL (preferred) ───────────────────────────────────────────────
@@ -479,34 +479,8 @@ function fetchRemotiveCategory(string $url, string $userAgent): array
 
 // ── Helper: HTML → plain text ─────────────────────────────────────────────────
 
-/**
- * Convert a raw HTML job description to clean, readable plain text.
- *
- * Steps:
- *   1. Replace block-level tags with newlines
- *   2. Strip all remaining HTML tags
- *   3. Decode HTML entities
- *   4. Collapse runs of 3+ newlines → one blank line
- *   5. Trim each line, then trim the whole string
- */
-function cleanDescription(string $rawHtml): string
-{
-    if (trim($rawHtml) === '') {
-        return '';
-    }
-
-    $text = preg_replace(
-        '/<\s*\/?\s*(p|br|li|h[1-6]|div|blockquote|ul|ol|tr|td|th)[^>]*>/i',
-        "\n",
-        $rawHtml
-    );
-    $text = strip_tags($text);
-    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $text = preg_replace('/\n{3,}/', "\n\n", $text);
-    $lines = array_map('trim', explode("\n", $text));
-
-    return trim(implode("\n", $lines));
-}
+// cleanDescription() is defined in helpers.php and required above.
+// See that file for the full implementation and step-by-step comments.
 
 // ── Helper: deduplication ─────────────────────────────────────────────────────
 
@@ -541,13 +515,13 @@ function refreshJob(
     string $locationDetail,
     int    $africaFriendly
 ): void {
-    // Refresh description when it has changed
+    // Refresh description when it has changed or was NULL
     $stmt = $db->prepare(
         "UPDATE jobs
             SET description = :desc
           WHERE source = 'remotive'
             AND source_id = :sid
-            AND description != :desc2"
+            AND (description IS NULL OR description != :desc2)"
     );
     $stmt->execute([':desc' => $cleanDesc, ':sid' => $sourceId, ':desc2' => $cleanDesc]);
 
@@ -929,7 +903,8 @@ foreach (REMOTIVE_CATEGORIES as $category) {
         $roleType     = mapRoleType($title);
         $affiliateUrl = buildAffiliateUrl($applyUrl, 'remotive');
         $logoUrl      = trim((string) ($job['company_logo'] ?? ''));
-        $postedAt     = date('Y-m-d H:i:s', strtotime((string) ($job['publication_date'] ?? 'now')));
+        $parsedTime   = strtotime((string) ($job['publication_date'] ?? ''));
+        $postedAt     = date('Y-m-d H:i:s', $parsedTime !== false ? $parsedTime : time());
         $salary       = parseSalary((string) ($job['salary'] ?? ''));
         $description  = cleanDescription((string) ($job['description'] ?? ''));
 

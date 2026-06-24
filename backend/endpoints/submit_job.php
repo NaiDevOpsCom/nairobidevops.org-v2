@@ -10,6 +10,11 @@ if (!$input || empty($input['title']) || empty($input['company']) || empty($inpu
     respondJson(400, ['error' => 'Missing required fields: title, company, apply_url']);
 }
 
+$applyUrl = trim($input['apply_url']);
+if (!filter_var($applyUrl, FILTER_VALIDATE_URL)) {
+    respondJson(400, ['error' => 'Invalid apply_url: must be a valid URL']);
+}
+
 try {
     $stmt = $db->prepare("
         INSERT INTO jobs (title, company, description, apply_url, source, is_active, is_approved)
@@ -19,7 +24,7 @@ try {
         ':title'       => htmlspecialchars(strip_tags(trim($input['title'])), ENT_QUOTES, 'UTF-8'),
         ':company'     => htmlspecialchars(strip_tags(trim($input['company'])), ENT_QUOTES, 'UTF-8'),
         ':description' => isset($input['description']) ? htmlspecialchars(strip_tags(trim($input['description'])), ENT_QUOTES, 'UTF-8') : null,
-        ':apply_url'   => filter_var(trim($input['apply_url']), FILTER_VALIDATE_URL) ? trim($input['apply_url']) : '',
+        ':apply_url'   => $applyUrl,
     ]);
 
     respondJson(201, ['success' => true, 'id' => (int)$db->lastInsertId()]);

@@ -141,7 +141,7 @@ jobs:
             ln -sf "/home/$REMOTE_USER/config/backend-config-staging.php" \
                    "$RELEASE_DIR/config.php"
 
-      - name: Atomically Switch Symlink & Clean Old Releases
+      - name: Atomically Switch Symlink
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
@@ -167,17 +167,7 @@ jobs:
             ln -sfn "$RELEASE_DIR" "$TMP_LINK"
             mv -Tf "$TMP_LINK" "$TARGET_LINK"
 
-            RELEASES_DIR="/home/$REMOTE_USER/backend-staging-releases"
-            CURRENT="$RELEASE_TIMESTAMP"
-            cd "$RELEASES_DIR"
-            for dir in */; do
-              dir="${dir%/}"
-              if [ "$dir" != "$CURRENT" ]; then
-                rm -rf "$dir"
-              fi
-            done
-
-            echo "Staging backend deployment successful."
+            echo "Symlink switched to release $RELEASE_TIMESTAMP."
 
       - name: Health Check
         env:
@@ -218,6 +208,33 @@ jobs:
             echo "Health check failed after $MAX_RETRIES attempts"
             exit 1
           fi
+
+      - name: Clean Old Releases
+        if: success()
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+
+            RELEASES_DIR="/home/$REMOTE_USER/backend-staging-releases"
+            CURRENT="$RELEASE_TIMESTAMP"
+            cd "$RELEASES_DIR"
+            for dir in */; do
+              dir="${dir%/}"
+              if [ "$dir" != "$CURRENT" ]; then
+                rm -rf "$dir"
+              fi
+            done
+
+            echo "Staging backend deployment successful."
 
   notify:
     needs: deploy
