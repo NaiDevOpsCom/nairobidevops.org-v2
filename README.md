@@ -75,33 +75,63 @@ The `frontend/client/src/data/` directory contains static data used throughout t
 
 ### Prerequisites
 
-- Node.js (v20+ recommended)
-- npm or yarn
+- Node.js (v20+ recommended) and npm
+- PHP (v8.1+ recommended)
+- MySQL / MariaDB (e.g., via WampServer, XAMPP, or standalone)
 
-### Installation
+### Frontend Setup
 
-1. **Clone the repository:**
-
+1. **Navigate to the frontend folder:**
    ```bash
-   git clone <repo-url>
-   cd ndc-redesign-website
    cd frontend
    ```
 
 2. **Install dependencies:**
-   Use `npm ci` for a consistent installation that matches our CI environment.
-
+   Use `npm ci` for a consistent installation that matches the CI environment.
    ```bash
    npm ci
    ```
 
 3. **Start the development server:**
-
    ```bash
    npm run dev
    ```
-
    - The app will be available at `http://localhost:5173`.
+
+### Backend Setup
+
+1. **Configure local environment**:
+   * Navigate to the `backend/` directory.
+   * Copy `config.example.php` to create `config.local.php`:
+     ```bash
+     cp config.example.php config.local.php
+     ```
+   * Open `config.local.php` and update the database settings (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`) to match your local MySQL configuration.
+
+2. **Initialize Database and Schema**:
+   * Create a local MySQL database named `nairobidevops_jobs_local`.
+   * Import the tables from `schema.sql`:
+     ```bash
+     mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS nairobidevops_jobs_local;"
+     mysql -u root -p nairobidevops_jobs_local < schema.sql
+     ```
+
+3. **Verify Database Connection**:
+   * Run the database checker script from the `backend/` directory:
+     ```bash
+     php check_db.php
+     ```
+   * You should see: `OK: connected to 'nairobidevops_jobs_local' on localhost:3306`.
+
+4. **Start the Backend Server**:
+   * Run the built-in PHP development server inside the `backend/` directory:
+     ```bash
+     php -S localhost:8000
+     ```
+
+5. **Test Backend Endpoints**:
+   * Query the jobs action endpoint in your browser or API client:
+     `http://localhost:8000/?action=jobs`
 
 ---
 

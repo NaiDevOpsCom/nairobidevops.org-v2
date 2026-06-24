@@ -21,6 +21,7 @@ import DonationPage from "@/pages/DonationPage";
 import Eventspage from "@/pages/Eventspage";
 import FAQPage from "@/pages/FAQPage";
 import Home from "@/pages/Home";
+import Jobs from "@/pages/jobs";
 import NotFound from "@/pages/not-found";
 import PartnershipPage from "@/pages/PartnershipPage";
 
@@ -39,6 +40,7 @@ const pathToComponent: Record<RoutePath, ComponentType> = {
   "/blogs": BlogPage,
   "/blogs/:slug": BlogDetail,
   "/donate": DonationPage,
+  "/jobs": Jobs,
 };
 
 if (import.meta.env.DEV) {
