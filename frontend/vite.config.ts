@@ -85,6 +85,11 @@ export default defineConfig(({ mode }) => {
         deny: ["**/.*"],
       },
       proxy: {
+        "/endpoints": {
+          target: "http://localhost:8000",
+          changeOrigin: false,
+          secure: false,
+        },
         "/api/luma": {
           target: "https://api.luma.com",
           changeOrigin: true,
