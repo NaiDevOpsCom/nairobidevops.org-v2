@@ -8,11 +8,6 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const POLICY_PATH = path.join(ROOT_DIR, "security-policy.json");
 const HTACCESS_PATH = path.join(ROOT_DIR, "client", "public", ".htaccess");
-const TEMPLATE_PATH = path.join(__dirname, ".htaccess.template");
-
-// ---------------------------------------------------------------------------
-// Policy loader
-// ---------------------------------------------------------------------------
 
 function loadPolicy() {
   if (!fs.existsSync(POLICY_PATH)) {
@@ -28,10 +23,6 @@ function loadPolicy() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// CSP string builder
-// ---------------------------------------------------------------------------
-
 function generateCSPString(cspConfig) {
   const directives = Object.entries(cspConfig)
     .map(([key, value]) => {
@@ -42,7 +33,10 @@ function generateCSPString(cspConfig) {
 
       // Array-valued directives (e.g. "default-src": ["'self'", "https://example.com"])
       if (Array.isArray(value)) {
-        return value.length === 0 ? `${key} 'none'` : `${key} ${value.join(" ")}`;
+        if (value.length === 0) {
+          return `${key} 'none'`;
+        }
+        return `${key} ${value.join(" ")}`;
       }
 
       // String-valued directives (e.g. "default-src": "'self'")
@@ -53,7 +47,7 @@ function generateCSPString(cspConfig) {
       // Any other shape is unexpected and should surface a configuration error
       console.error(
         `Error: Invalid CSP directive value for "${key}" in ${POLICY_PATH}. ` +
-          `Expected boolean, string, or array; received: ${JSON.stringify(value)}`
+        `Expected boolean, string, or array; received: ${JSON.stringify(value)}`
       );
       process.exit(1);
     })
@@ -62,73 +56,57 @@ function generateCSPString(cspConfig) {
   return directives.join("; ");
 }
 
-// ---------------------------------------------------------------------------
-// Apache header escaping
-//
-// Apache's mod_headers uses `"` as a value delimiter and `%` as a format-
-// string prefix, so both must be escaped before embedding in a Header
-// directive.  Backslashes must be doubled first to avoid double-escaping.
-// ---------------------------------------------------------------------------
 
-function escapeApacheHeaderValue(str) {
-  return str
-    .replaceAll("\\", "\\\\") // 1. double backslashes
-    .replaceAll('"', '\\"')   // 2. escape double-quotes
-    .replaceAll("%", "%%");   // 3. escape mod_headers format specifiers
-}
 
-// ---------------------------------------------------------------------------
-// .htaccess generator
-// ---------------------------------------------------------------------------
+const TEMPLATE_PATH = path.join(__dirname, ".htaccess.template");
 
 function generateHtaccess(policy) {
+
   const cspString = generateCSPString(policy.contentSecurityPolicy);
 
-  // --- Security header block ---
   const headerRules = [
     "<IfModule mod_headers.c>",
-    `  Header always set Content-Security-Policy "${escapeApacheHeaderValue(cspString)}"`,
-    ...Object.entries(policy.headers).map(
-      ([key, value]) => `  Header always set ${key} "${escapeApacheHeaderValue(value)}"`
-    ),
+    `  Header always set Content-Security-Policy "${cspString
+      .replaceAll(/\\/g, "\\\\")
+      .replaceAll(/"/g, '\\"')
+      .replaceAll(/%/g, "%%")}"`,
+
+    ...Object.entries(policy.headers).map(([key, value]) => {
+      const escapedValue = value.replaceAll(/\\/g, "\\\\").replaceAll(/"/g, '\\"').replaceAll(/%/g, "%%");
+      return `  Header always set ${key} "${escapedValue}"`;
+    }),
     "</IfModule>",
   ];
 
-  // --- Apache directory options ---
   const apacheConfigRules = [];
-  const options = policy.apacheConfig?.options;
-  if (options) {
+  if (policy.apacheConfig && policy.apacheConfig.options) {
+    const options = policy.apacheConfig.options;
     const hasIndexes = options.includes("-Indexes");
 
-    for (const option of options) {
+    options.forEach((option) => {
       if (option === "-Indexes") {
-        apacheConfigRules.push(
-          "  <IfModule mod_autoindex.c>",
-          `    Options ${option}`,
-          "  </IfModule>"
-        );
+        apacheConfigRules.push("  <IfModule mod_autoindex.c>");
+        apacheConfigRules.push(`    Options ${option}`);
+        apacheConfigRules.push("  </IfModule>");
       } else if (option === "-MultiViews") {
-        apacheConfigRules.push(
-          "  <IfModule mod_negotiation.c>",
-          `    Options ${hasIndexes ? "-Indexes " : ""}${option}`,
-          "  </IfModule>"
-        );
+        apacheConfigRules.push("  <IfModule mod_negotiation.c>");
+        apacheConfigRules.push(`    Options ${hasIndexes ? "-Indexes " : ""}${option}`);
+        apacheConfigRules.push("  </IfModule>");
       } else {
         apacheConfigRules.push(`  Options ${option}`);
       }
-    }
+    });
   }
 
-  // --- Proxy rewrite rules ---
   const proxyRules = [];
-  if (Array.isArray(policy.proxies)) {
-    for (const [index, proxy] of policy.proxies.entries()) {
+  if (policy.proxies && Array.isArray(policy.proxies)) {
+    policy.proxies.forEach((proxy, index) => {
       // Validate apacheRewrite
       if (typeof proxy.apacheRewrite !== "string" || !proxy.apacheRewrite.trim()) {
         const identifier = proxy.source || `at index ${index}`;
         throw new Error(
           `Invalid or missing "apacheRewrite" for proxy "${identifier}". ` +
-            `Expected non-empty string, received: ${JSON.stringify(proxy.apacheRewrite)}`
+          `Expected non-empty string, received: ${JSON.stringify(proxy.apacheRewrite)}`
         );
       }
 
@@ -136,7 +114,6 @@ function generateHtaccess(policy) {
       const destination = proxy.apacheRewrite.startsWith("/")
         ? proxy.apacheRewrite
         : `/${proxy.apacheRewrite}`;
-
       // Prefer an Apache-specific source pattern; otherwise convert Vercel splat syntax to Apache regex.
       const apacheSource =
         proxy.apacheSource ??
@@ -145,25 +122,22 @@ function generateHtaccess(policy) {
           .replace(/:path\*/g, "(.*)")
           .replace(/:(\w+)\*/g, "(.*)");
 
-      proxyRules.push(
-        `  # Proxy for ${proxy.source}`,
-        `  RewriteRule ^/?${apacheSource}$ ${destination} [QSA,L]`
-      );
-    }
+      proxyRules.push(`  # Proxy for ${proxy.source}`);
+      proxyRules.push(`  RewriteRule ^/?${apacheSource}$ ${destination} [QSA,L]`);
+    });
   }
 
-  // --- Merge into template ---
   if (!fs.existsSync(TEMPLATE_PATH)) {
     console.error(`Error: Template file not found at ${TEMPLATE_PATH}`);
     process.exit(1);
   }
 
   let content = fs.readFileSync(TEMPLATE_PATH, "utf8");
-  content = content.replaceAll("#{{SECURITY_HEADERS}}#", headerRules.join("\n"));
-  content = content.replaceAll("#{{APACHE_CONFIG}}#", apacheConfigRules.join("\n"));
-  content = content.replaceAll("#{{PROXY_RULES}}#", proxyRules.join("\n"));
+  content = content.replace("#{{SECURITY_HEADERS}}#", headerRules.join("\n"));
+  content = content.replace("#{{APACHE_CONFIG}}#", apacheConfigRules.join("\n"));
+  content = content.replace("#{{PROXY_RULES}}#", proxyRules.join("\n"));
 
-  // Ensure output directory exists
+  // Ensure directory exists
   const dir = path.dirname(HTACCESS_PATH);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -173,11 +147,13 @@ function generateHtaccess(policy) {
   console.log(`Generated .htaccess at ${HTACCESS_PATH}`);
 }
 
-// ---------------------------------------------------------------------------
-// Entry point (top-level await — no async wrapper needed)
-// ---------------------------------------------------------------------------
+async function main() {
+  console.log("Generating security headers...");
+  const policy = loadPolicy();
 
-console.log("Generating security headers...");
-const policy = loadPolicy();
-generateHtaccess(policy);
-console.log("Done.");
+  generateHtaccess(policy);
+
+  console.log("Done.");
+}
+
+main();

@@ -141,6 +141,15 @@ jobs:
             ln -sf "/home/$REMOTE_USER/config/backend-config-staging.php" \
                    "$RELEASE_DIR/config.php"
 
+      # Atomically switch the jobs-api symlink inside staging.nairobidevops.org/
+      #
+      # WHY: The frontend owns staging.nairobidevops.org/ and deploys files directly
+      # into it. The backend jobs-api must live as a symlink inside that folder.
+      # The backend workflow creates/updates it here; the frontend workflow
+      # recreates it after every frontend deploy (see staging-deploy.yml step 9).
+      #
+      # BACKEND_STAGING_REMOTE_PATH must be set to:
+      #   /home/nairobid/staging.nairobidevops.org/jobs-api
       - name: Atomically Switch Symlink
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
@@ -159,6 +168,10 @@ jobs:
             RELEASE_DIR="/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
             TMP_LINK="${TARGET_LINK}.tmp"
 
+            # Ensure the parent staging directory exists
+            # (it may not exist yet if frontend hasn't deployed yet)
+            mkdir -p "$(dirname "$TARGET_LINK")"
+
             if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
               echo "CRITICAL ERROR: $TARGET_LINK is not a symlink — aborting."
               exit 1
@@ -167,7 +180,8 @@ jobs:
             ln -sfn "$RELEASE_DIR" "$TMP_LINK"
             mv -Tf "$TMP_LINK" "$TARGET_LINK"
 
-            echo "Symlink switched to release $RELEASE_TIMESTAMP."
+            echo "✅ Symlink switched to release $RELEASE_TIMESTAMP."
+            echo "   $TARGET_LINK → $RELEASE_DIR"
 
       - name: Health Check
         env:
@@ -191,7 +205,7 @@ jobs:
 
             case "$HTTP_CODE" in
               2* | 3*)
-                echo "Health check passed (HTTP $HTTP_CODE)"
+                echo "✅ Health check passed (HTTP $HTTP_CODE)"
                 SUCCESS=true
                 break
                 ;;
@@ -234,7 +248,7 @@ jobs:
               fi
             done
 
-            echo "Staging backend deployment successful."
+            echo "✅ Staging backend deployment complete."
 
   notify:
     needs: deploy

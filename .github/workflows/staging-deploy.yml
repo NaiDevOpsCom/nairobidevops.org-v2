@@ -348,7 +348,41 @@ jobs:
 
             echo "✅ Staging deployment successful."
 
-      # 9. Health check — verify the staging URL responds
+      # 9. Re-link backend jobs-api symlink
+      #
+      # WHY: The frontend deploy extracts files directly into staging.nairobidevops.org/
+      # which overwrites everything including the jobs-api symlink on every deploy.
+      # This step recreates the symlink pointing to the latest backend release
+      # so the PHP API remains accessible after every frontend deploy.
+      - name: Re-link Backend jobs-api After Frontend Deploy
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER
+          script: |
+            set -euo pipefail
+
+            STAGING_DIR="/home/$REMOTE_USER/staging.nairobidevops.org"
+            BACKEND_RELEASES="/home/$REMOTE_USER/backend-staging-releases"
+
+            # Find the most recent backend release folder
+            LATEST=$(ls -1t "$BACKEND_RELEASES" 2>/dev/null | grep -v '\.tmp$' | head -1)
+
+            if [ -z "$LATEST" ]; then
+              echo "⚠️  No backend release found in $BACKEND_RELEASES — jobs-api not linked."
+              echo "   Deploy the backend first, then re-run this workflow."
+              exit 0
+            fi
+
+            ln -sfn "$BACKEND_RELEASES/$LATEST" "$STAGING_DIR/jobs-api"
+            echo "✅ Re-linked jobs-api → $LATEST"
+
+      # 10. Health check — verify the staging URL responds
       - name: Health Check
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
