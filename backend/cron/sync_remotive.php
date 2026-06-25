@@ -882,6 +882,13 @@ foreach (REMOTIVE_CATEGORIES as $category) {
         // from polluting the board. Narrow categories like devops-sysadmin and
         // cloud let every title through.
         if (!isRelevantForCategory($title, $category)) {
+    $totalSkipped++;
+    continue;
+}
+
+        // Final gate — if mapRoleType returns 'Other', the title has no
+        // DevOps-adjacent keywords. Skip regardless of category.
+        if (mapRoleType($title) === 'Other') {
             $totalSkipped++;
             continue;
         }

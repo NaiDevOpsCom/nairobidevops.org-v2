@@ -42,4 +42,5 @@ jobs:
         run: npm ci
 
       - name: Run root checks
+        working-directory: frontend
         run: npm run check
