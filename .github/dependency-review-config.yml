@@ -1,0 +1,53 @@
+
+# Dependency Review Policy
+# ─────────────────────────────────────────────────────────────
+# This file governs license and vulnerability policy for all
+# pull requests via actions/dependency-review-action.
+#
+# Reviewed: 2026-06-25
+# Reviewer:  [Your Name / Legal Team sign-off]
+#
+# FORMAT NOTE:
+#   Using YAML list format (not inline comma-string) to ensure
+#   compound SPDX expressions like "ISC AND JSON AND MIT" are
+#   parsed as atomic allow-list entries, not split on spaces.
+# ─────────────────────────────────────────────────────────────
+
+fail-on-severity: moderate
+
+vulnerability-check: true
+license-check: true
+
+# ─────────────────────────────────────────────────────────────
+# APPROVED LICENSES
+# ─────────────────────────────────────────────────────────────
+# Standard permissive licenses — no restrictions on commercial use.
+allow-licenses:
+  - MIT
+  - ISC
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - Unlicense
+  - CC0-1.0
+  - 0BSD
+  - MPL-2.0
+
+  # ── Compound expressions ─────────────────────────────────
+  # Both orderings are listed because the GitHub Dependency
+  # Graph API and npm registry may report the same package
+  # with differently-ordered SPDX tokens depending on the
+  # source they query.
+
+  # victory-vendor@37.x (transitive via recharts@3.x)
+  # The "JSON" component refers to Douglas Crockford's JSON
+  # License ("shall be used for Good, not Evil").
+  # Assessment: Low material risk for a front-end web project.
+  #   - Not in the SPDX formal license list (non-standard)
+  #   - Not OSI-approved
+  #   - Widely present across the D3/Victory ecosystem
+  #   - Legal review completed: [Date] by [Team/Person]
+  # Tracking: Open issue to evaluate recharts alternatives
+  #           that do not carry this transitive dependency.
+  - ISC AND JSON AND MIT
+  - MIT AND ISC
