@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [tailwindcss(), react(), sitemapPlugin(isHardened)],
+    envDir: path.resolve(import.meta.dirname, "client"), // Load environment variables from .env.staging
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -56,11 +57,11 @@ export default defineConfig(({ mode }) => {
       // Terser options for aggressive console/debugger removal
       terserOptions: isHardened
         ? {
-            compress: {
-              drop_console: true,
-              drop_debugger: true,
-            },
-          }
+          compress: {
+            drop_console: true,
+            drop_debugger: true,
+          },
+        }
         : undefined,
       rollupOptions: {
         output: {

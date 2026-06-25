@@ -9,6 +9,34 @@ import {
 } from "lucide-react";
 import React, { useState, useMemo, useEffect } from "react";
 
+// Job shape — previously imported from src/data/jobsData.ts (now deleted).
+// Defined here so jobs.tsx is self-contained.
+interface Job {
+  id: string;
+  title: string;
+  company: string;
+  companyLogo?: string;
+  description: string;
+  location: string;
+  salaryMin: number;
+  salaryMax: number;
+  currency: string;
+  period: string;
+  tags: string[];
+  isAfricaFriendly: boolean;
+  isRemote: boolean;
+  postedAt: string;
+  closingIn?: string;
+  applyUrl?: string;
+  roleType: "Platform Engineering" | "SRE" | "Cloud Architect" | "Security" | "DevOps Engineer";
+  locationTag:
+    | "Remote (Global)"
+    | "Remote (Africa Only)"
+    | "Nairobi, KE"
+    | "Lagos, NG"
+    | "Cape Town, ZA";
+}
+
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import Seo from "@/components/SEO";
@@ -23,7 +51,6 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import { Job } from "@/data/jobsData";
 import { statisticsData } from "@/data/ndcData";
 
 // NOTE: We fetch jobs from the backend endpoint and transform them into the
@@ -630,7 +657,7 @@ export default function Jobs() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch("/endpoints/get_jobs.php");
+        const res = await fetch(`${import.meta.env.VITE_API_URL ?? ""}/?action=jobs`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const payload = await res.json();
         // payload.jobs is expected to be an array of backend job objects
@@ -729,11 +756,10 @@ export default function Jobs() {
                     handleQuickFilterToggle(filter);
                     setVisibleCount(12);
                   }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${
-                    isActive
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${isActive
                       ? "bg-primary text-primary-foreground border-primary shadow-sm"
                       : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
-                  }`}
+                    }`}
                 >
                   {filter}
                 </button>
