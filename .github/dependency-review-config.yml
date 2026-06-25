@@ -7,10 +7,11 @@
 # Reviewed: 2026-06-25
 # Reviewer:  [Your Name / Legal Team sign-off]
 #
-# FORMAT NOTE:
-#   Using YAML list format (not inline comma-string) to ensure
-#   compound SPDX expressions like "ISC AND JSON AND MIT" are
-#   parsed as atomic allow-list entries, not split on spaces.
+# IMPORTANT — compound SPDX expressions (e.g. "ISC AND JSON AND MIT")
+# are NOT supported in allow-licenses. The action only matches
+# individual SPDX identifiers in that list. To exempt a specific
+# package that carries a compound/non-SPDX license, use
+# allow-dependencies-licenses with its PURL instead.
 # ─────────────────────────────────────────────────────────────
 
 fail-on-severity: moderate
@@ -19,7 +20,7 @@ vulnerability-check: true
 license-check: true
 
 # ─────────────────────────────────────────────────────────────
-# APPROVED LICENSES
+# APPROVED INDIVIDUAL LICENSES
 # ─────────────────────────────────────────────────────────────
 # Standard permissive licenses — no restrictions on commercial use.
 allow-licenses:
@@ -32,22 +33,25 @@ allow-licenses:
   - CC0-1.0
   - 0BSD
   - MPL-2.0
+  # JSON (Crockford) — "shall be used for Good, not Evil" clause.
+  # Not OSI-approved; widely present in the D3/Victory ecosystem.
+  # Listed here for belt-and-suspenders coverage alongside the
+  # PURL exception below. Legal review: [Date] by [Team/Person].
+  - JSON
 
-  # ── Compound expressions ─────────────────────────────────
-  # Both orderings are listed because the GitHub Dependency
-  # Graph API and npm registry may report the same package
-  # with differently-ordered SPDX tokens depending on the
-  # source they query.
-
-  # victory-vendor@37.x (transitive via recharts@3.x)
-  # The "JSON" component refers to Douglas Crockford's JSON
-  # License ("shall be used for Good, not Evil").
-  # Assessment: Low material risk for a front-end web project.
-  #   - Not in the SPDX formal license list (non-standard)
-  #   - Not OSI-approved
-  #   - Widely present across the D3/Victory ecosystem
-  #   - Legal review completed: [Date] by [Team/Person]
-  # Tracking: Open issue to evaluate recharts alternatives
-  #           that do not carry this transitive dependency.
-  - ISC AND JSON AND MIT
-  - MIT AND ISC
+# ─────────────────────────────────────────────────────────────
+# PACKAGE-LEVEL LICENSE EXCEPTIONS (PURL format)
+# ─────────────────────────────────────────────────────────────
+# Use this section for packages that carry compound or non-SPDX
+# license expressions that the action cannot match via allow-licenses.
+# These packages are still scanned for VULNERABILITIES — only their
+# license check is bypassed.
+allow-dependencies-licenses:
+  # victory-vendor@37.x — transitive dependency via recharts@3.x.
+  # Reports license "ISC AND JSON AND MIT" from the GitHub Dependency
+  # Graph API. The action does not support compound SPDX expressions
+  # in allow-licenses, so we exempt this specific package by PURL.
+  # The JSON license clause ("Good not Evil") is a known nuisance in
+  # the D3 ecosystem and is accepted as low-risk for front-end tooling.
+  # Track for removal: evaluate recharts alternatives that drop victory-vendor.
+  - "pkg:npm/victory-vendor"
