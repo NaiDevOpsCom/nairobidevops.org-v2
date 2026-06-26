@@ -57,11 +57,11 @@ export default defineConfig(({ mode }) => {
       // Terser options for aggressive console/debugger removal
       terserOptions: isHardened
         ? {
-          compress: {
-            drop_console: true,
-            drop_debugger: true,
-          },
-        }
+            compress: {
+              drop_console: true,
+              drop_debugger: true,
+            },
+          }
         : undefined,
       rollupOptions: {
         output: {

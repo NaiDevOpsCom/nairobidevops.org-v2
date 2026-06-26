@@ -409,14 +409,20 @@ function parseWwrTitle(string $raw): array
 /**
  * Extract a plain-text location from a WWR RSS <region> or <description> field.
  *
- * WWR encodes location in the <description> CDATA block using an <li> tag:
+ * WWR's RSS provides a dedicated <region> element and also encodes location
+ * in the <description> CDATA block using an <li> tag:
  *   <li>Anywhere in the World</li>  or  <li>USA Only</li>
  *
- * We extract that first <li> value as the location detail.
- * Falls back to an empty string if the pattern isn't found.
+ * We prefer <region> (authoritative), then fall back to the first <li>.
+ * Falls back to an empty string if neither is found.
  */
-function parseWwrLocation(string $descriptionCdata): string
+function parseWwrLocation(string $descriptionCdata, string $region = ''): string
 {
+    $region = trim($region);
+    if ($region !== '') {
+        return $region;
+    }
+
     if (preg_match('/<li[^>]*>\s*([^<]+?)\s*<\/li>/i', $descriptionCdata, $m)) {
         return trim(strip_tags($m[1]));
     }
@@ -655,8 +661,8 @@ foreach ($feeds as $index => $feed) {
             continue;
         }
 
-        // ── Location: parse from description CDATA ────────────────────────────
-        $locationDetail = sanitizeString(parseWwrLocation($rawDescription));
+        // ── Location: prefer RSS <region>, fall back to description CDATA ─────
+        $locationDetail = sanitizeString(parseWwrLocation($rawDescription, (string) ($item->region ?? '')));
 
         // ── Africa eligibility ────────────────────────────────────────────────
         $eligibility    = wwrClassifyAfrica($locationDetail);

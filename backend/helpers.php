@@ -96,6 +96,7 @@ function mapRoleType(string $title): string {
         // but also handle titles that START with 'sre' (no leading space).
         str_contains($lower, 'site reliability'),
         str_contains($lower, ' sre'),
+        $lower === 'sre',
         str_starts_with($lower, 'sre ')                 => 'SRE',
 
         // ── Cloud Architect ───────────────────────────────────────────────────
@@ -184,7 +185,7 @@ function buildAffiliateUrl(string $url, string $source): string {
  * Polyfill for mb_substr if the mbstring extension is not loaded.
  */
 if (!function_exists('mb_substr')) {
-    function mb_substr(string $string, int $start, ?int $length = null, ?string $encoding = null): string {
+    function mb_substr(string $string, int $start, ?int $length = null, ?string $encoding = null): string { // NOSONAR
         if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
             return (string)substr($string, $start, $length ?? strlen($string));
         }
