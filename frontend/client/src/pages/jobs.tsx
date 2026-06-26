@@ -30,11 +30,11 @@ interface Job {
   applyUrl?: string;
   roleType: "Platform Engineering" | "SRE" | "Cloud Architect" | "Security" | "DevOps Engineer";
   locationTag:
-    | "Remote (Global)"
-    | "Remote (Africa Only)"
-    | "Nairobi, KE"
-    | "Lagos, NG"
-    | "Cape Town, ZA";
+  | "Remote (Global)"
+  | "Remote (Africa Only)"
+  | "Nairobi, KE"
+  | "Lagos, NG"
+  | "Cape Town, ZA";
 }
 
 import Footer from "@/components/Footer";
@@ -757,8 +757,8 @@ export default function Jobs() {
                     setVisibleCount(12);
                   }}
                   className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${isActive
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
                     }`}
                 >
                   {filter}

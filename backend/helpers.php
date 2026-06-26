@@ -78,35 +78,93 @@ function sanitizeString(string $val): string {
 
 /**
  * Map a job title to a role type that matches the frontend whitelist.
- * Valid values: 'Platform Engineering' | 'SRE' | 'Cloud Architect' | 'Security' | 'DevOps Engineer'
+ *
+ * Valid values:
+ *   'SRE' | 'Cloud Architect' | 'Security' | 'Platform Engineering'
+ *   'DevOps Engineer' | 'Backend Engineer' | 'Frontend Engineer' | 'Sysadmin'
+ *   'Other'
+ *
+ * Order matters — more specific patterns are checked first to avoid
+ * misclassification (e.g. "DevSecOps" must hit Security before DevOps Engineer).
  */
 function mapRoleType(string $title): string {
     $lower = strtolower($title);
 
     return match (true) {
+        // ── SRE ───────────────────────────────────────────────────────────────
+        // Check ' sre' with leading space to avoid matching 'sre' inside words,
+        // but also handle titles that START with 'sre' (no leading space).
         str_contains($lower, 'site reliability'),
-        str_contains($lower, ' sre ')              => 'SRE',
+        str_contains($lower, ' sre'),
+        str_starts_with($lower, 'sre ')                 => 'SRE',
+
+        // ── Cloud Architect ───────────────────────────────────────────────────
         str_contains($lower, 'cloud architect'),
         str_contains($lower, 'solutions architect'),
-        str_contains($lower, 'cloud engineer')     => 'Cloud Architect',
-        str_contains($lower, 'security'),
-        str_contains($lower, 'devsecops')           => 'Security',
+        str_contains($lower, 'cloud engineer')          => 'Cloud Architect',
+
+        // ── Security / DevSecOps ──────────────────────────────────────────────
+        str_contains($lower, 'devsecops'),
+        str_contains($lower, 'security engineer'),
+        str_contains($lower, 'security architect'),
+        str_contains($lower, 'appsec'),
+        str_contains($lower, 'application security')    => 'Security',
+
+        // ── Platform Engineering ──────────────────────────────────────────────
         str_contains($lower, 'platform engineer'),
-        str_contains($lower, 'platform eng')        => 'Platform Engineering',
+        str_contains($lower, 'platform eng'),
+        str_contains($lower, 'developer experience'),
+        str_contains($lower, 'devex engineer')          => 'Platform Engineering',
+
+        // ── Sysadmin ──────────────────────────────────────────────────────────
+        str_contains($lower, 'sysadmin'),
+        str_contains($lower, 'system administrator'),
+        str_contains($lower, 'systems administrator'),
+        str_contains($lower, 'linux administrator'),
+        str_contains($lower, 'network engineer'),
+        str_contains($lower, 'network administrator')   => 'Sysadmin',
+
+        // ── DevOps Engineer ───────────────────────────────────────────────────
         str_contains($lower, 'devops'),
-        str_contains($lower, 'infrastructure'),
+        str_contains($lower, 'infrastructure engineer'),
+        str_contains($lower, 'infrastructure eng'),
         str_contains($lower, 'kubernetes'),
+        str_contains($lower, 'k8s'),
         str_contains($lower, 'terraform'),
-        str_contains($lower, 'backend engineer'),
+        str_contains($lower, 'ci/cd'),
+        str_contains($lower, 'reliability engineer'),
+        str_contains($lower, 'automation engineer'),
+        str_contains($lower, 'mlops'),
+        str_contains($lower, 'ml engineer'),
+        str_contains($lower, 'ai engineer'),
+        str_contains($lower, 'data engineer')           => 'DevOps Engineer',
+
+        // ── Frontend Engineer ─────────────────────────────────────────────────
+        str_contains($lower, 'frontend'),
+        str_contains($lower, 'front-end'),
+        str_contains($lower, 'front end'),
+        str_contains($lower, 'ui engineer'),
+        str_contains($lower, 'react engineer'),
+        str_contains($lower, 'vue engineer'),
+        str_contains($lower, 'angular engineer')        => 'Frontend Engineer',
+
+        // ── Backend Engineer ──────────────────────────────────────────────────
+        // Checked AFTER frontend so fullstack titles hit the next bucket
+        str_contains($lower, 'backend'),
+        str_contains($lower, 'back-end'),
+        str_contains($lower, 'back end'),
         str_contains($lower, 'software engineer'),
         str_contains($lower, 'fullstack'),
         str_contains($lower, 'full stack'),
         str_contains($lower, 'full-stack'),
-        str_contains($lower, 'data engineer'),
-        str_contains($lower, 'ml engineer'),
-        str_contains($lower, 'mlops'),
-        str_contains($lower, 'ai engineer')         => 'DevOps Engineer',
-        default                                     => 'Other',
+        str_contains($lower, 'api engineer'),
+        str_contains($lower, 'golang engineer'),
+        str_contains($lower, 'python engineer'),
+        str_contains($lower, 'ruby engineer'),
+        str_contains($lower, 'java engineer'),
+        str_contains($lower, 'node engineer')           => 'Backend Engineer',
+
+        default                                         => 'Other',
     };
 }
 
@@ -119,5 +177,41 @@ function buildAffiliateUrl(string $url, string $source): string {
     }
 
     $separator = str_contains($url, '?') ? '&' : '?';
-    return $url . $separator . 'aff=' . REMOTIVE_AFFILIATE_ID;
+    return $url . $separator . 'via=' . REMOTIVE_AFFILIATE_ID;
+}
+
+/**
+ * Polyfill for mb_substr if the mbstring extension is not loaded.
+ */
+if (!function_exists('mb_substr')) {
+    function mb_substr(string $string, int $start, ?int $length = null, ?string $encoding = null): string {
+        if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
+            return (string)substr($string, $start, $length ?? strlen($string));
+        }
+
+        preg_match_all('/./us', $string, $matches);
+        if (empty($matches[0])) {
+            return '';
+        }
+
+        $chars = $matches[0];
+        $count = count($chars);
+
+        if ($start < 0) {
+            $start = max(0, $count + $start);
+        }
+        if ($start >= $count) {
+            return '';
+        }
+
+        if ($length === null) {
+            return implode('', array_slice($chars, $start));
+        }
+
+        if ($length < 0) {
+            $length = max(0, $count - $start + $length);
+        }
+
+        return implode('', array_slice($chars, $start, $length));
+    }
 }
