@@ -91,3 +91,11 @@ backend/config.php
 backend/config.local.php
 backend/config.staging.php
 backend/vendor/
+backend/composer.phar
+backend/.phpunit.cache/
+backend/.php-cs-fixer.cache
+backend/test_res.txt
+
+# Composer Installer
+composer-setup.php
+

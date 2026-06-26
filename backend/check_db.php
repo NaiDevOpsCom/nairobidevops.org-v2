@@ -1,4 +1,5 @@
 <?php
+
 // Simple DB connection checker. Includes config.local.php for credentials and
 // attempts a lightweight test query. Exit codes:
 // 0 = success, 1 = connection error, 2 = query failed
@@ -11,11 +12,11 @@ if (!file_exists($localConfig)) {
 
 require_once $localConfig;
 
-$host = defined('DB_HOST') ? DB_HOST : '127.0.0.1';
-$port = defined('DB_PORT') ? DB_PORT : 3306;
-$name = defined('DB_NAME') ? DB_NAME : '';
-$user = defined('DB_USER') ? DB_USER : '';
-$pass = defined('DB_PASS') ? DB_PASS : '';
+$host = \defined('DB_HOST') ? DB_HOST : '127.0.0.1';
+$port = \defined('DB_PORT') ? DB_PORT : 3306;
+$name = \defined('DB_NAME') ? DB_NAME : '';
+$user = \defined('DB_USER') ? DB_USER : '';
+$pass = \defined('DB_PASS') ? DB_PASS : '';
 
 if (empty($name) || empty($user)) {
     fwrite(STDERR, "ERROR: DB_NAME or DB_USER not set in config.local.php\n");

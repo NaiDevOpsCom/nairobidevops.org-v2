@@ -1,4 +1,5 @@
 <?php
+
 $allowedOrigins = [
     'https://nairobidevops.org',
     'https://staging.nairobidevops.org',
@@ -6,7 +7,7 @@ $allowedOrigins = [
     'http://localhost:4000',
 ];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if (in_array($origin, $allowedOrigins)) {
+if (\in_array($origin, $allowedOrigins)) {
     header("Access-Control-Allow-Origin: $origin");
     header('Vary: Origin');
 }
@@ -28,7 +29,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 $postActions = ['submit', 'track'];
 
-if (in_array($action, $postActions, true) && $method !== 'POST') {
+if (\in_array($action, $postActions, true) && $method !== 'POST') {
     respondJson(405, ['error' => 'Method not allowed']);
 }
 

@@ -14,7 +14,44 @@ on:
       - ".github/workflows/deploy-backend-prod.yml"
 
 jobs:
+  validate:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: "8.3"
+          coverage: none
+          tools: composer
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHP formatting check (PHP-CS-Fixer)
+        run: composer run format:check
+
+      - name: PHP unit tests (PHPUnit)
+        run: composer run test
+
   deploy:
+    needs: validate
     runs-on: ubuntu-latest
     environment: production
     permissions: {}
@@ -174,7 +211,7 @@ jobs:
             echo "Backend deployment successful."
 
   notify:
-    needs: deploy
+    needs: [validate, deploy]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
@@ -189,14 +226,14 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: >-
-            ${{ needs.deploy.result == 'success' && '✅' || '❌' }}
+            ${{ (needs.validate.result == 'success' && needs.deploy.result == 'success') && '✅' || '❌' }}
             Backend Production Deploy
-            ${{ needs.deploy.result == 'success' && 'Successful' || 'Failed' }}
+            ${{ (needs.validate.result == 'success' && needs.deploy.result == 'success') && 'Successful' || 'Failed' }}
             - ${{ github.repository }}
           to: ${{ secrets.NOTIFICATION_EMAIL }}
           from: ${{ secrets.MAIL_FROM }}
           body: |
-            ${{ needs.deploy.result == 'success' && 'Backend deployed to production successfully.' || 'Backend production deployment FAILED.' }}
+            ${{ (needs.validate.result == 'success' && needs.deploy.result == 'success') && 'Backend deployed to production successfully.' || 'Backend production deployment FAILED.' }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
             Triggered by: ${{ github.actor }}

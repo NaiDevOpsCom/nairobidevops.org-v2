@@ -3,7 +3,8 @@
 /**
  * Send a JSON response and exit.
  */
-function respondJson(int $status, array $data): void {
+function respondJson(int $status, array $data): void
+{
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_THROW_ON_ERROR);
@@ -55,7 +56,8 @@ function cleanDescription(string $rawHtml): string
 /**
  * Calculate the number of days until a closing date.
  */
-function daysUntilClose(?string $closesAt): int {
+function daysUntilClose(?string $closesAt): int
+{
     if ($closesAt === null) {
         return 0;
     }
@@ -72,8 +74,12 @@ function daysUntilClose(?string $closesAt): int {
 /**
  * Sanitize a string by stripping HTML tags and trimming.
  */
-function sanitizeString(string $val): string {
-    return htmlspecialchars(strip_tags(trim($val)), ENT_QUOTES, 'UTF-8');
+
+function sanitizeString(string $val): string
+{
+    // Decode HTML entities first (e.g. &amp; → &), then strip any tags, then trim
+    $decoded = html_entity_decode(trim($val), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    return trim(strip_tags($decoded));
 }
 
 /**
@@ -87,7 +93,8 @@ function sanitizeString(string $val): string {
  * Order matters — more specific patterns are checked first to avoid
  * misclassification (e.g. "DevSecOps" must hit Security before DevOps Engineer).
  */
-function mapRoleType(string $title): string {
+function mapRoleType(string $title): string
+{
     $lower = strtolower($title);
 
     return match (true) {
@@ -172,8 +179,9 @@ function mapRoleType(string $title): string {
 /**
  * Build an affiliate URL if affiliate ID is defined.
  */
-function buildAffiliateUrl(string $url, string $source): string {
-    if ($source !== 'remotive' || !defined('REMOTIVE_AFFILIATE_ID') || REMOTIVE_AFFILIATE_ID === '') {
+function buildAffiliateUrl(string $url, string $source): string
+{
+    if ($source !== 'remotive' || !\defined('REMOTIVE_AFFILIATE_ID') || REMOTIVE_AFFILIATE_ID === '') {
         return $url;
     }
 
@@ -184,11 +192,11 @@ function buildAffiliateUrl(string $url, string $source): string {
 /**
  * Polyfill for mb_substr if the mbstring extension is not loaded.
  */
-if (!function_exists('mb_substr')) {
-    function mb_substr(string $string, int $start, ?int $length = null, ?string $encoding = null): string { // NOSONAR
-        if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
-            return (string)substr($string, $start, $length ?? strlen($string));
-        }
+if (!\function_exists('mb_substr')) {
+    function mb_substr(string $string, int $start, ?int $length = null, ?string $encoding = null): string // NOSONAR
+    {if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
+        return (string)substr($string, $start, $length ?? \strlen($string));
+    }
 
         preg_match_all('/./us', $string, $matches);
         if (empty($matches[0])) {
@@ -196,7 +204,7 @@ if (!function_exists('mb_substr')) {
         }
 
         $chars = $matches[0];
-        $count = count($chars);
+        $count = \count($chars);
 
         if ($start < 0) {
             $start = max(0, $count + $start);
@@ -206,13 +214,13 @@ if (!function_exists('mb_substr')) {
         }
 
         if ($length === null) {
-            return implode('', array_slice($chars, $start));
+            return implode('', \array_slice($chars, $start));
         }
 
         if ($length < 0) {
             $length = max(0, $count - $start + $length);
         }
 
-        return implode('', array_slice($chars, $start, $length));
+        return implode('', \array_slice($chars, $start, $length));
     }
 }

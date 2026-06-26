@@ -44,3 +44,41 @@ jobs:
       - name: Run root checks
         working-directory: frontend
         run: npm run check
+
+  backend-checks:
+    name: Backend Quality Gates
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: "8.3"
+          coverage: none
+          tools: composer
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHP syntax lint
+        working-directory: .
+        run: node scripts/check-backend-php.mjs
+
+      - name: PHP formatting check (PHP-CS-Fixer)
+        run: composer run format:check
+
+      - name: PHP unit tests (PHPUnit)
+        run: composer run test
