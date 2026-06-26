@@ -1,39 +1,40 @@
 <?php
-  header('Content-Type: application/json');
-  $allowedOrigins = [
+$allowedOrigins = [
     'https://nairobidevops.org',
     'https://staging.nairobidevops.org',
     'http://localhost:5173',
     'http://localhost:4000',
-  ];
-  $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-  if (in_array($origin, $allowedOrigins)) {
+];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins)) {
     header("Access-Control-Allow-Origin: $origin");
     header('Vary: Origin');
-  }
-  header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-  header('Access-Control-Allow-Headers: Content-Type');
+}
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
 
-  if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-      http_response_code(204);
-      exit;
-  }
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
 
-  require_once __DIR__ . '/db.php';
-  require_once __DIR__ . '/helpers.php';
+header('Content-Type: application/json'); // ← moved here
 
-  $action = $_GET['action'] ?? '';
-  $method = $_SERVER['REQUEST_METHOD'];
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/helpers.php';
 
-  $postActions = ['submit', 'track'];
+$action = $_GET['action'] ?? '';
+$method = $_SERVER['REQUEST_METHOD'];
 
-  if (in_array($action, $postActions, true) && $method !== 'POST') {
-      respondJson(405, ['error' => 'Method not allowed']);
-  }
+$postActions = ['submit', 'track'];
 
-  match($action) {
-      'jobs'   => require_once __DIR__ . '/endpoints/get_jobs.php',
-      'submit' => require_once __DIR__ . '/endpoints/submit_job.php',
-      'track'  => require_once __DIR__ . '/endpoints/track_click.php',
-      default  => respondJson(404, ['error' => 'Unknown action'])
-  };
+if (in_array($action, $postActions, true) && $method !== 'POST') {
+    respondJson(405, ['error' => 'Method not allowed']);
+}
+
+match($action) {
+    'jobs'   => require_once __DIR__ . '/endpoints/get_jobs.php',
+    'submit' => require_once __DIR__ . '/endpoints/submit_job.php',
+    'track'  => require_once __DIR__ . '/endpoints/track_click.php',
+    default  => respondJson(404, ['error' => 'Unknown action'])
+};

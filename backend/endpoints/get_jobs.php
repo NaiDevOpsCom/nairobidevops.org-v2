@@ -41,10 +41,29 @@ try {
     respondJson(500, ['error' => 'Database query failed']);
 }
 
+$last_updated = null;
+try {
+    $sync_stmt = $db->query("SELECT MAX(ran_at) FROM sync_log");
+    $last_updated = $sync_stmt->fetchColumn() ?: null;
+} catch (PDOException $e) {
+    // Ignore and let fallback handle it
+}
+
+if (!$last_updated) {
+    try {
+        $jobs_stmt = $db->query("SELECT MAX(fetched_at) FROM jobs WHERE is_active = 1 AND is_approved = 1");
+        $last_updated = $jobs_stmt->fetchColumn() ?: null;
+    } catch (PDOException $e) {
+        // Ignore
+    }
+}
+
 respondJson(200, [
-    'total'       => $total,
-    'page'        => $page,
-    'per_page'    => $per_page,
-    'total_pages' => $total > 0 ? (int)ceil($total / $per_page) : 0,
-    'jobs'        => $jobs
+    'total'        => $total,
+    'page'         => $page,
+    'per_page'     => $per_page,
+    'total_pages'  => $total > 0 ? (int)ceil($total / $per_page) : 0,
+    'last_updated' => $last_updated,
+    'jobs'         => $jobs
 ]);
+

@@ -28,7 +28,15 @@ interface Job {
   postedAt: string;
   closingIn?: string;
   applyUrl?: string;
-  roleType: "Platform Engineering" | "SRE" | "Cloud Architect" | "Security" | "DevOps Engineer";
+  roleType:
+    | "Platform Engineering"
+    | "SRE"
+    | "Cloud Architect"
+    | "Security"
+    | "DevOps Engineer"
+    | "Sysadmin"
+    | "Frontend Engineer"
+    | "Backend Engineer";
   locationTag:
     | "Remote (Global)"
     | "Remote (Africa Only)"
@@ -236,6 +244,9 @@ const mapBackendJobToFrontendJob = (j: Record<string, unknown>): Job => {
     "Cloud Architect",
     "Security",
     "DevOps Engineer",
+    "Sysadmin",
+    "Frontend Engineer",
+    "Backend Engineer",
   ] as const;
   type RoleType = (typeof validRoles)[number];
   const roleType = determineRoleType(rawRoleType, validRoles as unknown as string[]) as RoleType;
@@ -582,6 +593,9 @@ export default function Jobs() {
     "Cloud Architect",
     "Security",
     "DevOps Engineer",
+    "Sysadmin",
+    "Frontend Engineer",
+    "Backend Engineer",
   ];
   const locationOptions = [
     "Remote (Global)",
@@ -756,10 +770,11 @@ export default function Jobs() {
                     handleQuickFilterToggle(filter);
                     setVisibleCount(12);
                   }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${isActive
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all ${
+                    isActive
                       ? "bg-primary text-primary-foreground border-primary shadow-sm"
                       : "border-border text-muted-foreground bg-card hover:bg-accent hover:text-accent-foreground"
-                    }`}
+                  }`}
                 >
                   {filter}
                 </button>
