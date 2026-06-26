@@ -1,6 +1,6 @@
 <?php
 
-/**
+    /**
  * Send a JSON response and exit.
  */
 function respondJson(int $status, array $data): void
@@ -8,7 +8,7 @@ function respondJson(int $status, array $data): void
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_THROW_ON_ERROR);
-    exit;
+    exit(1);
 }
 
 /**
@@ -39,11 +39,11 @@ function cleanDescription(string $rawHtml): string
         $rawHtml
     );
 
-    // Step 2: Strip all remaining HTML tags (inline: strong, em, a, span, …)
-    $text = strip_tags($text);
-
-    // Step 3: Decode HTML entities — safe here because step 2 already removed tags
+    // Step 2: Decode HTML entities first (prevents injection via encoded tags)
     $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    // Step 3: Strip all remaining HTML tags (inline: strong, em, a, span, …)
+    $text = strip_tags($text);
 
     // Step 4: Collapse 3+ consecutive newlines → one blank line
     $text = preg_replace('/\n{3,}/', "\n\n", $text);

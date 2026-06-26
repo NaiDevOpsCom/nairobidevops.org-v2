@@ -28,7 +28,7 @@ function getDB(): PDO
             if (php_sapi_name() !== 'cli') {
                 http_response_code(500);
             }
-            die(json_encode(['error' => 'Database connection failed']));
+            exit(json_encode(['error' => 'Database connection failed']));
         }
     }
 

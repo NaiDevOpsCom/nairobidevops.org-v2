@@ -12,6 +12,9 @@ if (!$input || empty($input['job_id'])) {
 }
 
 $jobId = (int)$input['job_id'];
+if ($jobId <= 0) {
+    respondJson(400, ['error' => 'Invalid job_id: must be a positive integer']);
+}
 
 try {
     $stmt = $db->prepare('SELECT id FROM jobs WHERE id = ? AND is_active = 1');

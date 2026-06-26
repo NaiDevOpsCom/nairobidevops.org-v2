@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     INDEX idx_role        (role_type),
     INDEX idx_notified    (is_notified),
     INDEX idx_fetched     (fetched_at)
-  );
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
   CREATE TABLE IF NOT EXISTS sync_log (
     id            INT PRIMARY KEY AUTO_INCREMENT,

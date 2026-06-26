@@ -104,7 +104,7 @@ $whereClause = 'WHERE ' . implode(' AND ', $conditions);
 // Featured jobs always float to the top within any sort mode.
 
 $orderClause = match ($sort) {
-    'closing_soon' => 'ORDER BY is_featured DESC, closes_at ASC, posted_at DESC',
+    'closing_soon' => 'ORDER BY is_featured DESC, (CASE WHEN closes_at IS NULL THEN CAST("9999-12-31 23:59:59" AS DATETIME) ELSE closes_at END) ASC, posted_at DESC',
     'salary_desc'  => 'ORDER BY is_featured DESC, salary_max DESC, salary_min DESC, posted_at DESC',
     default        => 'ORDER BY is_featured DESC, posted_at DESC',
 };
