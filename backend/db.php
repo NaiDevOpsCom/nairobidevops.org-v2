@@ -2,9 +2,11 @@
 
 // Load correct config — config.php is symlinked by the deploy workflow
 // For local dev it won't exist, so we fall back to config.local.php
+// In CI neither file exists; skip gracefully so the autoloader doesn't fatal
+// when tools like php-cs-fixer or phpunit load this file.
 if (file_exists(__DIR__ . '/config.php')) {
     require_once __DIR__ . '/config.php';
-} else {
+} elseif (file_exists(__DIR__ . '/config.local.php')) {
     require_once __DIR__ . '/config.local.php';
 }
 
