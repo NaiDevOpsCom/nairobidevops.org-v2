@@ -1,4 +1,5 @@
 <?php
+
 /**
  * get_jobs.php
  * Returns a paginated, filtered list of active approved job listings.
@@ -18,8 +19,8 @@
 
 declare(strict_types=1);
 
-require_once dirname(__DIR__) . '/db.php';
-require_once dirname(__DIR__) . '/helpers.php';
+require_once \dirname(__DIR__) . '/db.php';
+require_once \dirname(__DIR__) . '/helpers.php';
 
 $db = getDB();
 
@@ -37,7 +38,7 @@ $offset         = ($page - 1) * $perPage;
 
 // Valid sort values — reject anything else and fall back to newest
 $validSorts = ['newest', 'closing_soon', 'salary_desc'];
-if (!in_array($sort, $validSorts, true)) {
+if (!\in_array($sort, $validSorts, true)) {
     $sort = 'newest';
 }
 
@@ -68,7 +69,7 @@ if ($q !== '') {
 
 // Role type filter (IN clause)
 if (!empty($roleTypes)) {
-    $placeholders = implode(',', array_fill(0, count($roleTypes), '?'));
+    $placeholders = implode(',', array_fill(0, \count($roleTypes), '?'));
     $conditions[] = "role_type IN ({$placeholders})";
     foreach ($roleTypes as $rt) {
         $params[] = $rt;
@@ -77,7 +78,7 @@ if (!empty($roleTypes)) {
 
 // Location type filter (IN clause)
 if (!empty($locationTypes)) {
-    $placeholders = implode(',', array_fill(0, count($locationTypes), '?'));
+    $placeholders = implode(',', array_fill(0, \count($locationTypes), '?'));
     $conditions[] = "location_type IN ({$placeholders})";
     foreach ($locationTypes as $lt) {
         $params[] = $lt;
@@ -91,7 +92,7 @@ if ($africaFriendly === 1) {
 
 // Source filter (IN clause)
 if (!empty($sources)) {
-    $placeholders = implode(',', array_fill(0, count($sources), '?'));
+    $placeholders = implode(',', array_fill(0, \count($sources), '?'));
     $conditions[] = "source IN ({$placeholders})";
     foreach ($sources as $src) {
         $params[] = $src;

@@ -1,6 +1,6 @@
 <?php
 
-    /**
+/**
  * Send a JSON response and exit.
  */
 function respondJson(int $status, array $data): void
@@ -194,9 +194,10 @@ function buildAffiliateUrl(string $url, string $source): string
  */
 if (!\function_exists('mb_substr')) {
     function mb_substr(string $string, int $start, ?int $length = null, ?string $encoding = null): string // NOSONAR
-    {if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
-        return (string)substr($string, $start, $length ?? \strlen($string));
-    }
+    {
+        if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
+            return (string)substr($string, $start, $length ?? \strlen($string));
+        }
 
         preg_match_all('/./us', $string, $matches);
         if (empty($matches[0])) {
