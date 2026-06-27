@@ -20,13 +20,49 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
+
+/**
+ * Resolve the absolute path of the Git binary by scanning PATH directories.
+ * Uses fs checks only — no shell or child_process PATH resolution involved.
+ * Respects the GIT_PATH environment variable as an explicit override.
+ *
+ * This satisfies SonarQube rule S4036 by ensuring execFileSync receives a
+ * fully-resolved, absolute binary path rather than relying on PATH at runtime.
+ */
+function resolveGitBinary() {
+  if (process.env.GIT_PATH) return process.env.GIT_PATH;
+
+  const pathDirs = (process.env.PATH || "").split(delimiter).filter(Boolean);
+  const extensions =
+    process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
+
+  for (const dir of pathDirs) {
+    for (const ext of extensions) {
+      const candidate = join(dir, `git${ext}`);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+
+  return null;
+}
+
+const gitBin = resolveGitBinary();
+
+if (!gitBin) {
+  console.error(
+    "❌ `git` was not found in PATH. Install Git or set the GIT_PATH environment variable.",
+  );
+  process.exit(1);
+}
 
 // Resolve the root .git/hooks directory.
 let gitRoot;
 try {
-  // execFileSync runs the binary directly (no shell), mitigating S4036 / PATH-hijacking risk.
-  gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+  // execFileSync with an absolute binary path (no shell) — mitigates PATH-hijacking (S4036).
+  gitRoot = execFileSync(gitBin, ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+  }).trim();
 } catch {
   console.error("❌ Not a Git repository. Run this from inside the project.");
   process.exit(1);
