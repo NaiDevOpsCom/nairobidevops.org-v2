@@ -28,6 +28,8 @@ interface Job {
   postedAt: string;
   closingIn?: string;
   applyUrl?: string;
+  /** True when applyUrl is an absolute http(s) URL — validated at mapping time. */
+  isSafeUrl: boolean;
   roleType:
     | "Platform Engineering"
     | "SRE"
@@ -251,6 +253,7 @@ const mapBackendJobToFrontendJob = (j: Record<string, unknown>): Job => {
   type RoleType = (typeof validRoles)[number];
   const roleType = determineRoleType(rawRoleType, validRoles as unknown as string[]) as RoleType;
   const applyUrl = strOr(j.affiliate_apply_url, j.apply_url, j.applyUrl) || undefined;
+  const isSafeUrl = typeof applyUrl === "string" && /^https?:\/\//.test(applyUrl);
   const rawLocType = strOr(j.location_type, j.locationType);
   const rawLocDetail = strOr(j.location_detail, j.location, j.location_label);
   const locationTag = determineLocationTag(rawLocType, rawLocDetail);
@@ -273,6 +276,7 @@ const mapBackendJobToFrontendJob = (j: Record<string, unknown>): Job => {
     isRemote,
     postedAt,
     closingIn,
+    isSafeUrl,
     applyUrl,
     roleType,
     locationTag,
@@ -408,6 +412,7 @@ function FilterSidebar({
           onCheckedChange={onAfricaToggle}
           role="switch"
           aria-checked={africaFriendly}
+          aria-label="Toggle Africa-Friendly jobs filter"
           className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted"
         />
       </div>
@@ -523,7 +528,7 @@ function JobCard({
           {renderUrgencyIndicator(job)}
         </div>
 
-        {job.applyUrl ? (
+        {job.applyUrl && job.isSafeUrl ? (
           <a
             href={job.applyUrl}
             target="_blank"
@@ -745,6 +750,7 @@ export default function Jobs() {
                   setVisibleCount(12);
                 }}
                 placeholder="Search role, tech stack, or company..."
+                aria-label="Search jobs by role, technology stack, or company"
                 className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all"
               />
             </div>
@@ -832,6 +838,7 @@ export default function Jobs() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
+                aria-label="Sort jobs by"
                 className="bg-card text-foreground border border-border rounded-md pl-3 pr-8 py-1.5 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="Newest First">Newest First</option>
@@ -880,6 +887,7 @@ export default function Jobs() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
+                    aria-label="Sort jobs by"
                     className="bg-card text-foreground border border-border rounded-md pl-3 pr-8 py-1.5 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
                   >
                     <option value="Newest First">Newest First</option>

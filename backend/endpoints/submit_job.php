@@ -1,4 +1,5 @@
 <?php
+
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
@@ -11,8 +12,20 @@ if (!$input || empty($input['title']) || empty($input['company']) || empty($inpu
 }
 
 $applyUrl = trim($input['apply_url']);
+
+// Validate URL scheme (only http/https allowed)
+$parsed = parse_url($applyUrl);
+if (!$parsed || !isset($parsed['scheme']) || ($parsed['scheme'] !== 'http' && $parsed['scheme'] !== 'https')) {
+    respondJson(400, ['error' => 'Invalid apply_url: must use http:// or https:// scheme']);
+}
+
 if (!filter_var($applyUrl, FILTER_VALIDATE_URL)) {
     respondJson(400, ['error' => 'Invalid apply_url: must be a valid URL']);
+}
+
+// Ensure required source_id is provided
+if (empty($input['source_id'])) {
+    respondJson(400, ['error' => 'Missing required field: source_id']);
 }
 
 try {

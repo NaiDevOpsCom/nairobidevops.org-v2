@@ -11,17 +11,24 @@ on:
       - pre-staging
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # Single source of truth for the PHP version used across all backend jobs.
+  # Matches the local dev environment (PHP 8.5.x) and satisfies Symfony
+  # 8.1's ">=8.4.1" requirement. Using the "8.5" minor (not a pinned patch
+  # like "8.5.7") lets setup-php always install the latest 8.5.x patch,
+  # so security/point releases land in CI automatically.
+  PHP_VERSION: "8.5"
 
 jobs:
   check:
     name: Root checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -31,12 +38,6 @@ jobs:
         with:
           node-version: 22
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
-        with:
-          php-version: "8.3"
-          coverage: none
-
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -44,3 +45,160 @@ jobs:
       - name: Run root checks
         working-directory: frontend
         run: npm run check
+
+  # ---------------------------------------------------------------------
+  # Backend: single install, shared across parallel quality-gate jobs.
+  # ---------------------------------------------------------------------
+  backend-setup:
+    name: Backend - Install dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+          tools: composer
+
+      - name: Validate composer.json/composer.lock
+        run: composer validate --strict --no-check-publish
+
+      - name: Resolve Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer download cache
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.2
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-cache-${{ env.PHP_VERSION }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            composer-cache-${{ env.PHP_VERSION }}-
+
+      - name: Install Composer dependencies
+        env:
+          COMPOSER_PROCESS_TIMEOUT: 0
+          COMPOSER_NO_INTERACTION: 1
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # Share the installed vendor/ directory with downstream jobs so they
+      # don't each need to re-run setup-php + composer install.
+      - name: Upload vendor artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-vendor
+          path: backend/vendor
+          retention-days: 1
+
+  backend-lint:
+    name: PHP syntax lint
+    needs: backend-setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Download vendor artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-vendor
+          path: backend/vendor
+      - name: PHP syntax lint
+        run: node scripts/check-backend-php.mjs
+
+  backend-format:
+    name: PHP formatting check (PHP-CS-Fixer)
+    needs: backend-setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+      - name: Download vendor artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-vendor
+          path: backend/vendor
+      - name: Run PHP-CS-Fixer
+        run: composer run format:check
+
+  backend-test:
+    name: PHPUnit
+    needs: backend-setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+      - name: Download vendor artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-vendor
+          path: backend/vendor
+      - name: Run PHPUnit
+        run: composer run test
+
+  backend-security-audit:
+    name: Composer security audit
+    needs: backend-setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+      - name: Download vendor artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-vendor
+          path: backend/vendor
+      - name: Run composer audit
+        run: composer audit --no-interaction
+
+  backend-checks:
+    name: Backend Quality Gates
+    needs:
+      - backend-lint
+      - backend-format
+      - backend-test
+      - backend-security-audit
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: All backend checks passed
+        run: echo "All backend quality gates passed."

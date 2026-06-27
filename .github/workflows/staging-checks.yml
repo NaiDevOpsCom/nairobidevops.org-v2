@@ -16,8 +16,10 @@ on:
     branches: [pre-staging]
 
 # Global environment variables for all jobs
+# Keep PHP_VERSION in sync with project-checks.yml and deploy workflows.
 env:
   NODE_VERSION: "22"
+  PHP_VERSION: "8.5"
   CACHE_VERSION: "v1"
   BUNDLE_SIZE_LIMIT_MB: "10"
   BUNDLE_SIZE_WARNING_MB: "8"
@@ -342,7 +344,7 @@ jobs:
 
   quality-summary:
     name: Quality Gates Summary
-    needs: quality-checks
+    needs: [quality-checks, backend-checks]
     runs-on: ubuntu-latest
     if: always()
 
@@ -364,3 +366,48 @@ jobs:
   # The health-check step there curls STAGING_URL after the cPanel deploy
   # completes, giving a reliable post-deploy signal rather than checking
   # a Vercel preview URL that may not exist.
+
+  backend-checks:
+    name: Backend Quality Gates
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+          tools: composer
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.2
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Setup Node.js (for syntax lint helper)
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: PHP syntax lint
+        working-directory: .
+        run: node scripts/check-backend-php.mjs
+
+      - name: PHP formatting check (PHP-CS-Fixer)
+        run: composer run format:check
+
+      - name: PHP unit tests (PHPUnit)
+        run: composer run test

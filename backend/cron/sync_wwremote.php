@@ -1,4 +1,5 @@
 <?php
+
 /**
  * sync_wwremote.php
  * Fetches DevOps-adjacent jobs from We Work Remotely RSS feeds.
@@ -21,8 +22,8 @@ declare(strict_types=1);
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 
-require_once dirname(__DIR__) . '/db.php';
-require_once dirname(__DIR__) . '/helpers.php';
+require_once \dirname(__DIR__) . '/db.php';
+require_once \dirname(__DIR__) . '/helpers.php';
 
 $startTime = time();
 
@@ -219,13 +220,15 @@ $db = getDB();
 
 // ── Dedicated exception ───────────────────────────────────────────────────────
 
-class WwrFeedException extends RuntimeException {}
+class WwrFeedException extends RuntimeException
+{
+}
 
 // ── SSL guard ─────────────────────────────────────────────────────────────────
 
 function wwrShouldDisableSsl(): bool
 {
-    if (defined('APP_ENV')) {
+    if (\defined('APP_ENV')) {
         $env = APP_ENV;
     } else {
         $env = getenv('APP_ENV') ?: 'local';
@@ -269,7 +272,9 @@ function wwrFetchViaCurl(string $url): string
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlErr  = curl_error($ch);
-    curl_close($ch);
+    if (\PHP_VERSION_ID < 80000) {
+        curl_close($ch);
+    }
 
     if ($curlErr) {
         throw new WwrFeedException("cURL error for {$url}: {$curlErr}");
@@ -317,8 +322,12 @@ function wwrFetchViaStream(string $url): string
     }
 
     $httpCode = 500;
-    if (!empty($http_response_header)) {
-        preg_match('{HTTP\/\S*\s(\d\d\d)}', $http_response_header[0], $m);
+    // PHP 8.5+: $http_response_header is deprecated; use the new function.
+    $responseHeaders = \function_exists('http_get_last_response_headers')
+        ? http_get_last_response_headers()
+        : ($http_response_header ?? []); // @phpstan-ignore-line
+    if (!empty($responseHeaders)) {
+        preg_match('{HTTP\/\S*\s(\d\d\d)}', $responseHeaders[0], $m);
         if (isset($m[1])) {
             $httpCode = (int) $m[1];
         }
@@ -341,11 +350,11 @@ function wwrFetchViaStream(string $url): string
  */
 function wwrFetchFeed(string $url): array
 {
-    $raw = function_exists('curl_init')
+    $raw = \function_exists('curl_init')
         ? wwrFetchViaCurl($url)
         : wwrFetchViaStream($url);
 
-    if (strlen($raw) > 5 * 1024 * 1024) {
+    if (\strlen($raw) > 5 * 1024 * 1024) {
         throw new WwrFeedException("Response too large (> 5 MB) for {$url}");
     }
 
@@ -443,7 +452,7 @@ function wwrMatchesPositive(string $loc): bool
 
 function wwrMatchesExactCountry(string $loc): bool
 {
-    return in_array($loc, WWR_LOCATION_COUNTRIES, true);
+    return \in_array($loc, WWR_LOCATION_COUNTRIES, true);
 }
 
 function wwrMatchesExclude(string $loc): bool
@@ -600,13 +609,13 @@ foreach ($feeds as $index => $feed) {
     try {
         $items = wwrFetchFeed($feedUrl);
     } catch (WwrFeedException $e) {
-        $msg = "FETCH ERROR: " . $e->getMessage();
+        $msg = 'FETCH ERROR: ' . $e->getMessage();
         echo $msg . "\n";
         $errors[] = $msg;
         continue;
     }
 
-    $feedCount     = count($items);
+    $feedCount     = \count($items);
     $totalFetched += $feedCount;
     echo "  → {$feedCount} items returned\n";
 
@@ -704,8 +713,8 @@ foreach ($feeds as $index => $feed) {
                 ':apply_url'      => $applyUrl,
                 ':source_id'      => $sourceId,
                 ':role_type'      => $roleType,
-                ':location_detail'=> $locationDetail !== '' ? $locationDetail : null,
-                ':africa_friendly'=> $africaFriendly,
+                ':location_detail' => $locationDetail !== '' ? $locationDetail : null,
+                ':africa_friendly' => $africaFriendly,
                 ':posted_at'      => $postedAt,
             ]);
             $totalInserted++;
@@ -724,7 +733,7 @@ foreach ($feeds as $index => $feed) {
     echo "  ✓ Feed done. Inserted so far: {$totalInserted}\n\n";
 
     // Polite delay between feed requests
-    if ($index < count($feeds) - 1) {
+    if ($index < \count($feeds) - 1) {
         sleep(WWR_SLEEP_BETWEEN);
     }
 }
@@ -743,7 +752,7 @@ try {
     $storedJobs->execute();
 
     $deactivateStmt = $db->prepare(
-        "UPDATE jobs SET is_active = 0 WHERE id = :id"
+        'UPDATE jobs SET is_active = 0 WHERE id = :id'
     );
 
     foreach ($storedJobs->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -753,7 +762,7 @@ try {
         }
     }
 } catch (PDOException $e) {
-    $msg = "CLEANUP ERROR: " . $e->getMessage();
+    $msg = 'CLEANUP ERROR: ' . $e->getMessage();
     echo $msg . "\n";
     $errors[] = $msg;
 }
@@ -786,7 +795,7 @@ echo "  Skipped:     {$totalSkipped}  (duplicates, invalid fields, or off-topic)
 echo "  Duration:    {$duration}s\n";
 
 if (!empty($errors)) {
-    echo "  Errors:      " . count($errors) . " (see sync_log for details)\n";
+    echo '  Errors:      ' . \count($errors) . " (see sync_log for details)\n";
 }
 
 echo "─────────────────────────────────\n";

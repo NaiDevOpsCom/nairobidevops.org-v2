@@ -1,4 +1,5 @@
 <?php
+
 /**
  * sync_remotive.php
  * Fetches DevOps-adjacent jobs from the Remotive public API.
@@ -23,8 +24,8 @@ declare(strict_types=1);
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 
-require_once dirname(__DIR__) . '/db.php';
-require_once dirname(__DIR__) . '/helpers.php';
+require_once \dirname(__DIR__) . '/db.php';
+require_once \dirname(__DIR__) . '/helpers.php';
 
 $startTime = time();
 
@@ -314,7 +315,9 @@ $db = getDB();
 
 // ── Dedicated exception for Remotive API failures ────────────────────────────
 
-class RemotiveApiException extends RuntimeException {}
+class RemotiveApiException extends RuntimeException
+{
+}
 
 // ── SSL guard ─────────────────────────────────────────────────────────────────
 
@@ -380,7 +383,9 @@ function fetchViaCurl(string $url, string $userAgent): string
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlErr  = curl_error($ch);
-    curl_close($ch);
+    if (\PHP_VERSION_ID < 80000) {
+        curl_close($ch);
+    }
 
     if ($curlErr) {
         throw new RemotiveApiException("cURL error for {$url}: {$curlErr}");
@@ -430,8 +435,12 @@ function fetchViaStream(string $url, string $userAgent): string
     }
 
     $httpCode = 500;
-    if (isset($http_response_header) && count($http_response_header) > 0) {
-        preg_match('{HTTP\/\S*\s(\d\d\d)}', $http_response_header[0], $matches);
+    // PHP 8.5+: $http_response_header is deprecated; use the new function.
+    $responseHeaders = \function_exists('http_get_last_response_headers')
+        ? http_get_last_response_headers()
+        : ($http_response_header ?? []); // @phpstan-ignore-line
+    if (!empty($responseHeaders)) {
+        preg_match('{HTTP\/\S*\s(\d\d\d)}', $responseHeaders[0], $matches);
         if (isset($matches[1])) {
             $httpCode = (int) $matches[1];
         }
@@ -455,12 +464,12 @@ function fetchViaStream(string $url, string $userAgent): string
  */
 function fetchRemotiveCategory(string $url, string $userAgent): array
 {
-    $response = function_exists('curl_init')
+    $response = \function_exists('curl_init')
         ? fetchViaCurl($url, $userAgent)
         : fetchViaStream($url, $userAgent);
 
     // Guard against unexpectedly large payloads (> 5 MB = likely error page)
-    if (strlen($response) > 5 * 1024 * 1024) {
+    if (\strlen($response) > 5 * 1024 * 1024) {
         throw new RemotiveApiException("Response too large (> 5 MB) for {$url} — possible error page");
     }
 
@@ -470,7 +479,7 @@ function fetchRemotiveCategory(string $url, string $userAgent): array
         throw new RemotiveApiException("JSON decode failed for {$url}: " . json_last_error_msg());
     }
 
-    if (!is_array($data)) {
+    if (!\is_array($data)) {
         throw new RemotiveApiException("Unexpected JSON root type for {$url}");
     }
 
@@ -609,7 +618,7 @@ function matchesPositiveSignal(string $loc): bool
  */
 function matchesExactCountry(string $loc): bool
 {
-    return in_array($loc, LOCATION_COUNTRIES, true);
+    return \in_array($loc, LOCATION_COUNTRIES, true);
 }
 
 /**
@@ -738,7 +747,7 @@ function extractNumbers(string $raw): array
         $numbers[] = (int) $m;
     }
 
-    $numbers = array_filter($numbers, static fn(int $n): bool => $n >= 500 && $n <= 1_000_000);
+    $numbers = array_filter($numbers, static fn (int $n): bool => $n >= 500 && $n <= 1_000_000);
     return array_values($numbers);
 }
 
@@ -766,10 +775,10 @@ function parseSalary(string $raw): array
 
     $numbers = extractNumbers($raw);
 
-    if (count($numbers) >= 2) {
+    if (\count($numbers) >= 2) {
         $result['salary_min'] = min($numbers[0], $numbers[1]);
         $result['salary_max'] = max($numbers[0], $numbers[1]);
-    } elseif (count($numbers) === 1) {
+    } elseif (\count($numbers) === 1) {
         $result['salary_min'] = $numbers[0];
     }
 
@@ -853,7 +862,7 @@ foreach (REMOTIVE_CATEGORIES as $category) {
         continue;
     }
 
-    $categoryCount  = count($jobs);
+    $categoryCount  = \count($jobs);
     $totalFetched  += $categoryCount;
     echo "  → {$categoryCount} jobs returned\n";
 
@@ -882,9 +891,9 @@ foreach (REMOTIVE_CATEGORIES as $category) {
         // from polluting the board. Narrow categories like devops-sysadmin and
         // cloud let every title through.
         if (!isRelevantForCategory($title, $category)) {
-    $totalSkipped++;
-    continue;
-}
+            $totalSkipped++;
+            continue;
+        }
 
         // Final gate — if mapRoleType returns 'Other', the title has no
         // DevOps-adjacent keywords. Skip regardless of category.
@@ -916,12 +925,12 @@ foreach (REMOTIVE_CATEGORIES as $category) {
         $description  = cleanDescription((string) ($job['description'] ?? ''));
 
         // Tags: Remotive returns an array of strings; encode as JSON for storage
-        $rawTags = is_array($job['tags'] ?? null) ? $job['tags'] : [];
+        $rawTags = \is_array($job['tags'] ?? null) ? $job['tags'] : [];
         $tags    = json_encode(
             array_values(
                 array_filter(
                     array_map('trim', $rawTags),
-                    static fn(string $t): bool => $t !== ''
+                    static fn (string $t): bool => $t !== ''
                 )
             ),
             JSON_UNESCAPED_UNICODE
@@ -1001,7 +1010,7 @@ try {
     $storedJobs->execute();
 
     $deactivateStmt = $db->prepare(
-        "UPDATE jobs SET is_active = 0 WHERE id = :id"
+        'UPDATE jobs SET is_active = 0 WHERE id = :id'
     );
 
     foreach ($storedJobs->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -1013,7 +1022,7 @@ try {
         }
     }
 } catch (PDOException $e) {
-    $msg = "CLEANUP ERROR: " . $e->getMessage();
+    $msg = 'CLEANUP ERROR: ' . $e->getMessage();
     echo $msg . "\n";
     $errors[] = $msg;
 }
@@ -1047,7 +1056,7 @@ echo "  Skipped:     {$totalSkipped}  (duplicates, invalid fields, or off-topic)
 echo "  Duration:    {$duration}s\n";
 
 if (!empty($errors)) {
-    echo "  Errors:    " . count($errors) . " (see sync_log for details)\n";
+    echo '  Errors:    ' . \count($errors) . " (see sync_log for details)\n";
 }
 
 echo "─────────────────────────────────\n";
@@ -1130,4 +1139,3 @@ if (PHP_SAPI === 'cli' && getenv('SMOKE_TEST')) {
     echo "  SMOKE TEST PASSED\n";
     exit(0);
 }
-

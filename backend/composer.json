@@ -1,0 +1,33 @@
+{
+    "name": "ndc/backend",
+    "description": "Nairobi DevOps Community - Backend API",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "files": [
+            "helpers.php",
+            "db.php"
+        ]
+    },
+    "scripts": {
+        "format": "@php vendor/bin/php-cs-fixer fix",
+        "format:check": "@php vendor/bin/php-cs-fixer fix --dry-run --diff",
+        "test": "@php vendor/bin/phpunit",
+        "test:coverage": "@php vendor/bin/phpunit --coverage-html coverage",
+        "audit": "@composer audit"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "platform": {
+            "php": "8.5.7"
+        }
+    }
+}

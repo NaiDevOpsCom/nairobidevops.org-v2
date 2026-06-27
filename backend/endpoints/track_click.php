@@ -1,4 +1,5 @@
 <?php
+
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
@@ -11,16 +12,19 @@ if (!$input || empty($input['job_id'])) {
 }
 
 $jobId = (int)$input['job_id'];
+if ($jobId <= 0) {
+    respondJson(400, ['error' => 'Invalid job_id: must be a positive integer']);
+}
 
 try {
-    $stmt = $db->prepare("SELECT id FROM jobs WHERE id = ? AND is_active = 1");
+    $stmt = $db->prepare('SELECT id FROM jobs WHERE id = ? AND is_active = 1');
     $stmt->execute([$jobId]);
 
     if (!$stmt->fetch()) {
         respondJson(404, ['error' => 'Job not found']);
     }
 
-    $insert = $db->prepare("INSERT INTO job_clicks (job_id, clicked_at) VALUES (?, NOW())");
+    $insert = $db->prepare('INSERT INTO job_clicks (job_id, clicked_at) VALUES (?, NOW())');
     $insert->execute([$jobId]);
 
     respondJson(200, ['success' => true]);

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+>
+    <testsuites>
+        <testsuite name="Backend">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>.</directory>
+        </include>
+        <exclude>
+            <directory>vendor</directory>
+            <directory>tests</directory>
+            <file>config.local.php</file>
+            <file>config.php</file>
+        </exclude>
+    </source>
+    <php>
+        <const name="APP_ENV" value="test"/>
+        <const name="DB_NAME" value="nairobidevops_jobs_test"/>
+        <const name="PHPUNIT_RUNNING" value="1"/>
+    </php>
+</phpunit>
