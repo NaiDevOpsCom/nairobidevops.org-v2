@@ -18,14 +18,15 @@
  *   - PHPUnit tests (backend)
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 
 // Resolve the root .git/hooks directory.
 let gitRoot;
 try {
-  gitRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
+  // execFileSync runs the binary directly (no shell), mitigating S4036 / PATH-hijacking risk.
+  gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 } catch {
   console.error("❌ Not a Git repository. Run this from inside the project.");
   process.exit(1);

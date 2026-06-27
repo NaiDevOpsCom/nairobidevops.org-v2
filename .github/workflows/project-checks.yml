@@ -11,9 +11,6 @@ on:
       - pre-staging
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -30,6 +27,8 @@ jobs:
   check:
     name: Root checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -53,6 +52,8 @@ jobs:
   backend-setup:
     name: Backend - Install dependencies
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: backend
@@ -101,14 +102,11 @@ jobs:
     name: PHP syntax lint
     needs: backend-setup
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
-        with:
-          php-version: ${{ env.PHP_VERSION }}
-          coverage: none
       - name: Download vendor artifact
         uses: actions/download-artifact@v4
         with:
@@ -121,6 +119,8 @@ jobs:
     name: PHP formatting check (PHP-CS-Fixer)
     needs: backend-setup
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: backend
@@ -144,6 +144,8 @@ jobs:
     name: PHPUnit
     needs: backend-setup
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: backend
@@ -167,6 +169,8 @@ jobs:
     name: Composer security audit
     needs: backend-setup
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: backend
@@ -194,6 +198,7 @@ jobs:
       - backend-test
       - backend-security-audit
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: All backend checks passed
         run: echo "All backend quality gates passed."
