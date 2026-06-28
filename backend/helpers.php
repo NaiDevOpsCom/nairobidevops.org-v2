@@ -200,7 +200,14 @@ function detectCurrency(string $raw): string
 
 /**
  * Detect the pay period in a raw salary string.
- * Returns 'annual' or 'monthly' (default).
+ * Returns 'annual' or 'monthly'.
+ *
+ * Explicit keyword detection takes priority. When no keyword is present we
+ * fall back to a magnitude heuristic: if the largest numeric value found in
+ * the string is >= 20,000 we treat the figures as annual, since monthly
+ * salaries rarely reach that threshold. This prevents Remotive salaries that
+ * omit a period indicator (e.g. "$40,000–$60,000") from being misclassified
+ * as monthly and displayed without the ÷12 normalisation.
  */
 function detectPeriod(string $raw): string
 {
@@ -208,7 +215,36 @@ function detectPeriod(string $raw): string
              || stripos($raw, 'annual') !== false
              || stripos($raw, 'yr')     !== false;
 
-    return $isAnnual ? 'annual' : 'monthly';
+    if ($isAnnual) {
+        return 'annual';
+    }
+
+    $isMonthly = stripos($raw, 'month') !== false
+              || stripos($raw, '/mo')   !== false
+              || stripos($raw, 'mo.')   !== false;
+
+    if ($isMonthly) {
+        return 'monthly';
+    }
+
+    // No explicit period keyword — use magnitude heuristic.
+    // Extract the largest numeric value in the string (honouring 'k' suffix).
+    preg_match_all('/[\d,]+k?/i', $raw, $matches);
+    $max = 0;
+    foreach ($matches[0] as $m) {
+        $m = str_replace(',', '', $m);
+        if (stripos($m, 'k') !== false) {
+            $val = (int) str_ireplace('k', '', $m) * 1000;
+        } else {
+            $val = (int) $m;
+        }
+        if ($val > $max) {
+            $max = $val;
+        }
+    }
+
+    // Values >= 20,000 are almost certainly annual figures.
+    return $max >= 20_000 ? 'annual' : 'monthly';
 }
 
 /**
