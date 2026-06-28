@@ -229,12 +229,13 @@ function detectPeriod(string $raw): string
 
     // No explicit period keyword — use magnitude heuristic.
     // Extract the largest numeric value in the string (honouring 'k' suffix).
-    preg_match_all('/[\d,]+k?/i', $raw, $matches);
+    // The pattern handles integers, comma-grouped numbers, and decimals (e.g. 25.5k).
+    preg_match_all('/[\d,]*\.?\d+k?/i', $raw, $matches);
     $max = 0;
     foreach ($matches[0] as $m) {
         $m = str_replace(',', '', $m);
         if (stripos($m, 'k') !== false) {
-            $val = (int) str_ireplace('k', '', $m) * 1000;
+            $val = (int) round((float) str_ireplace('k', '', $m) * 1000);
         } else {
             $val = (int) $m;
         }
@@ -256,13 +257,13 @@ function detectPeriod(string $raw): string
  */
 function extractSalaryNumbers(string $raw): array
 {
-    preg_match_all('/[\d,]+k?/i', $raw, $matches);
+    preg_match_all('/[\d,]*\.?\d+k?/i', $raw, $matches);
     $numbers = [];
 
     foreach ($matches[0] as $m) {
         $m = str_replace(',', '', $m);
         if (stripos($m, 'k') !== false) {
-            $m = (int) str_ireplace('k', '', $m) * 1000;
+            $m = (int) round((float) str_ireplace('k', '', $m) * 1000);
         }
         $numbers[] = (int) $m;
     }
