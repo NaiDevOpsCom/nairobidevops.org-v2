@@ -176,6 +176,112 @@ function mapRoleType(string $title): string
     };
 }
 
+// ── Salary helpers ────────────────────────────────────────────────────────────
+//
+// These are shared by sync_remotive.php and sync_wwremote.php.
+// Remotive returns a dedicated salary string from its JSON API.
+// WWR has no salary field — the helpers are called on text extracted
+// from the job description CDATA when a salary pattern is found.
+
+/**
+ * Detect the currency symbol or code in a raw salary string.
+ * Returns 'EUR', 'GBP', or 'USD' (default).
+ */
+function detectCurrency(string $raw): string
+{
+    if (stripos($raw, 'EUR') !== false || str_contains($raw, '€')) {
+        return 'EUR';
+    }
+    if (stripos($raw, 'GBP') !== false || str_contains($raw, '£')) {
+        return 'GBP';
+    }
+    return 'USD';
+}
+
+/**
+ * Detect the pay period in a raw salary string.
+ * Returns 'annual' or 'monthly' (default).
+ */
+function detectPeriod(string $raw): string
+{
+    $isAnnual = stripos($raw, 'year')   !== false
+             || stripos($raw, 'annual') !== false
+             || stripos($raw, 'yr')     !== false;
+
+    return $isAnnual ? 'annual' : 'monthly';
+}
+
+/**
+ * Extract numeric salary figures from a raw string.
+ * Handles formats like "$4,000", "70k", "90000".
+ * Filters out spurious year values (< 500 or > 1,000,000).
+ *
+ * @return int[]
+ */
+function extractSalaryNumbers(string $raw): array
+{
+    preg_match_all('/[\d,]+k?/i', $raw, $matches);
+    $numbers = [];
+
+    foreach ($matches[0] as $m) {
+        $m = str_replace(',', '', $m);
+        if (stripos($m, 'k') !== false) {
+            $m = (int) str_ireplace('k', '', $m) * 1000;
+        }
+        $numbers[] = (int) $m;
+    }
+
+    $numbers = array_filter($numbers, static fn (int $n): bool => $n >= 500 && $n <= 1_000_000);
+    return array_values($numbers);
+}
+
+/**
+ * Parse a free-text salary string into structured min/max/currency/period.
+ *
+ * Returns nulls for fields that cannot be parsed — callers must handle nulls.
+ * Annual salaries are normalised to monthly for consistency across sources.
+ *
+ * @return array{salary_min: int|null, salary_max: int|null, salary_currency: string, salary_period: string}
+ */
+function parseSalary(string $raw): array
+{
+    $result = [
+        'salary_min'      => null,
+        'salary_max'      => null,
+        'salary_currency' => 'USD',
+        'salary_period'   => 'monthly',
+    ];
+
+    if (trim($raw) === '') {
+        return $result;
+    }
+
+    $result['salary_currency'] = detectCurrency($raw);
+    $result['salary_period']   = detectPeriod($raw);
+
+    $numbers = extractSalaryNumbers($raw);
+
+    if (\count($numbers) >= 2) {
+        $result['salary_min'] = min($numbers[0], $numbers[1]);
+        $result['salary_max'] = max($numbers[0], $numbers[1]);
+    } elseif (\count($numbers) === 1) {
+        $result['salary_min'] = $numbers[0];
+    }
+
+    // Normalise annual figures to monthly for consistency across sources
+    if ($result['salary_period'] === 'annual') {
+        if ($result['salary_min'] !== null) {
+            $result['salary_min'] = (int) round($result['salary_min'] / 12);
+        }
+        if ($result['salary_max'] !== null) {
+            $result['salary_max'] = (int) round($result['salary_max'] / 12);
+        }
+        $result['salary_period'] = 'monthly';
+    }
+
+    return $result;
+}
+
 /**
  * Build an affiliate URL if affiliate ID is defined.
  */

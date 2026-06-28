@@ -10,7 +10,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
@@ -184,7 +184,8 @@ function UrgencyIndicator({ job }: { readonly job: Job }) {
         <span
           className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse"
           aria-hidden="true"
-        /> Closing today
+        />{" "}
+        Closing today
       </span>
     );
   }
@@ -224,7 +225,7 @@ function JobCard({ job }: { readonly job: Job }) {
   return (
     <article
       className={[
-        "flex flex-col md:flex-row gap-4 p-5 justify-between items-start md:items-center",
+        "relative flex flex-col md:flex-row gap-4 p-5 justify-between items-start md:items-center",
         "rounded-xl border transition-all duration-150",
         isFeatured
           ? "bg-[#141f16] border-primary/20 shadow-sm"
@@ -233,7 +234,7 @@ function JobCard({ job }: { readonly job: Job }) {
     >
       {/* Featured badge */}
       {isFeatured && (
-        <div className="absolute -mt-2 ml-4">
+        <div className="absolute -top-2 left-4">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/20 text-primary border border-primary/30">
             ⭐ Featured
           </span>
@@ -287,8 +288,8 @@ function JobCard({ job }: { readonly job: Job }) {
                 {tag}
               </span>
             ))}
-            {job.tags.length > 4 && (
-              <span className="text-xs text-muted-foreground">+{job.tags.length - 4}</span>
+            {job.tags.length > 3 && (
+              <span className="text-xs text-muted-foreground">+{job.tags.length - 3}</span>
             )}
           </div>
 
@@ -392,7 +393,7 @@ function FilterPanel({
         {activeCount > 0 && (
           <button
             onClick={onClear}
-            className="text-xs font-semibold text-primary hover:underline focus:outline-none"
+            className="text-xs font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Clear all
           </button>
@@ -575,7 +576,36 @@ export default function Jobs() {
   const totalMembers = statisticsData.find((s) => s.id === "community-members")?.number ?? "4,000+";
   const totalEvents = statisticsData.find((s) => s.id === "events")?.number ?? "70+";
 
-  const closingSoonCount = jobs.filter(
+  const [allJobsForCounting, setAllJobsForCounting] = useState<Job[]>([]);
+  const [allJobsFetched, setAllJobsFetched] = useState(false);
+
+  useEffect(() => {
+    if (allJobsFetched) return;
+
+    const controller = new AbortController();
+    const fetchAllJobs = async () => {
+      try {
+        const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+        const url = `${apiBase}/?action=jobs&page=1&per_page=1000`;
+        const response = await fetch(url, { signal: controller.signal });
+        if (response.ok) {
+          const data = await response.json();
+          setAllJobsForCounting(data.jobs || []);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("Failed to fetch job count:", err);
+        }
+      } finally {
+        setAllJobsFetched(true);
+      }
+    };
+
+    fetchAllJobs();
+    return () => controller.abort();
+  }, [allJobsFetched]);
+
+  const closingSoonCount = allJobsForCounting.filter(
     (j) => j.days_remaining !== null && j.days_remaining <= 7
   ).length;
 
@@ -611,13 +641,13 @@ export default function Jobs() {
               {isLoading ? "—" : `${total} open roles`}
             </span>
             <span className="text-white/30 hidden md:inline">|</span>
-            <span className="text-white/70">
+            <span className="text-white/80">
               {closingSoonCount > 0
                 ? `${closingSoonCount} closing this week`
                 : "Updated " + lastSync}
             </span>
-            <span className="text-white/30 hidden md:inline">|</span>
-            <span className="text-white/50">Updated {lastSync}</span>
+            <span className="text-white/50 hidden md:inline">|</span>
+            <span className="text-white/70">Updated {lastSync}</span>
           </div>
 
           {/* Search bar */}
@@ -805,7 +835,11 @@ export default function Jobs() {
                 <Button
                   variant="outline"
                   className="mt-1 gap-2"
-                  onClick={() => patchFilters({ page: 1 })}
+                  onClick={() => {
+                    patchFilters({ page: 1 });
+                    // Force a fetch by updating filters without setting page
+                    setFilters((prev) => ({ ...prev, page: 1 }));
+                  }}
                 >
                   <RefreshCw className="h-4 w-4" />
                   Retry
@@ -857,7 +891,7 @@ export default function Jobs() {
       </main>
 
       {/* ── Employer CTA ─────────────────────────────────────────────────── */}
-      <section className="bg-ndc-darkblue text-white border-t border-white/10 py-16">
+      <section className="bg-ndc-darkblue text-[#F5F5F7] border-t border-white/10 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
             {/* Left: copy */}
@@ -871,12 +905,12 @@ export default function Jobs() {
                 Post a role and reach engineers actively building Africa&apos;s infrastructure.
               </p>
               <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-2">
-                <Button className="bg-primary text-white hover:bg-primary/90 font-semibold px-6">
+                <Button className="flex items-center text-lg px-8 py-4 hover:bg-white hover:text-primary transition-colors duration-200 overflow-hidden">
                   Post a Job →
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10 font-medium px-6"
+                  className="flex items-center text-lg px-8 py-4 bg-white/10 border-white/20 text-white hover:bg-white hover:text-black overflow-hidden"
                 >
                   Learn about featuring
                 </Button>

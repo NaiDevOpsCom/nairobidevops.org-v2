@@ -11,8 +11,8 @@
  *   php cron\works\migrate_clean_descriptions.php
  */
 
-require_once \dirname(__DIR__, 1) . '/db.php';
-require_once \dirname(__DIR__, 1) . '/helpers.php'; // provides cleanDescription()
+require_once \dirname(__DIR__) . '/db.php';
+require_once \dirname(__DIR__) . '/helpers.php'; // provides cleanDescription()
 
 $db = getDB();
 

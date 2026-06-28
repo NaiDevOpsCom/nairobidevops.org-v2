@@ -505,6 +505,48 @@ function wwrIsRelevant(string $title): bool
     return false;
 }
 
+// ── Salary hint extractor ─────────────────────────────────────────────────────
+
+/**
+ * Scan a WWR job description CDATA block for salary patterns and return
+ * the first matching snippet for parseSalary() to process.
+ *
+ * WWR has no dedicated salary RSS field, so this is best-effort. It will
+ * match patterns like:
+ *   "$80,000 – $120,000/year"   →  "$80,000 – $120,000/year"
+ *   "Salary: $4,000/month"      →  "$4,000/month"
+ *   "€60k per year"             →  "€60k per year"
+ *
+ * Returns an empty string when no salary pattern is found, which causes
+ * parseSalary() to return all-null — that is the correct outcome for
+ * listings that don't publish compensation.
+ */
+function wwrExtractSalaryHint(string $descriptionCdata): string
+{
+    // Strip HTML so patterns aren't broken across tags (e.g. <strong>$80k</strong>)
+    $plain = strip_tags($descriptionCdata);
+
+    $patterns = [
+        // Range with currency: $80k – $120k, $80,000–$120,000
+        '/[\$€£][\d,]+k?\s*[-–—]\s*\$?[\d,]+k?(?:\s*\/\s*(?:year|yr|month|mo))?/i',
+        // "Salary: $X" or "Salary range: $X"
+        '/salary(?:\s+range)?[:\s]+[\$€£]?[\d,]+k?(?:\s*[-–]\s*[\$€£]?[\d,]+k?)?/i',
+        // "$X per year/month" or "$X/year"
+        '/[\$€£][\d,]+k?\s*(?:\/|\bper\b)\s*(?:year|yr|annual|month|mo)/i',
+        // "USD/EUR/GBP X" or "X USD"
+        '/(?:USD|EUR|GBP)\s+[\d,]+k?(?:\s*[-–]\s*[\d,]+k?)?/i',
+        '/[\d,]+k?\s*(?:USD|EUR|GBP)/i',
+    ];
+
+    foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $plain, $match)) {
+            return $match[0];
+        }
+    }
+
+    return '';
+}
+
 // ── Deduplication ─────────────────────────────────────────────────────────────
 
 function wwrJobExists(PDO $db, string $sourceId): bool
@@ -519,17 +561,28 @@ function wwrJobExists(PDO $db, string $sourceId): bool
 // ── Refresh existing rows ─────────────────────────────────────────────────────
 
 /**
- * Keep already-stored WWR jobs clean across re-syncs.
- * Updates description when changed, backfills africa_friendly when now qualifying.
+ * Keep already-stored WWR jobs clean across re-syncs without re-inserting them.
+ *
+ * Required params:
+ *   $db, $sourceId, $cleanDesc, $locationDetail, $africaFriendly
+ *
+ * Optional enrichment via $extras array (all keys optional, safe to omit):
+ *   'logo'   string  — company_logo_url; backfilled when stored row is NULL
+ *   'tags'   string  — JSON-encoded tag array; backfilled when stored row is NULL
+ *   'salary' array   — parseSalary() result; backfilled when salary_min is NULL
  */
 function wwrRefreshJob(
     PDO    $db,
     string $sourceId,
     string $cleanDesc,
     string $locationDetail,
-    int    $africaFriendly
+    int    $africaFriendly,
+    array  $extras = []
 ): void {
-    // Refresh description when changed
+    $logoUrl = (string) ($extras['logo']   ?? '');
+    $tags    = (string) ($extras['tags']   ?? '[]');
+    $salary  = (array)  ($extras['salary'] ?? []);
+    // Refresh description when it has changed or was NULL
     $db->prepare(
         "UPDATE jobs
             SET description = :desc
@@ -559,6 +612,46 @@ function wwrRefreshJob(
                 AND africa_friendly = 0"
         )->execute([':sid' => $sourceId]);
     }
+
+    // Backfill company_logo_url when it was NULL and we now have a URL
+    if ($logoUrl !== '') {
+        $db->prepare(
+            "UPDATE jobs
+                SET company_logo_url = :logo
+              WHERE source = 'weworkremotely'
+                AND source_id = :sid
+                AND company_logo_url IS NULL"
+        )->execute([':logo' => $logoUrl, ':sid' => $sourceId]);
+    }
+
+    // Backfill tags when they were NULL
+    $db->prepare(
+        "UPDATE jobs
+            SET tags = :tags
+          WHERE source = 'weworkremotely'
+            AND source_id = :sid
+            AND tags IS NULL"
+    )->execute([':tags' => $tags, ':sid' => $sourceId]);
+
+    // Backfill salary fields when salary_min was NULL and we now have a value
+    if (!empty($salary['salary_min'])) {
+        $db->prepare(
+            "UPDATE jobs
+                SET salary_min      = :min,
+                    salary_max      = :max,
+                    salary_currency = :cur,
+                    salary_period   = :per
+              WHERE source = 'weworkremotely'
+                AND source_id = :sid
+                AND salary_min IS NULL"
+        )->execute([
+            ':min' => $salary['salary_min'],
+            ':max' => $salary['salary_max'],
+            ':cur' => $salary['salary_currency'],
+            ':per' => $salary['salary_period'],
+            ':sid' => $sourceId,
+        ]);
+    }
 }
 
 // ── Prepared INSERT ───────────────────────────────────────────────────────────
@@ -567,6 +660,7 @@ $insertStmt = $db->prepare("
     INSERT INTO jobs (
         title,
         company,
+        company_logo_url,
         description,
         apply_url,
         source,
@@ -575,6 +669,11 @@ $insertStmt = $db->prepare("
         location_type,
         location_detail,
         africa_friendly,
+        salary_min,
+        salary_max,
+        salary_currency,
+        salary_period,
+        tags,
         posted_at,
         is_active,
         is_approved,
@@ -582,6 +681,7 @@ $insertStmt = $db->prepare("
     ) VALUES (
         :title,
         :company,
+        :company_logo_url,
         :description,
         :apply_url,
         'weworkremotely',
@@ -590,6 +690,11 @@ $insertStmt = $db->prepare("
         'international_remote',
         :location_detail,
         :africa_friendly,
+        :salary_min,
+        :salary_max,
+        :salary_currency,
+        :salary_period,
+        :tags,
         :posted_at,
         1,
         1,
@@ -688,13 +793,71 @@ foreach ($feeds as $index => $feed) {
         // ── Description: strip HTML ───────────────────────────────────────────
         $description = cleanDescription($rawDescription);
 
+        // ── Company logo: prefer <enclosure url="...">, fall back to first <img> ──
+        // WWR RSS items include a company logo via an <enclosure> element.
+        // The URL lives in the 'url' XML attribute, not as element text, so
+        // SimpleXML accesses it via $item->enclosure['url'].
+        $logoUrl = '';
+        if (isset($item->enclosure) && !empty((string) $item->enclosure['url'])) {
+            $candidate = trim((string) $item->enclosure['url']);
+            if (filter_var($candidate, FILTER_VALIDATE_URL) !== false) {
+                $logoUrl = $candidate;
+            }
+        }
+        // Fallback: extract first <img src="..."> from description CDATA
+        if ($logoUrl === '' && preg_match('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $rawDescription, $imgMatch)) {
+            $candidate = trim($imgMatch[1]);
+            if (filter_var($candidate, FILTER_VALIDATE_URL) !== false) {
+                $logoUrl = $candidate;
+            }
+        }
+
+        // ── Tags: collect RSS <category> elements + derive a slug from the feed URL ──
+        // WWR items may carry one or more <category> children.
+        // We also append the feed's category slug (e.g. "devops sysadmin")
+        // so every job has at least one searchable tag.
+        $rawTags = [];
+        foreach (($item->category ?? []) as $cat) {
+            $catStr = trim((string) $cat);
+            if ($catStr !== '') {
+                $rawTags[] = $catStr;
+            }
+        }
+        // Derive a human-readable tag from the feed URL slug
+        if (preg_match('/categories\/remote-(.+?)-jobs\.rss/', $feedUrl, $slugMatch)) {
+            $slugTag = str_replace('-', ' ', $slugMatch[1]);
+            if ($slugTag !== '' && !\in_array($slugTag, $rawTags, true)) {
+                $rawTags[] = $slugTag;
+            }
+        }
+        $tags = json_encode(
+            array_values(
+                array_filter(
+                    array_map('trim', $rawTags),
+                    static fn (string $t): bool => $t !== ''
+                )
+            ),
+            JSON_UNESCAPED_UNICODE
+        );
+
+        // ── Salary: attempt to parse from description CDATA ───────────────────
+        // WWR RSS has no dedicated salary field. We scan the plain-text version
+        // of the description for common salary patterns (e.g. "$80k–$120k/year",
+        // "USD 4,000/month"). This will be null for most listings — that is
+        // expected and acceptable; it matches what the source provides.
+        $salary = parseSalary(wwrExtractSalaryHint($rawDescription));
+
         // ── Posted at ─────────────────────────────────────────────────────────
         $parsedTime = strtotime($rawPubDate);
         $postedAt   = date('Y-m-d H:i:s', $parsedTime !== false ? $parsedTime : time());
 
         // ── Deduplication ─────────────────────────────────────────────────────
         if (wwrJobExists($db, $sourceId)) {
-            wwrRefreshJob($db, $sourceId, $description, $locationDetail, $africaFriendly);
+            wwrRefreshJob($db, $sourceId, $description, $locationDetail, $africaFriendly, [
+                'logo'   => $logoUrl,
+                'tags'   => $tags,
+                'salary' => $salary,
+            ]);
             $totalSkipped++;
             continue;
         }
@@ -708,15 +871,21 @@ foreach ($feeds as $index => $feed) {
         // ── Insert ────────────────────────────────────────────────────────────
         try {
             $insertStmt->execute([
-                ':title'          => $title,
-                ':company'        => $company,
-                ':description'    => $description,
-                ':apply_url'      => $applyUrl,
-                ':source_id'      => $sourceId,
-                ':role_type'      => $roleType,
+                ':title'           => $title,
+                ':company'         => $company,
+                ':company_logo_url' => $logoUrl !== '' ? $logoUrl : null,
+                ':description'     => $description,
+                ':apply_url'       => $applyUrl,
+                ':source_id'       => $sourceId,
+                ':role_type'       => $roleType,
                 ':location_detail' => $locationDetail !== '' ? $locationDetail : null,
                 ':africa_friendly' => $africaFriendly,
-                ':posted_at'      => $postedAt,
+                ':salary_min'      => $salary['salary_min'],
+                ':salary_max'      => $salary['salary_max'],
+                ':salary_currency' => $salary['salary_currency'],
+                ':salary_period'   => $salary['salary_period'],
+                ':tags'            => $tags,
+                ':posted_at'       => $postedAt,
             ]);
             $totalInserted++;
         } catch (PDOException $e) {

@@ -23,7 +23,7 @@ export interface Job {
   title: string;
   company: string;
   company_logo_url: string | null;
-  role_type: RoleType | string;
+  role_type: RoleType | (string & {});
   location_type: LocationType;
   location_detail: string | null;
   africa_friendly: boolean;
@@ -157,7 +157,17 @@ export function useJobs(filters: JobFilters): UseJobsResult {
   const [isError, setIsError] = useState(false);
 
   // Internal page state — owned by the hook so setPage can trigger a re-fetch
-  const [currentPage, setCurrentPage] = useState(filters.page);
+  const [currentPage, setCurrentPage] = useState<number>(filters.page);
+
+  // Sync internal page with external filters.page when they differ
+  useEffect(() => {
+    // Detect a change from external filters.page
+    const pageChanged = filters.page !== currentPage;
+    if (pageChanged) {
+      // Update currentPage to match filters.page, which will trigger a fetch
+      setCurrentPage(filters.page);
+    }
+  }, [filters.page, currentPage]);
 
   // Debounced search term — updated after SEARCH_DEBOUNCE_MS of silence
   const [debouncedQ, setDebouncedQ] = useState(filters.q);
@@ -250,6 +260,8 @@ export function useJobs(filters: JobFilters): UseJobsResult {
         } else {
           setLastSync("—");
         }
+
+        setIsLoading(false);
       } catch (err) {
         // Ignore AbortError — it's expected when a newer request cancels this one
         if (err instanceof Error && err.name === "AbortError") return;
@@ -259,7 +271,6 @@ export function useJobs(filters: JobFilters): UseJobsResult {
         setJobs([]);
         setTotal(0);
         setTotalPages(0);
-      } finally {
         setIsLoading(false);
       }
     };
