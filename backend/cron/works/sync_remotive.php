@@ -24,8 +24,9 @@ declare(strict_types=1);
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 
-require_once \dirname(__DIR__) . '/db.php';
-require_once \dirname(__DIR__) . '/helpers.php';
+$basePath = __DIR__ . '/../../';
+require_once $basePath . 'db.php';
+require_once $basePath . 'helpers.php';
 
 $startTime = time();
 
