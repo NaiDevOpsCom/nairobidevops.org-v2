@@ -300,14 +300,18 @@ jobs:
 
             let raw = '';
             try {
+              // Cap at 500 commits to prevent unbounded output on first releases
+              // (range = 'HEAD' pulls full history when no prior tag exists).
+              // %b (commit body) is not used by the parser below — drop it to
+              // avoid inflating the string with multi-line commit descriptions.
               raw = require('child_process')
-                .execSync(`git log ${range} --format="%s|||%b"`, {
+                .execSync(`git log ${range} --format="%s" -n 500`, {
                   encoding: 'utf8', maxBuffer: 10 * 1024 * 1024
                 }).trim();
             } catch {}
 
             for (const line of raw.split('\n').filter(Boolean)) {
-              const [s] = line.split('|||');
+              const s = line;
               if (!s || /bump version|release \d|^chore: release v/i.test(s)) continue;
 
               const t = s.trim();
@@ -349,7 +353,7 @@ jobs:
 
             if (!md.includes('- ')) md += '- No significant changes captured for this release.\n';
 
-            // Write CHANGELOG.md
+            // Write CHANGELOG.md (full content — no size limit applies here)
             const fs = require('fs');
             const header = '# Changelog\n\n';
             let existing = '';
@@ -358,8 +362,22 @@ jobs:
             const separator = existing.startsWith(header) ? '' : (header + '\n');
             fs.writeFileSync('CHANGELOG.md', separator + md + '\n---\n\n' + existing.replace(/^# Changelog\n\n?/, ''));
 
-            // Write release notes to file (avoids shell escaping issues)
-            fs.writeFileSync('.release-notes.md', md);
+            // Write release notes — truncated to GitHub's 125,000 character API hard limit.
+            // CHANGELOG.md above always gets the full content; only the Release body is capped.
+            // The truncation notice tells readers where to find the full history.
+            const GITHUB_RELEASE_BODY_LIMIT = 125_000;
+            const HEADROOM = 1_000; // leave room for the notice itself
+            const MAX_CHARS = GITHUB_RELEASE_BODY_LIMIT - HEADROOM;
+            let releaseNotes = md;
+            if (releaseNotes.length > MAX_CHARS) {
+              const truncationNotice =
+                '\n\n---\n> ⚠️ **Release notes were truncated** to fit GitHub\'s 125,000 character limit. ' +
+                'See [CHANGELOG.md](./CHANGELOG.md) in the repository for the complete history.\n';
+              releaseNotes = releaseNotes.slice(0, MAX_CHARS - truncationNotice.length) + truncationNotice;
+              core.warning(`Release notes exceeded ${GITHUB_RELEASE_BODY_LIMIT} characters and were truncated.`);
+            }
+            core.notice(`Release notes size: ${releaseNotes.length} characters (limit: ${GITHUB_RELEASE_BODY_LIMIT})`);
+            fs.writeFileSync('.release-notes.md', releaseNotes);
 
       - name: Commit CHANGELOG.md
         if: steps.guard.outputs.skip == 'false'
