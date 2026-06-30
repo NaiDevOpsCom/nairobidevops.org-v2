@@ -260,9 +260,9 @@ Review checklist:
 
 | File                                                                                                                    | Purpose       |
 | ----------------------------------------------------------------------------------------------------------------------- | ------------- |
-| [`client/src/utils/safeNavigate.ts`](../client/src/utils/safeNavigate.ts)                                               | Core utility  |
-| [`client/src/utils/__tests__/safeNavigate.test.ts`](../client/src/utils/__tests__/safeNavigate.test.ts)                 | Unit tests    |
-| [`client/src/components/landing/herosection/HeroSlide.tsx`](../client/src/components/landing/herosection/HeroSlide.tsx) | Example usage |
+| [`frontend/client/src/utils/safeNavigate.ts`](../../../frontend/client/src/utils/safeNavigate.ts)                                               | Core utility  |
+| [`frontend/client/src/utils/__tests__/safeNavigate.test.ts`](../../../frontend/client/src/utils/__tests__/safeNavigate.test.ts)                 | Unit tests    |
+| [`frontend/client/src/components/landing/herosection/HeroSlide.tsx`](../../../frontend/client/src/components/landing/herosection/HeroSlide.tsx) | Example usage |
 
 ---
 

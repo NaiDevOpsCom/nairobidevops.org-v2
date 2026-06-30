@@ -31,4 +31,15 @@ class HelpersTest extends TestCase
         $result = cleanDescription($input);
         $this->assertStringNotContainsString("\n\n\n", $result);
     }
+
+    public function testMapRoleTypeClassifiesSreAndSecurityTitles(): void
+    {
+        $this->assertSame('SRE', mapRoleType('Site Reliability Engineer'));
+        $this->assertSame('Security', mapRoleType('Application Security Engineer'));
+    }
+
+    public function testMapRoleTypeDefaultsToDevOpsEngineerForUnknownTitles(): void
+    {
+        $this->assertSame('DevOps Engineer', mapRoleType('Operations Specialist'));
+    }
 }

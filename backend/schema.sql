@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 
   CREATE TABLE IF NOT EXISTS notifications_log (
     id                INT PRIMARY KEY AUTO_INCREMENT,
-    channel           ENUM('telegram','slack','whatsapp','twitter','linkedin') NOT NULL,
+    channel           ENUM('telegram','discord','whatsapp','twitter','linkedin') NOT NULL,
     notification_type ENUM('daily_digest','weekly_roundup','instant_alert') NOT NULL,
     job_ids           JSON,
     message_preview   TEXT,

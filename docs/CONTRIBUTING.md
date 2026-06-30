@@ -37,31 +37,65 @@ This is an internal project. Contributors are typically invited team members, bu
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js** (v20 or later recommended)
-- **npm** (comes with Node.js)
+- **Node.js** (v20 or later recommended) and **npm**
+- **PHP** (v8.2 or later recommended)
+- **MySQL / MariaDB** (e.g., via WampServer, XAMPP, or standalone)
+- **Composer** (PHP dependency manager)
 
-Follow these steps to get your development environment ready:
+### Frontend Setup
 
-1.  **Clone the Repository**
-
-    ```bash
-    git clone <repository-url>
-    cd ndc-redesign-website
-    ```
-
-2.  **Install Dependencies**
-    Use `npm ci` to install dependencies based on the `package-lock.json` file. This ensures a consistent and reliable setup that matches our CI environment.
+1.  **Install frontend dependencies:**
 
     ```bash
+    cd frontend
     npm ci
     ```
 
-3.  **Run the Development Server**
-    This command starts the Vite development server with hot-reloading.
+2.  **Start the frontend dev server:**
+
     ```bash
     npm run dev
     ```
+
     The application will be available at `http://localhost:5173`.
+
+### Backend Setup
+
+1.  **Install backend dependencies:**
+
+    ```bash
+    cd backend
+    composer install
+    ```
+
+2.  **Configure local environment:**
+
+    ```bash
+    cp config.example.php config.local.php
+    ```
+
+    Edit `config.local.php` to set your local MySQL credentials (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`).
+
+3.  **Create database and import schema:**
+
+    ```bash
+    mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS nairobidevops_jobs_local;"
+    mysql -u root -p nairobidevops_jobs_local < schema.sql
+    ```
+
+4.  **Verify connection:**
+
+    ```bash
+    php check_db.php
+    ```
+
+5.  **Start the backend server:**
+
+    ```bash
+    php -S localhost:8000
+    ```
+
+    Test it at `http://localhost:8000/?action=jobs`.
 
 ---
 
@@ -146,10 +180,11 @@ We use a branching model based on `main` and `pre-dev` (staging) branches:
 
 ## Code Quality and Standards
 
-### Linting and Formatting
+### Frontend
 
-- **Prettier**: We use Prettier for consistent code formatting. Run `npm run format` to format your code automatically.
-- **ESLint**: We use ESLint to catch potential bugs, security issues, and enforce best practices. Run `npm run lint` to check your code.
+- **Prettier**: Used for consistent code formatting. Run `npm run format` from `frontend/` to format automatically.
+- **ESLint**: Used to catch potential bugs, security issues, and enforce best practices. Run `npm run lint` from `frontend/`.
+- **TypeScript**: Strict type checking via `npm run typecheck`.
 
 **Key Linting Rules:**
 
@@ -158,9 +193,26 @@ We use a branching model based on `main` and `pre-dev` (staging) branches:
 - **Imports**: `eslint-plugin-unused-imports` ensures a clean codebase by stripping unused imports.
 - **Best Practices**: Stricter rules are in place. Address warnings (e.g., regarding impure functions) rather than suppressing them.
 
+**Run all frontend checks together:**
+```bash
+cd frontend && npm run check
+```
+
+### Backend
+
+- **PHP-CS-Fixer**: Used for PHP code style. Configured in `backend/.php-cs-fixer.php` with PSR-12 rules.
+
+Run from the `backend/` directory:
+
+```bash
+composer format:check   # Check style without modifying
+composer format         # Auto-fix style issues
+```
+
 ### Testing
 
-- **Vitest**: The project uses Vitest for unit and integration tests. Run `npm run test` to execute the test suite. All new features should include corresponding tests.
+- **Frontend (Vitest)**: Run `npm run test` from `frontend/` for unit and integration tests.
+- **Backend (PHPUnit)**: Run `composer test` from `backend/` for PHP tests.
 
 ### Commit Message Convention
 
@@ -215,8 +267,29 @@ chore(deps): bump react-query version
 
 ## Important Scripts
 
-- `npm run dev`: Start the development server.
-- `npm run build`: Create a production-ready build.
-- `npm run test`: Run the test suite.
-- `npm run lint`: Run ESLint checks.
-- `npm run format`: Format all files with Prettier.
+### Frontend (`frontend/`)
+
+| Command              | Description                              |
+| -------------------- | ---------------------------------------- |
+| `npm run dev`        | Start Vite dev server                    |
+| `npm run build`      | Production build                         |
+| `npm run preview`    | Preview production build                 |
+| `npm run test`       | Run Vitest tests                         |
+| `npm run test:watch` | Run tests in watch mode                  |
+| `npm run lint`       | Run ESLint checks                        |
+| `npm run lint:fix`   | Run ESLint with auto-fix                 |
+| `npm run format`     | Format all files with Prettier           |
+| `npm run format:check` | Check formatting without modifying     |
+| `npm run typecheck`  | TypeScript type checking                 |
+| `npm run check`      | Run all checks (lint + typecheck + format)|
+
+### Backend (`backend/`)
+
+| Command                   | Description                              |
+| ------------------------- | ---------------------------------------- |
+| `composer install`        | Install PHP dependencies                 |
+| `composer test`           | Run PHPUnit tests                        |
+| `composer test:coverage`  | Run tests with coverage report           |
+| `composer format`         | Fix code style with PHP-CS-Fixer         |
+| `composer format:check`   | Check code style (dry run)               |
+| `composer audit`          | Audit dependencies for vulnerabilities   |

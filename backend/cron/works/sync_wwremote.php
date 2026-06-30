@@ -2,20 +2,14 @@
 
 /**
  * sync_wwremote.php
- * Fetches DevOps-adjacent jobs from We Work Remotely RSS feeds.
+ * Fetches jobs from We Work Remotely RSS feeds.
+ *
+ * Community scope: DevOps, SRE, Platform, Security, Networking, Cloud,
+ * Backend, Frontend, Full-Stack, Data, ML, QA, Engineering Management,
+ * Technical PM — all levels, all legitimate software engineering roles.
  *
  * Run every 6 hours via cPanel cron (offset 30 min from Remotive), or manually:
  *   php cron/sync_wwremote.php
- *
- * Goals
- * ─────
- *   • Pull DevOps/SRE/Cloud/Backend roles from WWR's public RSS feeds
- *   • Skip jobs whose location restrictions exclude Africa
- *   • Flag jobs that explicitly welcome Africa as africa_friendly = 1
- *   • Follow the same patterns as sync_remotive.php for consistency
- *   • Stay non-breaking: same DB schema, same helpers.php surface
- *
- * WWR RSS feeds are public — no account or API key needed.
  */
 
 declare(strict_types=1);
@@ -28,168 +22,200 @@ require_once $basePath . 'helpers.php';
 
 $startTime = time();
 
-// ── Config ───────────────────────────────────────────────────────────────────
+// ── WWR RSS feeds ─────────────────────────────────────────────────────────────
+//
+// gated = true  → title must pass TECH_ROLE_KEYWORDS (blocks non-tech noise)
+// gated = false → every item in the feed is accepted (feeds already scoped)
+//
+// WWR feed catalogue (confirmed live as of June 2026):
+//   remote-devops-sysadmin-jobs      → DevOps, SRE, Sysadmin, Platform
+//   remote-security-jobs             → Security, DevSecOps, Networking
+//   remote-programming-jobs          → General software engineering
+//   remote-back-end-programming-jobs → Backend-specific
+//   remote-front-end-programming-jobs→ Frontend-specific
+//   remote-full-stack-programming-jobs → Full-stack
+//   remote-data-science-jobs         → Data Engineering, ML, AI
+//   remote-qa-jobs                   → QA, SDET, Test Automation
+//   remote-management-and-finance-jobs → Engineering Management, Tech PM
+//                                       (gated — also contains non-tech mgmt)
+//
 
-/**
- * WWR RSS feeds to pull.
- *
- * Each entry is:
- *   'url'      → the RSS feed URL
- *   'gated'    → whether title-keyword filtering applies (true for broad feeds)
- *
- * devops-sysadmin → core audience; no keyword gate (every title passes)
- * programming     → broad; gated by DEVOPS_TITLE_KEYWORDS
- * back-end        → broad; gated by DEVOPS_TITLE_KEYWORDS
- *
- * To add a new feed: append here and optionally add a keyword set.
- */
 const WWR_FEEDS = [
+    // ── Core DevOps / SRE / Platform / Sysadmin ──────────────────────────────
     [
         'url'   => 'https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss',
         'gated' => false,
     ],
+    // ── Backend ───────────────────────────────────────────────────────────────
+    [
+        'url'   => 'https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss',
+        'gated' => false,
+    ],
+    // ── Frontend ──────────────────────────────────────────────────────────────
+    [
+        'url'   => 'https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss',
+        'gated' => false,
+    ],
+    // ── Full-Stack ────────────────────────────────────────────────────────────
+    [
+        'url'   => 'https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss',
+        'gated' => false,
+    ],
+    // ── General programming (gated) ───────────────────────────────────────────
     [
         'url'   => 'https://weworkremotely.com/categories/remote-programming-jobs.rss',
         'gated' => true,
     ],
+    // ── Engineering Management / Technical PM (gated) ────────────────────────
     [
-        'url'   => 'https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss',
+        'url'   => 'https://weworkremotely.com/categories/remote-management-and-finance-jobs.rss',
         'gated' => true,
     ],
+    // REMOVED: remote-security-jobs.rss     → 301, no redirect destination (dead)
+    // REMOVED: remote-data-science-jobs.rss → 301, no redirect destination (dead)
+    // REMOVED: remote-qa-jobs.rss           → 301, no redirect destination (dead)
 ];
 
-/**
- * Title keywords for the gated (broad) feeds.
- * Covers all role types in the frontend whitelist:
- *   SRE · Cloud Architect · Security · Platform Engineering
- *   DevOps Engineer · Backend Engineer · Frontend Engineer · Sysadmin
- */
-const WWR_DEVOPS_KEYWORDS = [
-    // SRE
-    'sre',
-    'site reliability',
-    'reliability engineer',
+// ── Non-tech block list (applied to ALL feeds including ungated ones) ─────────
+//
+// These title patterns indicate clearly non-tech roles that slip into
+// WWR's broad categories. Block them regardless of feed.
+// Rule: if ANY of these appear in the job title → skip.
+//
+const NON_TECH_BLOCK = [
+    'copywriter',
+    'copy writer',
+    'sales assistant',
+    'sales representative',
+    'account executive',
+    'account manager',
+    'financial sales',
+    'inside sales',
+    'head of sales',
+    'sales specialist',
+    'video editor',
+    'motion graphic',
+    'graphic designer',
+    'office assistant',
+    'office manager',
+    'data analyst',         // not a software engineering role
+    'data entry',
+    'online data analyst',
+    'quality assurance rater',  // crowd-work / annotation — not QA engineer
+    'freelance writer',
+    'content writer',
+    'technical writer',         // borderline — remove this line if you want tech writers
+    'recruiter',
+    'talent acquisition',
+    'account payable',
+    'account receivable',
+    'bookkeeper',
+    'payroll',
+    'customer success',
+    'customer support',
+    'customer operations',
+    'customer service',
+    'community manager',
+    'social media',
+    'seo specialist',
+    'paid media',
+    'growth hacker',
+    'business development',
+    'partnerships manager',
+    'legal counsel',
+    'paralegal',
+    'operations manager',       // non-tech ops
+    'chief of staff',
+    'executive assistant',
+    'personal assistant',
+    'help desk',                // tier-1 support, not engineering
+    'it support',               // tier-1 support
+    'service desk',
+    'administrative',
+    'oracle hcm',          // HR Cloud — not DevOps
+    'oracle scm',          // Supply Chain — not DevOps
+];
 
-    // Cloud Architect
-    'cloud engineer',
-    'cloud architect',
-    'solutions architect',
+// ── Tech role keywords for GATED feeds ───────────────────────────────────────
+//
+// For the broad feeds (programming, management-and-finance), a title must
+// contain at least one of these to be accepted.
+//
+const TECH_ROLE_KEYWORDS = [
+    // Engineering roles
+    'engineer', 'developer', 'architect', 'programmer', 'coder',
+    // Specific tech stacks / disciplines
+    'devops', 'sre', 'platform', 'infrastructure', 'cloud', 'security',
+    'backend', 'back-end', 'back end', 'frontend', 'front-end', 'front end',
+    'fullstack', 'full-stack', 'full stack',
+    'data engineer', 'ml engineer', 'ai engineer', 'mlops', 'dataops',
+    'kubernetes', 'terraform', 'docker', 'ansible',
+    'python', 'golang', 'go developer', 'rust', 'java', 'kotlin',
+    'node', 'react', 'vue', 'angular', 'typescript',
+    'qa engineer', 'sdet', 'test automation', 'quality engineer',
+    // Management — tech-specific only
+    'engineering manager', 'engineering lead', 'tech lead', 'technical lead',
+    'vp of engineering', 'head of engineering', 'cto',
+    'director of engineering', 'staff engineer', 'principal engineer',
+    'product manager', 'technical product manager', 'technical pm',
+    // Qa terms
+    'qa engineer', 'quality engineer', 'sdet', 'test automation',
+    'data scientist', 'data engineer', 'ml engineer', 'ai engineer',
+];
 
+// ── Tech keyword list for TAG EXTRACTION from job titles ──────────────────────
+//
+// These are stored as the job's tags[] in the DB and shown as pills on cards.
+// Ordered from most specific to most generic so longer matches aren't shadowed.
+//
+const TECH_TAG_KEYWORDS = [
+    // Infrastructure / DevOps tools
+    'kubernetes', 'k8s', 'terraform', 'ansible', 'helm', 'docker',
+    'jenkins', 'gitlab', 'github', 'ci/cd', 'cicd', 'argocd', 'flux',
+    'prometheus', 'grafana', 'datadog', 'splunk', 'elasticsearch',
+    // Cloud platforms
+    'aws', 'gcp', 'azure', 'cloudflare', 'digitalocean', 'heroku',
+    // OS / Networking
+    'linux', 'nginx', 'apache', 'haproxy', 'istio', 'envoy',
+    // Databases
+    'postgres', 'postgresql', 'mysql', 'mongodb', 'redis', 'kafka',
+    'cassandra', 'dynamodb', 'bigquery', 'snowflake',
+    // Languages
+    'python', 'golang', 'go', 'rust', 'java', 'kotlin', 'scala',
+    'ruby', 'rails', 'php', 'laravel', 'node', 'nodejs',
+    'typescript', 'javascript', 'elixir', 'haskell', 'c++', 'c#',
+    // Frontend frameworks
+    'react', 'vue', 'angular', 'svelte', 'nextjs', 'next.js',
+    // APIs / Architecture
+    'graphql', 'grpc', 'rest', 'api', 'microservices', 'serverless',
+    // Data / ML
+    'spark', 'airflow', 'dbt', 'pandas', 'tensorflow', 'pytorch',
+    'llm', 'mlops', 'dataops',
     // Security
-    'devsecops',
-    'security engineer',
-    'security architect',
-    'appsec',
-    'application security',
-
-    // Platform Engineering
-    'platform engineer',
-    'developer experience',
-    'devex engineer',
-
-    // Sysadmin
-    'sysadmin',
-    'system administrator',
-    'systems administrator',
-    'linux administrator',
-    'network engineer',
-    'network administrator',
-
-    // DevOps Engineer
-    'devops',
-    'infrastructure engineer',
-    'kubernetes',
-    'k8s',
-    'terraform',
-    'ci/cd',
-    'pipeline',
-    'automation engineer',
-    'mlops',
-    'ml engineer',
-    'ai engineer',
-    'data engineer',
-
-    // Frontend Engineer
-    'frontend',
-    'front-end',
-    'front end',
-    'ui engineer',
-    'react engineer',
-    'vue engineer',
-    'angular engineer',
-
-    // Backend Engineer
-    'backend',
-    'back-end',
-    'back end',
-    'software engineer',
-    'fullstack',
-    'full stack',
-    'full-stack',
-    'api engineer',
-    'systems engineer',
+    'devsecops', 'appsec', 'soc', 'siem', 'pentest', 'zero trust',
+    // Disciplines (broad — kept last so specific tools match first)
+    'devops', 'sre', 'platform', 'infrastructure', 'infra', 'cloud',
+    'backend', 'frontend', 'fullstack', 'security', 'networking',
+    'automation', 'observability', 'monitoring',
 ];
 
-/**
- * Location strings that signal the role explicitly welcomes Africa.
- * Mirrors AFRICA_POSITIVE_SIGNALS in sync_remotive.php.
- */
+// ── Africa signals (unchanged from your original) ────────────────────────────
+
 const WWR_AFRICA_POSITIVE = [
-    'africa',
-    'kenya',
-    'nigeria',
-    'ghana',
-    'south africa',
-    'egypt',
-    'ethiopia',
-    'tanzania',
-    'uganda',
-    'rwanda',
-    'nairobi',
-    'lagos',
-    'accra',
-    'cairo',
-    'emea',
-    'worldwide',
-    'anywhere',
+    'africa', 'kenya', 'nigeria', 'ghana', 'south africa', 'egypt',
+    'ethiopia', 'tanzania', 'uganda', 'rwanda', 'nairobi', 'lagos',
+    'accra', 'cairo', 'emea', 'worldwide', 'anywhere',
 ];
 
-/**
- * Location strings that signal the role EXCLUDES Africa.
- * Mirrors AFRICA_EXCLUDE_SIGNALS in sync_remotive.php.
- */
 const WWR_AFRICA_EXCLUDE = [
-    'americas',
-    'north america',
-    'south america',
-    'latin america',
-    'latam',
-    'usa only',
-    'us only',
-    'united states only',
-    'canada only',
-    'europe only',
-    'eu only',
-    'european union',
-    'asia',
-    'apac',
-    'asia pacific',
-    'australia',
-    'new zealand',
-    'israel',
-    'middle east',
-    'brazil',
-    'mexico',
-    'argentina',
-    'colombia',
-    'chile',
-    'peru',
+    'americas', 'north america', 'south america', 'latin america', 'latam',
+    'usa only', 'us only', 'united states only', 'canada only',
+    'europe only', 'eu only', 'european union',
+    'asia', 'apac', 'asia pacific', 'australia', 'new zealand',
+    'israel', 'middle east', 'brazil', 'mexico', 'argentina',
+    'colombia', 'chile', 'peru',
 ];
 
-/**
- * Exact-match non-African countries and cities.
- * Mirrors LOCATION_COUNTRIES in sync_remotive.php.
- */
 const WWR_LOCATION_COUNTRIES = [
     'brazil', 'united states', 'usa', 'canada', 'mexico', 'argentina',
     'colombia', 'chile', 'peru', 'uruguay', 'venezuela',
@@ -205,9 +231,9 @@ const WWR_LOCATION_COUNTRIES = [
 ];
 
 const WWR_USER_AGENT    = 'NairobiDevOps JobsBot/1.0 (nairobidevops.org)';
-const WWR_SLEEP_BETWEEN = 2; // seconds between feed requests
+const WWR_SLEEP_BETWEEN = 2;
 
-// ── Counters ─────────────────────────────────────────────────────────────────
+// ── Counters ──────────────────────────────────────────────────────────────────
 
 $totalFetched  = 0;
 $totalInserted = 0;
@@ -215,46 +241,31 @@ $totalSkipped  = 0;
 $totalExcluded = 0;
 $errors        = [];
 
-// ── DB connection ─────────────────────────────────────────────────────────────
-
 $db = getDB();
 
-// ── Dedicated exception ───────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 class WwrFeedException extends RuntimeException
 {
 }
 
-// ── SSL guard ─────────────────────────────────────────────────────────────────
-
 function wwrShouldDisableSsl(): bool
 {
-    if (\defined('APP_ENV')) {
-        $env = APP_ENV;
-    } else {
-        $env = getenv('APP_ENV') ?: 'local';
-    }
+    $appEnvFromEnv = getenv('APP_ENV');
+    $envFallback   = $appEnvFromEnv !== false ? $appEnvFromEnv : 'local';
+    $env           = \defined('APP_ENV') ? APP_ENV : $envFallback;
     if ($env === 'production' || $env === 'staging') {
         return false;
     }
     return filter_var(getenv('DISABLE_SSL_VERIFY'), FILTER_VALIDATE_BOOLEAN);
 }
 
-// ── Transport: cURL ───────────────────────────────────────────────────────────
-
-/**
- * Fetch an RSS feed URL via cURL and return the raw XML string.
- *
- * @throws WwrFeedException on network or HTTP error
- */
 function wwrFetchViaCurl(string $url): string
 {
     if (filter_var($url, FILTER_VALIDATE_URL) === false) {
         throw new WwrFeedException("Invalid URL: {$url}");
     }
-
     $disableSsl = wwrShouldDisableSsl();
-
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -266,16 +277,14 @@ function wwrFetchViaCurl(string $url): string
         ],
         CURLOPT_SSL_VERIFYPEER => !$disableSsl,
         CURLOPT_SSL_VERIFYHOST => $disableSsl ? 0 : 2,
-        CURLOPT_FOLLOWLOCATION => false,
-        CURLOPT_MAXREDIRS      => 0,
+        CURLOPT_FOLLOWLOCATION => true,   // follow future redirects silently
+        CURLOPT_MAXREDIRS      => 3,
     ]);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlErr  = curl_error($ch);
-    if (\PHP_VERSION_ID < 80000) {
-        curl_close($ch);
-    }
+    // curl_close() removed — deprecated in PHP 8.5, no-op since PHP 8.0
 
     if ($curlErr) {
         throw new WwrFeedException("cURL error for {$url}: {$curlErr}");
@@ -287,79 +296,17 @@ function wwrFetchViaCurl(string $url): string
     return $response;
 }
 
-// ── Transport: stream fallback ────────────────────────────────────────────────
-
-/**
- * Fetch an RSS feed URL via file_get_contents when cURL is unavailable.
- *
- * @throws WwrFeedException on network or HTTP error
- */
-function wwrFetchViaStream(string $url): string
+function wwrFetchFeed(string $url): array
 {
-    if (filter_var($url, FILTER_VALIDATE_URL) === false) {
-        throw new WwrFeedException("Invalid URL: {$url}");
-    }
-
-    $disableSsl = wwrShouldDisableSsl();
-
-    $context  = stream_context_create([
-        'http' => [
-            'method'          => 'GET',
-            'header'          => "Accept: application/rss+xml\r\nUser-Agent: " . WWR_USER_AGENT . "\r\n",
-            'timeout'         => 60,
-            'ignore_errors'   => true,
-            'follow_location' => 0,
-        ],
-        'ssl'  => [
-            'verify_peer'      => !$disableSsl,
-            'verify_peer_name' => !$disableSsl,
-        ],
-    ]);
-
-    $response = file_get_contents($url, false, $context);
-
-    if ($response === false) {
-        throw new WwrFeedException("file_get_contents failed for {$url}");
-    }
-
-    $httpCode = 500;
-    // PHP 8.5+: $http_response_header is deprecated; use the new function.
-    $responseHeaders = \function_exists('http_get_last_response_headers')
-        ? http_get_last_response_headers()
-        : ($http_response_header ?? []); // @phpstan-ignore-line
-    if (!empty($responseHeaders)) {
-        preg_match('{HTTP\/\S*\s(\d\d\d)}', $responseHeaders[0], $m);
-        if (isset($m[1])) {
-            $httpCode = (int) $m[1];
+    if (\function_exists('curl_init')) {
+        $raw = wwrFetchViaCurl($url);
+    } else {
+        $raw = file_get_contents($url);
+        if ($raw === false) {
+            throw new WwrFeedException("Stream fetch failed: {$url}");
         }
     }
 
-    if ($httpCode !== 200) {
-        throw new WwrFeedException("HTTP {$httpCode} from WWR for {$url}");
-    }
-
-    return $response;
-}
-
-// ── Fetch + parse one RSS feed ────────────────────────────────────────────────
-
-/**
- * Fetch an RSS feed URL and return a SimpleXMLElement of the channel items.
- *
- * @return SimpleXMLElement[]
- * @throws WwrFeedException
- */
-function wwrFetchFeed(string $url): array
-{
-    $raw = \function_exists('curl_init')
-        ? wwrFetchViaCurl($url)
-        : wwrFetchViaStream($url);
-
-    if (\strlen($raw) > 5 * 1024 * 1024) {
-        throw new WwrFeedException("Response too large (> 5 MB) for {$url}");
-    }
-
-    // Suppress libxml warnings — malformed RSS shouldn't crash the cron
     libxml_use_internal_errors(true);
     $xml = simplexml_load_string($raw);
     libxml_clear_errors();
@@ -368,78 +315,38 @@ function wwrFetchFeed(string $url): array
         throw new WwrFeedException("Failed to parse XML from {$url}");
     }
 
-    $items = $xml->channel->item ?? [];
-
-    // SimpleXMLElement implements Traversable but not Countable in all PHP versions
-    // — convert to array so callers can use count() and array functions safely
     $result = [];
-    foreach ($items as $item) {
+    foreach (($xml->channel->item ?? []) as $item) {
         $result[] = $item;
     }
-
     return $result;
 }
 
-// ── WWR title parser ──────────────────────────────────────────────────────────
-
-/**
- * WWR RSS titles follow the format: "Company: Job Title at Location"
- * or sometimes just "Company: Job Title".
- *
- * Split on the FIRST ": " only — company names can contain colons.
- * Strip the trailing "at Location" from the job title when present.
- *
- * @return array{company: string, title: string}
- */
 function parseWwrTitle(string $raw): array
 {
-    $raw = trim($raw);
-
-    // Split on first ": " — everything before is the company
+    $raw      = trim($raw);
     $colonPos = strpos($raw, ': ');
-
     if ($colonPos === false) {
-        // No colon — treat the whole string as the title, company unknown
         return ['company' => '', 'title' => $raw];
     }
-
     $company = trim(substr($raw, 0, $colonPos));
     $rest    = trim(substr($raw, $colonPos + 2));
-
-    // Strip trailing " at Location" — WWR sometimes appends this
-    // e.g. "Senior DevOps Engineer at Worldwide"
-    $atPos = strrpos($rest, ' at ');
-    $title = $atPos !== false ? trim(substr($rest, 0, $atPos)) : $rest;
-
+    $atPos   = strrpos($rest, ' at ');
+    $title   = $atPos !== false ? trim(substr($rest, 0, $atPos)) : $rest;
     return ['company' => $company, 'title' => $title];
 }
 
-// ── Location parser ───────────────────────────────────────────────────────────
-
-/**
- * Extract a plain-text location from a WWR RSS <region> or <description> field.
- *
- * WWR's RSS provides a dedicated <region> element and also encodes location
- * in the <description> CDATA block using an <li> tag:
- *   <li>Anywhere in the World</li>  or  <li>USA Only</li>
- *
- * We prefer <region> (authoritative), then fall back to the first <li>.
- * Falls back to an empty string if neither is found.
- */
 function parseWwrLocation(string $descriptionCdata, string $region = ''): string
 {
     $region = trim($region);
     if ($region !== '') {
         return $region;
     }
-
     if (preg_match('/<li[^>]*>\s*([^<]+?)\s*<\/li>/i', $descriptionCdata, $m)) {
         return trim(strip_tags($m[1]));
     }
     return '';
 }
-
-// ── Africa eligibility (WWR-scoped, mirrors Remotive classifier) ──────────────
 
 function wwrMatchesPositive(string $loc): bool
 {
@@ -466,38 +373,43 @@ function wwrMatchesExclude(string $loc): bool
     return false;
 }
 
-/**
- * Classify a WWR job's Africa eligibility.
- *
- * @return string 'africa_friendly' | 'neutral' | 'exclude_africa'
- */
 function wwrClassifyAfrica(string $locationDetail): string
 {
     $loc = strtolower(trim($locationDetail));
-
     if ($loc === '') {
         return 'neutral';
     }
-
     if (wwrMatchesPositive($loc)) {
         return 'africa_friendly';
     }
-
     return (wwrMatchesExactCountry($loc) || wwrMatchesExclude($loc))
         ? 'exclude_africa'
         : 'neutral';
 }
 
-// ── Relevance gate ────────────────────────────────────────────────────────────
-
 /**
- * Return true if the job title matches at least one DevOps keyword.
- * Only called for feeds where gated = true.
+ * Returns true if the title contains a non-tech keyword that should be blocked
+ * regardless of which feed it came from.
  */
-function wwrIsRelevant(string $title): bool
+function wwrIsNonTech(string $title): bool
 {
     $lower = strtolower($title);
-    foreach (WWR_DEVOPS_KEYWORDS as $kw) {
+    foreach (NON_TECH_BLOCK as $pattern) {
+        if (str_contains($lower, $pattern)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Returns true if the title matches at least one tech role keyword.
+ * Only enforced on gated feeds.
+ */
+function wwrIsTechRole(string $title): bool
+{
+    $lower = strtolower($title);
+    foreach (TECH_ROLE_KEYWORDS as $kw) {
         if (str_contains($lower, $kw)) {
             return true;
         }
@@ -505,49 +417,42 @@ function wwrIsRelevant(string $title): bool
     return false;
 }
 
-// ── Salary hint extractor ─────────────────────────────────────────────────────
-
 /**
- * Scan a WWR job description CDATA block for salary patterns and return
- * the first matching snippet for parseSalary() to process.
+ * Extract tech stack keywords from a job title and return them as a
+ * deduplicated array. These become the tag pills on job cards.
  *
- * WWR has no dedicated salary RSS field, so this is best-effort. It will
- * match patterns like:
- *   "$80,000 – $120,000/year"   →  "$80,000 – $120,000/year"
- *   "Salary: $4,000/month"      →  "$4,000/month"
- *   "€60k per year"             →  "€60k per year"
- *
- * Returns an empty string when no salary pattern is found, which causes
- * parseSalary() to return all-null — that is the correct outcome for
- * listings that don't publish compensation.
+ * Uses TECH_TAG_KEYWORDS checked against the lowercased title so we get
+ * specific tool names (kubernetes, terraform) rather than category slugs.
  */
+function wwrExtractTags(string $title): array
+{
+    $lower = strtolower($title);
+    $found = [];
+    foreach (TECH_TAG_KEYWORDS as $kw) {
+        if (str_contains($lower, $kw)) {
+            $found[] = $kw;
+        }
+    }
+    return array_values(array_unique($found));
+}
+
 function wwrExtractSalaryHint(string $descriptionCdata): string
 {
-    // Strip HTML so patterns aren't broken across tags (e.g. <strong>$80k</strong>)
-    $plain = strip_tags($descriptionCdata);
-
+    $plain    = strip_tags($descriptionCdata);
     $patterns = [
-        // Range with currency: $80k – $120k, $80,000–$120,000
         '/[\$€£][\d,]+k?\s*[-–—]\s*\$?[\d,]+k?(?:\s*\/\s*(?:year|yr|month|mo))?/i',
-        // "Salary: $X" or "Salary range: $X"
         '/salary(?:\s+range)?[:\s]+[\$€£]?[\d,]+k?(?:\s*[-–]\s*[\$€£]?[\d,]+k?)?/i',
-        // "$X per year/month" or "$X/year"
         '/[\$€£][\d,]+k?\s*(?:\/|\bper\b)\s*(?:year|yr|annual|month|mo)/i',
-        // "USD/EUR/GBP X" or "X USD"
         '/(?:USD|EUR|GBP)\s+[\d,]+k?(?:\s*[-–]\s*[\d,]+k?)?/i',
         '/[\d,]+k?\s*(?:USD|EUR|GBP)/i',
     ];
-
     foreach ($patterns as $pattern) {
         if (preg_match($pattern, $plain, $match)) {
             return $match[0];
         }
     }
-
     return '';
 }
-
-// ── Deduplication ─────────────────────────────────────────────────────────────
 
 function wwrJobExists(PDO $db, string $sourceId): bool
 {
@@ -558,18 +463,9 @@ function wwrJobExists(PDO $db, string $sourceId): bool
     return (bool) $stmt->fetch();
 }
 
-// ── Refresh existing rows ─────────────────────────────────────────────────────
-
 /**
- * Keep already-stored WWR jobs clean across re-syncs without re-inserting them.
- *
- * Required params:
- *   $db, $sourceId, $cleanDesc, $locationDetail, $africaFriendly
- *
- * Optional enrichment via $extras array (all keys optional, safe to omit):
- *   'logo'   string  — company_logo_url; backfilled when stored row is NULL
- *   'tags'   string  — JSON-encoded tag array; backfilled when stored row is NULL
- *   'salary' array   — parseSalary() result; backfilled when salary_min is NULL
+ * Refresh an already-stored WWR job with any new data from this sync run.
+ * Only updates fields that have changed or were previously NULL.
  */
 function wwrRefreshJob(
     PDO    $db,
@@ -582,67 +478,47 @@ function wwrRefreshJob(
     $logoUrl = (string) ($extras['logo']   ?? '');
     $tags    = (string) ($extras['tags']   ?? '[]');
     $salary  = (array)  ($extras['salary'] ?? []);
-    // Refresh description when it has changed or was NULL
+
     $db->prepare(
-        "UPDATE jobs
-            SET description = :desc
-          WHERE source = 'weworkremotely'
-            AND source_id = :sid
+        "UPDATE jobs SET description = :desc
+          WHERE source = 'weworkremotely' AND source_id = :sid
             AND (description IS NULL OR description != :desc2)"
     )->execute([':desc' => $cleanDesc, ':sid' => $sourceId, ':desc2' => $cleanDesc]);
 
-    // Backfill location_detail when it was NULL
     if ($locationDetail !== '') {
         $db->prepare(
-            "UPDATE jobs
-                SET location_detail = :loc
-              WHERE source = 'weworkremotely'
-                AND source_id = :sid
+            "UPDATE jobs SET location_detail = :loc
+              WHERE source = 'weworkremotely' AND source_id = :sid
                 AND location_detail IS NULL"
         )->execute([':loc' => $locationDetail, ':sid' => $sourceId]);
     }
 
-    // Backfill africa_friendly = 1 for rows stored before classifier existed
     if ($africaFriendly === 1) {
         $db->prepare(
-            "UPDATE jobs
-                SET africa_friendly = 1
-              WHERE source = 'weworkremotely'
-                AND source_id = :sid
-                AND africa_friendly = 0"
+            "UPDATE jobs SET africa_friendly = 1
+              WHERE source = 'weworkremotely' AND source_id = :sid AND africa_friendly = 0"
         )->execute([':sid' => $sourceId]);
     }
 
-    // Backfill company_logo_url when it was NULL and we now have a URL
     if ($logoUrl !== '') {
         $db->prepare(
-            "UPDATE jobs
-                SET company_logo_url = :logo
-              WHERE source = 'weworkremotely'
-                AND source_id = :sid
+            "UPDATE jobs SET company_logo_url = :logo
+              WHERE source = 'weworkremotely' AND source_id = :sid
                 AND company_logo_url IS NULL"
         )->execute([':logo' => $logoUrl, ':sid' => $sourceId]);
     }
 
-    // Backfill tags when they were NULL
+    // Always refresh tags — replaces old category slugs with new keyword tags
     $db->prepare(
-        "UPDATE jobs
-            SET tags = :tags
-          WHERE source = 'weworkremotely'
-            AND source_id = :sid
-            AND tags IS NULL"
+        "UPDATE jobs SET tags = :tags
+          WHERE source = 'weworkremotely' AND source_id = :sid"
     )->execute([':tags' => $tags, ':sid' => $sourceId]);
 
-    // Backfill salary fields when salary_min was NULL and we now have a value
     if (!empty($salary['salary_min'])) {
         $db->prepare(
-            "UPDATE jobs
-                SET salary_min      = :min,
-                    salary_max      = :max,
-                    salary_currency = :cur,
-                    salary_period   = :per
-              WHERE source = 'weworkremotely'
-                AND source_id = :sid
+            "UPDATE jobs SET salary_min = :min, salary_max = :max,
+                            salary_currency = :cur, salary_period = :per
+              WHERE source = 'weworkremotely' AND source_id = :sid
                 AND salary_min IS NULL"
         )->execute([
             ':min' => $salary['salary_min'],
@@ -658,82 +534,52 @@ function wwrRefreshJob(
 
 $insertStmt = $db->prepare("
     INSERT INTO jobs (
-        title,
-        company,
-        company_logo_url,
-        description,
-        apply_url,
-        source,
-        source_id,
-        role_type,
-        location_type,
-        location_detail,
+        title, company, company_logo_url, description,
+        apply_url, source, source_id,
+        role_type, location_type, location_detail,
         africa_friendly,
-        salary_min,
-        salary_max,
-        salary_currency,
-        salary_period,
-        tags,
-        posted_at,
-        is_active,
-        is_approved,
-        is_notified
+        salary_min, salary_max, salary_currency, salary_period,
+        tags, posted_at,
+        is_active, is_approved, is_notified
     ) VALUES (
-        :title,
-        :company,
-        :company_logo_url,
-        :description,
-        :apply_url,
-        'weworkremotely',
-        :source_id,
-        :role_type,
-        'international_remote',
-        :location_detail,
+        :title, :company, :company_logo_url, :description,
+        :apply_url, 'weworkremotely', :source_id,
+        :role_type, 'international_remote', :location_detail,
         :africa_friendly,
-        :salary_min,
-        :salary_max,
-        :salary_currency,
-        :salary_period,
-        :tags,
-        :posted_at,
-        1,
-        1,
-        0
+        :salary_min, :salary_max, :salary_currency, :salary_period,
+        :tags, :posted_at,
+        1, 1, 0
     )
 ");
 
 // ── Main sync loop ────────────────────────────────────────────────────────────
 
-$feeds = WWR_FEEDS;
-
-foreach ($feeds as $index => $feed) {
+foreach (WWR_FEEDS as $index => $feed) {
     $feedUrl = $feed['url'];
     $isGated = $feed['gated'];
 
-    echo "Fetching feed: {$feedUrl} ...\n";
+    echo "Fetching: {$feedUrl}\n";
 
     try {
         $items = wwrFetchFeed($feedUrl);
     } catch (WwrFeedException $e) {
-        $msg = 'FETCH ERROR: ' . $e->getMessage();
-        echo $msg . "\n";
+        $msg      = 'FETCH ERROR: ' . $e->getMessage();
         $errors[] = $msg;
+        echo "  {$msg}\n\n";
         continue;
     }
 
     $feedCount     = \count($items);
     $totalFetched += $feedCount;
-    echo "  → {$feedCount} items returned\n";
+    echo "  → {$feedCount} items\n";
 
     foreach ($items as $item) {
-        // ── Extract raw fields from RSS item ──────────────────────────────────
         $rawGuid        = trim((string) ($item->guid        ?? ''));
         $rawTitle       = trim((string) ($item->title       ?? ''));
         $rawLink        = trim((string) ($item->link        ?? ''));
         $rawPubDate     = trim((string) ($item->pubDate     ?? ''));
         $rawDescription = trim((string) ($item->description ?? ''));
 
-        // ── source_id: use guid, fall back to link ────────────────────────────
         $sourceId = $rawGuid !== '' ? $rawGuid : $rawLink;
 
         if ($sourceId === '' || $rawTitle === '') {
@@ -741,7 +587,6 @@ foreach ($feeds as $index => $feed) {
             continue;
         }
 
-        // ── Parse WWR title into company + job title ──────────────────────────
         $parsed  = parseWwrTitle($rawTitle);
         $company = sanitizeString($parsed['company']);
         $title   = sanitizeString($parsed['title']);
@@ -751,52 +596,45 @@ foreach ($feeds as $index => $feed) {
             continue;
         }
 
-        // ── Apply URL: WWR link tags often carry a redirect wrapper ───────────
-        // Use the link as-is — it always resolves to the correct listing page
         $applyUrl = $rawLink;
-
         if (filter_var($applyUrl, FILTER_VALIDATE_URL) === false) {
             $totalSkipped++;
-            echo "  ✗ Skipped (invalid apply URL): {$title} @ {$company}\n";
             continue;
         }
 
-        // ── Keyword gate for broad feeds ──────────────────────────────────────
-        if ($isGated && !wwrIsRelevant($title)) {
+        // ── Block non-tech roles from ALL feeds ───────────────────────────────
+        if (wwrIsNonTech($title)) {
+            $totalSkipped++;
+            echo "  ✗ Non-tech blocked: {$title}\n";
+            continue;
+        }
+
+        // ── For gated feeds: require at least one tech keyword in title ────────
+        if ($isGated && !wwrIsTechRole($title)) {
             $totalSkipped++;
             continue;
         }
 
-        // ── Role type (same mapper as Remotive) ───────────────────────────────
+        // ── Role type ─────────────────────────────────────────────────────────
         $roleType = mapRoleType($title);
 
-        // Skip titles with no DevOps-adjacent keywords
-        if ($roleType === 'Other') {
-            $totalSkipped++;
-            continue;
-        }
-
-        // ── Location: prefer RSS <region>, fall back to description CDATA ─────
-        $locationDetail = sanitizeString(parseWwrLocation($rawDescription, (string) ($item->region ?? '')));
+        // ── Location ──────────────────────────────────────────────────────────
+        $locationDetail = sanitizeString(
+            parseWwrLocation($rawDescription, (string) ($item->region ?? ''))
+        );
 
         // ── Africa eligibility ────────────────────────────────────────────────
-        $eligibility    = wwrClassifyAfrica($locationDetail);
-
+        $eligibility = wwrClassifyAfrica($locationDetail);
         if ($eligibility === 'exclude_africa') {
             $totalExcluded++;
-            echo "  ✗ Excluded (restricts Africa): {$title} @ {$company} [{$locationDetail}]\n";
             continue;
         }
-
         $africaFriendly = ($eligibility === 'africa_friendly') ? 1 : 0;
 
-        // ── Description: strip HTML ───────────────────────────────────────────
+        // ── Description ───────────────────────────────────────────────────────
         $description = cleanDescription($rawDescription);
 
-        // ── Company logo: prefer <enclosure url="...">, fall back to first <img> ──
-        // WWR RSS items include a company logo via an <enclosure> element.
-        // The URL lives in the 'url' XML attribute, not as element text, so
-        // SimpleXML accesses it via $item->enclosure['url'].
+        // ── Logo ──────────────────────────────────────────────────────────────
         $logoUrl = '';
         if (isset($item->enclosure) && !empty((string) $item->enclosure['url'])) {
             $candidate = trim((string) $item->enclosure['url']);
@@ -804,7 +642,6 @@ foreach ($feeds as $index => $feed) {
                 $logoUrl = $candidate;
             }
         }
-        // Fallback: extract first <img src="..."> from description CDATA
         if ($logoUrl === '' && preg_match('/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i', $rawDescription, $imgMatch)) {
             $candidate = trim($imgMatch[1]);
             if (filter_var($candidate, FILTER_VALIDATE_URL) !== false) {
@@ -812,39 +649,14 @@ foreach ($feeds as $index => $feed) {
             }
         }
 
-        // ── Tags: collect RSS <category> elements + derive a slug from the feed URL ──
-        // WWR items may carry one or more <category> children.
-        // We also append the feed's category slug (e.g. "devops sysadmin")
-        // so every job has at least one searchable tag.
-        $rawTags = [];
-        foreach (($item->category ?? []) as $cat) {
-            $catStr = trim((string) $cat);
-            if ($catStr !== '') {
-                $rawTags[] = $catStr;
-            }
-        }
-        // Derive a human-readable tag from the feed URL slug
-        if (preg_match('/categories\/remote-(.+?)-jobs\.rss/', $feedUrl, $slugMatch)) {
-            $slugTag = str_replace('-', ' ', $slugMatch[1]);
-            if ($slugTag !== '' && !\in_array($slugTag, $rawTags, true)) {
-                $rawTags[] = $slugTag;
-            }
-        }
-        $tags = json_encode(
-            array_values(
-                array_filter(
-                    array_map('trim', $rawTags),
-                    static fn (string $t): bool => $t !== ''
-                )
-            ),
+        // ── Tags: extracted from job title, not category slugs ────────────────
+        $extractedTags = wwrExtractTags($title);
+        $tagsJson      = json_encode(
+            array_values(array_unique($extractedTags)),
             JSON_UNESCAPED_UNICODE
         );
 
-        // ── Salary: attempt to parse from description CDATA ───────────────────
-        // WWR RSS has no dedicated salary field. We scan the plain-text version
-        // of the description for common salary patterns (e.g. "$80k–$120k/year",
-        // "USD 4,000/month"). This will be null for most listings — that is
-        // expected and acceptable; it matches what the source provides.
+        // ── Salary ────────────────────────────────────────────────────────────
         $salary = parseSalary(wwrExtractSalaryHint($rawDescription));
 
         // ── Posted at ─────────────────────────────────────────────────────────
@@ -855,7 +667,7 @@ foreach ($feeds as $index => $feed) {
         if (wwrJobExists($db, $sourceId)) {
             wwrRefreshJob($db, $sourceId, $description, $locationDetail, $africaFriendly, [
                 'logo'   => $logoUrl,
-                'tags'   => $tags,
+                'tags'   => $tagsJson,
                 'salary' => $salary,
             ]);
             $totalSkipped++;
@@ -871,39 +683,37 @@ foreach ($feeds as $index => $feed) {
         // ── Insert ────────────────────────────────────────────────────────────
         try {
             $insertStmt->execute([
-                ':title'           => $title,
-                ':company'         => $company,
+                ':title'            => $title,
+                ':company'          => $company,
                 ':company_logo_url' => $logoUrl !== '' ? $logoUrl : null,
-                ':description'     => $description,
-                ':apply_url'       => $applyUrl,
-                ':source_id'       => $sourceId,
-                ':role_type'       => $roleType,
-                ':location_detail' => $locationDetail !== '' ? $locationDetail : null,
-                ':africa_friendly' => $africaFriendly,
-                ':salary_min'      => $salary['salary_min'],
-                ':salary_max'      => $salary['salary_max'],
-                ':salary_currency' => $salary['salary_currency'],
-                ':salary_period'   => $salary['salary_period'],
-                ':tags'            => $tags,
-                ':posted_at'       => $postedAt,
+                ':description'      => $description,
+                ':apply_url'        => $applyUrl,
+                ':source_id'        => $sourceId,
+                ':role_type'        => $roleType,
+                ':location_detail'  => $locationDetail !== '' ? $locationDetail : null,
+                ':africa_friendly'  => $africaFriendly,
+                ':salary_min'       => $salary['salary_min'],
+                ':salary_max'       => $salary['salary_max'],
+                ':salary_currency'  => $salary['salary_currency'],
+                ':salary_period'    => $salary['salary_period'],
+                ':tags'             => $tagsJson,
+                ':posted_at'        => $postedAt,
             ]);
             $totalInserted++;
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
-                // Duplicate key from race condition — safe to skip
                 $totalSkipped++;
             } else {
-                $msg = "INSERT ERROR [job {$sourceId}]: " . $e->getMessage();
-                echo $msg . "\n";
+                $msg      = "INSERT ERROR [{$sourceId}]: " . $e->getMessage();
                 $errors[] = $msg;
+                echo "  {$msg}\n";
             }
         }
     }
 
-    echo "  ✓ Feed done. Inserted so far: {$totalInserted}\n\n";
+    echo "  ✓ Done. Inserted so far: {$totalInserted}\n\n";
 
-    // Polite delay between feed requests
-    if ($index < \count($feeds) - 1) {
+    if ($index < \count(WWR_FEEDS) - 1) {
         sleep(WWR_SLEEP_BETWEEN);
     }
 }
@@ -911,20 +721,13 @@ foreach ($feeds as $index => $feed) {
 // ── Cleanup: deactivate stored WWR jobs that now match exclude_africa ─────────
 
 $totalDeactivated = 0;
-
 try {
     $storedJobs = $db->prepare(
-        "SELECT id, location_detail
-           FROM jobs
-          WHERE source = 'weworkremotely'
-            AND is_active = 1"
+        "SELECT id, location_detail FROM jobs
+          WHERE source = 'weworkremotely' AND is_active = 1"
     );
     $storedJobs->execute();
-
-    $deactivateStmt = $db->prepare(
-        'UPDATE jobs SET is_active = 0 WHERE id = :id'
-    );
-
+    $deactivateStmt = $db->prepare('UPDATE jobs SET is_active = 0 WHERE id = :id');
     foreach ($storedJobs->fetchAll(PDO::FETCH_ASSOC) as $row) {
         if (wwrClassifyAfrica((string) $row['location_detail']) === 'exclude_africa') {
             $deactivateStmt->execute([':id' => (int) $row['id']]);
@@ -932,12 +735,10 @@ try {
         }
     }
 } catch (PDOException $e) {
-    $msg = 'CLEANUP ERROR: ' . $e->getMessage();
-    echo $msg . "\n";
-    $errors[] = $msg;
+    $errors[] = 'CLEANUP ERROR: ' . $e->getMessage();
 }
 
-// ── Log to sync_log ───────────────────────────────────────────────────────────
+// ── Log ───────────────────────────────────────────────────────────────────────
 
 $duration  = time() - $startTime;
 $errorText = empty($errors) ? null : implode("\n", $errors);
@@ -955,17 +756,20 @@ $db->prepare("
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 
-echo "─────────────────────────────────\n";
+echo "─────────────────────────────────────────\n";
 echo "We Work Remotely sync complete\n";
-echo "  Fetched:     {$totalFetched}\n";
-echo "  Inserted:    {$totalInserted}\n";
-echo "  Excluded:    {$totalExcluded}  (location restricts Africa)\n";
-echo "  Deactivated: {$totalDeactivated}  (reclassified as exclude_africa)\n";
-echo "  Skipped:     {$totalSkipped}  (duplicates, invalid fields, or off-topic)\n";
-echo "  Duration:    {$duration}s\n";
+echo '  Feeds processed : ' . \count(WWR_FEEDS) . "\n";
+echo "  Fetched         : {$totalFetched}\n";
+echo "  Inserted        : {$totalInserted}\n";
+echo "  Excluded        : {$totalExcluded}  (location restricts Africa)\n";
+echo "  Deactivated     : {$totalDeactivated}  (reclassified on refresh)\n";
+echo "  Skipped         : {$totalSkipped}  (duplicates / non-tech / off-topic)\n";
+echo "  Duration        : {$duration}s\n";
 
 if (!empty($errors)) {
-    echo '  Errors:      ' . \count($errors) . " (see sync_log for details)\n";
+    echo '  Errors          : ' . \count($errors) . " (see sync_log)\n";
+    foreach ($errors as $err) {
+        echo "    ! {$err}\n";
+    }
 }
-
-echo "─────────────────────────────────\n";
+echo "─────────────────────────────────────────\n";
