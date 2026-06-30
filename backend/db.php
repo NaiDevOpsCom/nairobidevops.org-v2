@@ -30,7 +30,7 @@ function getDB(): PDO
             if (php_sapi_name() !== 'cli') {
                 http_response_code(500);
             }
-            exit(json_encode(['error' => 'Database connection failed']));
+            throw new RuntimeException('Database connection failed: ' . $e->getMessage(), 0, $e);
         }
     }
 
