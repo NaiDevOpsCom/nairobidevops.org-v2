@@ -73,8 +73,14 @@ CREATE TABLE IF NOT EXISTS jobs (
   );
 
 -- ── Migration ──────────────────────────────────────────────────────────────────
--- Existing deployments with the previous notifications_log.channel enum that
--- included 'slack' but not 'discord' need this ALTER TABLE before using Discord:
+-- Existing deployments need the following ALTER TABLE statements:
+--
+-- 1. sync_log.source: add 'expire' value used by expire_jobs.php:
+--
+--   ALTER TABLE sync_log
+--     MODIFY COLUMN source ENUM('remotive','weworkremotely','manual','employer_submission','expire') NOT NULL;
+--
+-- 2. notifications_log.channel: add 'discord' (and other newer channels):
 --
 --   ALTER TABLE notifications_log
 --     MODIFY COLUMN channel ENUM('telegram','slack','discord','whatsapp','twitter','linkedin') NOT NULL;

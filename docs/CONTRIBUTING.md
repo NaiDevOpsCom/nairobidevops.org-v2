@@ -87,6 +87,7 @@ Before you begin, ensure you have the following installed:
 
     ```bash
     php -r "require 'db.php'; echo getDB() ? 'Connected' : 'Failed';"
+    ```
 
 5.  **Start the backend server:**
 

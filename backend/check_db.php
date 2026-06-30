@@ -13,7 +13,10 @@ try {
     echo '  Host: ' . DB_HOST . "\n";
     echo '  Database: ' . DB_NAME . "\n";
     exit(0);
-} catch (Throwable $e) {
+} catch (\RuntimeException $e) {
     echo '✗ Connection failed: ' . $e->getMessage() . "\n";
+    exit(1);
+} catch (Throwable $e) {
+    echo '✗ Query failed: ' . $e->getMessage() . "\n";
     exit(1);
 }
