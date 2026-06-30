@@ -16,12 +16,12 @@
  * 1. Temporarily set define('APP_ENV', 'production') in config.local.php
  * 2. Open PowerShell from repo root:
  *      cd backend
- *      php cron\works\notify_weekly.php
+ *      php cron\notification\notify_weekly.php
  * 3. Check Telegram + Discord for the message
  * 4. RESTORE define('APP_ENV', 'local') immediately after
  *
  * ─── cPANEL CRON (14:00 UTC Friday = 17:00 EAT) ─────────────────────────────
- * 0 14 * * 5  php /home/username/public_html/jobs-api/cron/works/notify_weekly.php >> /home/username/logs/weekly.log 2>&1
+ * 0 14 * * 5  php /home/username/public_html/jobs-api/cron/notification/notify_weekly.php >> /home/username/logs/weekly.log 2>&1
  *
  * ─── CHANNELS STATUS ─────────────────────────────────────────────────────────
  *   ✅ Telegram   — active (posts into the "Opportunities Updates" topic — see config)
@@ -185,7 +185,9 @@ foreach ($weeklyJobs as $i => $job) {
         }
     }
 
-    $jobLines[] = "{$num}.{$featured} *{$job['title']}* @ {$job['company']}{$africa}"
+    $safeTitle   = escapeTelegramMarkdown($job['title']);
+    $safeCompany = escapeTelegramMarkdown($job['company']);
+    $jobLines[] = "{$num}.{$featured} *{$safeTitle}* @ {$safeCompany}{$africa}"
                 . "\n   {$locEmoji} {$locLabel}{$salaryLine}{$deadlineLine}";
 }
 

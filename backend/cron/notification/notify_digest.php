@@ -15,14 +15,14 @@
  * 1. Temporarily set define('APP_ENV', 'production') in config.local.php
  * 2. Open PowerShell from repo root:
  *      cd backend
- *      php cron\works\notify_digest.php
+ *      php cron\notification\notify_digest.php
  * 3. Check Telegram group + Discord channel for the message
  * 4. Check notifications_log in TablePlus — should have a 'sent' row
  * 5. Check jobs table — is_notified should be 1 on included jobs
  * 6. RESTORE define('APP_ENV', 'local') in config.local.php immediately after
  *
  * ─── cPANEL CRON (06:00 UTC = 09:00 EAT daily) ──────────────────────────────
- * 0 6 * * *  php /home/username/public_html/jobs-api/cron/works/notify_digest.php >> /home/username/logs/digest.log 2>&1
+ * 0 6 * * *  php /home/username/public_html/jobs-api/cron/notification/notify_digest.php >> /home/username/logs/digest.log 2>&1
  *
  * ─── CHANNELS STATUS ─────────────────────────────────────────────────────────
  *   ✅ Telegram   — active (posts into the "Opportunities Updates" topic — see config)
@@ -168,7 +168,9 @@ foreach ($jobs as $i => $job) {
         }
     }
 
-    $jobLines[] = "{$num}. *{$job['title']}* @ {$job['company']}{$africa}{$closingStr}"
+    $safeTitle   = escapeTelegramMarkdown($job['title']);
+    $safeCompany = escapeTelegramMarkdown($job['company']);
+    $jobLines[] = "{$num}. *{$safeTitle}* @ {$safeCompany}{$africa}{$closingStr}"
                 . "\n   {$locEmoji} {$locLabel}{$salaryStr}";
 }
 
@@ -197,7 +199,7 @@ MSG;
 $jobIds     = array_column($jobs, 'id');
 $jobIdsJson = json_encode($jobIds);
 $msgPreview = mb_substr(strip_tags($message), 0, 200);
-$anySent    = false;
+$allSent    = true;
 
 foreach ($channelsToSend as $channel) {
     [$success, $error] = sendToChannel($channel, $message);
@@ -215,15 +217,18 @@ foreach ($channelsToSend as $channel) {
     ]);
 
     if ($success) {
-        $anySent = true;
         echo "[notify_digest] {$channel}: sent — {$totalNew} new jobs, showing " . \count($jobs) . "\n";
     } else {
+        $allSent = false;
         echo "[notify_digest] {$channel}: FAILED — {$error}\n";
     }
 }
 
-// ── Mark as notified only when at least one channel succeeded ─────────────────
-if ($anySent && !empty($jobIds)) {
+// ── Mark as notified only when ALL intended channels succeeded ─────────────
+// If any channel failed, jobs stay is_notified=0 so the failed channel(s)
+// can retry on the next cron run. Successful channels are deduplicated via
+// notifications_log regardless.
+if ($allSent && !empty($jobIds)) {
     $placeholders = implode(',', array_fill(0, \count($jobIds), '?'));
     $db->prepare("UPDATE jobs SET is_notified = 1 WHERE id IN ({$placeholders})")
        ->execute($jobIds);

@@ -47,6 +47,7 @@
  * │   locationEmoji()        location_type → emoji                          │
  * │   locationLabel()        location_type → human-readable label           │
  * │   currencySymbol()       currency code → symbol                         │
+ * │   escapeTelegramMarkdown()  Escape Markdown chars in external text      │
  * │                                                                         │
  * │ Polyfills                                                               │
  * │   mb_substr()            Fallback if mbstring extension not loaded      │
@@ -1080,8 +1081,9 @@ function sendDiscord(string $message): array
             || (APP_ENV !== 'production' && APP_ENV !== 'staging');
 
         $payload = json_encode([
-            'content'  => $chunk,
-            'username' => 'NairobiDevOps Jobs',
+            'content'          => $chunk,
+            'username'         => 'NairobiDevOps Jobs',
+            'allowed_mentions' => ['parse' => []],
         ]);
 
         $ch = curl_init(DISCORD_WEBHOOK_URL);
@@ -1297,6 +1299,33 @@ function currencySymbol(string $currency): string
         'KES'   => 'KSh ',
         default => strtoupper($currency) . ' ',
     };
+}
+
+/**
+ * Escape Telegram Markdown v1 special characters in a string.
+ *
+ * Job titles and company names from external APIs can contain characters
+ * that Telegram's Markdown parser treats as formatting (e.g. underscores
+ * in "Senior_SRE", backticks, square brackets). Without escaping, these
+ * break the entire message or cause Telegram to reject the send request.
+ *
+ * Must be called BEFORE inserting user-supplied text into Markdown-formatted
+ * message templates (*bold*, _italic_, etc.).
+ *
+ * @param string $text  Raw text to escape
+ * @return string       Safe text for Telegram Markdown
+ */
+function escapeTelegramMarkdown(string $text): string
+{
+    $replacements = [
+        '\\' => '\\\\',
+        '*'  => '\\*',
+        '_'  => '\\_',
+        '`'  => '\\`',
+        '['  => '\\[',
+    ];
+
+    return strtr($text, $replacements);
 }
 
 
