@@ -79,7 +79,7 @@ Key directories:
 
 ## Documentation
 
-All project documentation is located in the root-level [`docs/`](./docs/) directory.
+Most project documentation is located in the root-level [`docs/`](./docs/) directory.
 
 | Document                                                 | Description                                           |
 | -------------------------------------------------------- | ----------------------------------------------------- |
@@ -140,7 +140,7 @@ The frontend dev server runs at `http://localhost:5173`.
 
 4. **Verify database connection:**
    ```bash
-   php check_db.php
+   php backend/check_db.php
    ```
 
 5. **Start the development server:**
@@ -191,7 +191,7 @@ The frontend dev server runs at `http://localhost:5173`.
 | `composer format:check`       | Check code style (dry run, no changes)   |
 | `composer audit`              | Audit Composer dependencies for vulnerabilities |
 | `php -S localhost:8000`       | Start PHP built-in server                |
-| `php check_db.php`            | Verify database connection               |
+| `php backend/check_db.php`    | Verify database connection               |
 
 ---
 

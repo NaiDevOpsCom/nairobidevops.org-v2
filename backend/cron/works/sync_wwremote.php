@@ -429,8 +429,14 @@ function wwrExtractTags(string $title): array
     $lower = strtolower($title);
     $found = [];
     foreach (TECH_TAG_KEYWORDS as $kw) {
-        if (str_contains($lower, $kw)) {
-            $found[] = $kw;
+        if (\strlen($kw) <= 3) {
+            if (preg_match('/\b' . preg_quote($kw, '/') . '\b/', $lower)) {
+                $found[] = $kw;
+            }
+        } else {
+            if (str_contains($lower, $kw)) {
+                $found[] = $kw;
+            }
         }
     }
     return array_values(array_unique($found));

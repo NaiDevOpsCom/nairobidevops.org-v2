@@ -4,10 +4,10 @@
  * expire_jobs.php — Soft-expire stale job listings.
  *
  * Run daily at midnight EAT (21:00 UTC) via cPanel cron:
- *   0 21 * * *  php /home/username/public_html/jobs-api/cron/expire_jobs.php >> /home/username/logs/expire.log 2>&1
+ *   0 21 * * *  php /home/username/public_html/jobs-api/cron/works/expire_jobs.php >> /home/username/logs/expire.log 2>&1
  *
  * Or manually:
- *   php cron/expire_jobs.php
+ *   php cron/works/expire_jobs.php
  *
  * Two expiry rules (from PRD):
  *   1. Job has a closes_at date that has passed → expire immediately
@@ -50,7 +50,7 @@ $duration = (int) round((microtime(true) - $startTime) * 1000); // ms
 
 $db->prepare("
     INSERT INTO sync_log (source, jobs_expired, duration_sec, errors)
-    VALUES ('expire_cron', :expired, :duration, NULL)
+    VALUES ('expire', :expired, :duration, NULL)
 ")->execute([
     ':expired'  => $expired,
     ':duration' => $duration,

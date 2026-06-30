@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 
   CREATE TABLE IF NOT EXISTS sync_log (
     id            INT PRIMARY KEY AUTO_INCREMENT,
-    source        ENUM('remotive','weworkremotely','manual','employer_submission') NOT NULL,
+    source        ENUM('remotive','weworkremotely','manual','employer_submission','expire') NOT NULL,
     ran_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
     jobs_fetched  INT DEFAULT 0,
     jobs_inserted INT DEFAULT 0,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 
   CREATE TABLE IF NOT EXISTS notifications_log (
     id                INT PRIMARY KEY AUTO_INCREMENT,
-    channel           ENUM('telegram','discord','whatsapp','twitter','linkedin') NOT NULL,
+    channel           ENUM('telegram','slack','discord','whatsapp','twitter','linkedin') NOT NULL,
     notification_type ENUM('daily_digest','weekly_roundup','instant_alert') NOT NULL,
     job_ids           JSON,
     message_preview   TEXT,
@@ -71,4 +71,11 @@ CREATE TABLE IF NOT EXISTS jobs (
     INDEX idx_clicked   (clicked_at),
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
   );
-  
+
+-- ── Migration ──────────────────────────────────────────────────────────────────
+-- Existing deployments with the previous notifications_log.channel enum that
+-- included 'slack' but not 'discord' need this ALTER TABLE before using Discord:
+--
+--   ALTER TABLE notifications_log
+--     MODIFY COLUMN channel ENUM('telegram','slack','discord','whatsapp','twitter','linkedin') NOT NULL;
+--
