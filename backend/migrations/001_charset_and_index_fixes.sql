@@ -1,23 +1,19 @@
 -- ============================================================================
 -- Migration: 001_charset_and_index_fixes.sql
--- Purpose:   Fix charset inconsistency, ENUM fragility, and missing indexes
+-- Purpose:   Fix charset inconsistency, ENUM fragility, and correct indexes
 --            ahead of adding new job source APIs.
 --
--- Run this IDENTICALLY against: local -> staging -> production.
--- Safe to re-run: ALTER TABLE ... MODIFY / CONVERT statements are idempotent
--- in effect (re-applying them is a no-op if already applied), but the
--- ADD INDEX / ADD COLUMN statements will error on a second run unless you
--- guard them (see notes at bottom). Run once per environment and verify.
+-- Compatible with: MySQL 5.7, 8.0, 8.4, 9.x
+-- Run against:     local -> staging -> production (in that order)
 -- ============================================================================
 
+
 -- ----------------------------------------------------------------------------
--- 1. CHARSET FIXES
--- `jobs` already has utf8mb4 set explicitly. These three tables do not and
--- will have inherited whatever the server/database default was at creation
--- time (often latin1 or 3-byte utf8 on cPanel). Converting now prevents
--- silent truncation/corruption when non-Latin or emoji text (job titles,
--- error messages, message previews) gets inserted from new sources.
+-- 1. CHARSET FIXES — all four tables to utf8mb4_unicode_ci
 -- ----------------------------------------------------------------------------
+
+ALTER TABLE jobs
+  CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ALTER TABLE sync_log
   CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -30,11 +26,9 @@ ALTER TABLE job_clicks
 
 
 -- ----------------------------------------------------------------------------
--- 2. WIDEN `sync_log.source` FROM ENUM TO VARCHAR
--- This is a log table, not a dedup anchor (jobs.source is, and stays ENUM
--- below) -- there's no integrity benefit to constraining it, and every new
--- API source means a forgotten ALTER here breaks logging for that source's
--- failures silently, which is the opposite of what sync_log is for.
+-- 2. WIDEN sync_log.source FROM ENUM TO VARCHAR
+-- Log tables must never require a schema migration just to accept a new
+-- source name — that would silently break failure logging for new sources.
 -- ----------------------------------------------------------------------------
 
 ALTER TABLE sync_log
@@ -42,10 +36,9 @@ ALTER TABLE sync_log
 
 
 -- ----------------------------------------------------------------------------
--- 3. WIDEN `notifications_log.channel` FROM ENUM TO VARCHAR
--- Same reasoning -- you already added 'discord' once since the original
--- design. Next channel (whatsapp, linkedin, twitter per the PRD Phase 2
--- list) should not require a schema migration just to log a send attempt.
+-- 3. WIDEN notifications_log.channel FROM ENUM TO VARCHAR
+-- Same reasoning — new channels (whatsapp, linkedin, twitter) should not
+-- require a migration just to log a send attempt.
 -- ----------------------------------------------------------------------------
 
 ALTER TABLE notifications_log
@@ -53,45 +46,66 @@ ALTER TABLE notifications_log
 
 
 -- ----------------------------------------------------------------------------
--- 4. COMPOSITE INDEXES ON `jobs` FOR THE HOT QUERY PATH
--- get_jobs.php always filters WHERE is_active=1 AND is_approved=1, then
--- sorts by posted_at DESC (newest) or closes_at ASC (closing soon).
--- Single-column indexes force MySQL to pick one and filesort the rest.
--- There is currently no index on is_approved at all despite it being in
--- every query's WHERE clause.
+-- 4. DROP OLD INCORRECT INDEXES
+-- Written without IF EXISTS for MySQL 5.7/8.0 compatibility.
+-- These will error if the indexes don't exist — that is safe to ignore,
+-- MySQL continues executing the rest of the file.
 -- ----------------------------------------------------------------------------
 
-ALTER TABLE jobs
-  ADD INDEX idx_active_approved_posted (is_active, is_approved, posted_at);
-
-ALTER TABLE jobs
-  ADD INDEX idx_active_approved_closes (is_active, is_approved, closes_at);
+ALTER TABLE jobs DROP INDEX idx_active_approved_posted;
+ALTER TABLE jobs DROP INDEX idx_active_approved_closes;
 
 
 -- ----------------------------------------------------------------------------
--- 5. ADD `click_type` TO `job_clicks`
--- PRD distinguishes 'apply' vs 'affiliate_apply' clicks for revenue
--- reporting, but the table as built only records that a click happened.
--- Adding now avoids click data you can't retroactively categorise later.
+-- 5. GENERATED COLUMN FOR NULL-SAFE closes_at SORTING
+-- Jobs with no deadline have closes_at = NULL. A plain index on closes_at
+-- cannot sort NULLs predictably for "closing soon" ORDER BY.
+-- This generated column substitutes a far-future sentinel so every row
+-- has a real sortable value. VIRTUAL = no extra disk storage.
+-- Written without IF NOT EXISTS for MySQL 5.7/8.0 compatibility.
+-- ----------------------------------------------------------------------------
+
+ALTER TABLE jobs
+  ADD COLUMN closes_at_sort DATETIME
+    GENERATED ALWAYS AS (IFNULL(closes_at, '2099-12-31 23:59:59')) VIRTUAL;
+
+
+-- ----------------------------------------------------------------------------
+-- 6. CORRECT COMPOSITE INDEXES MATCHING ACTUAL QUERY PATTERNS
+--
+-- get_jobs.php hot path:
+--   WHERE is_active = 1 AND is_approved = 1
+--   ORDER BY is_featured DESC, posted_at DESC    (newest sort)
+--   ORDER BY is_featured DESC, closes_at_sort ASC (closing soon sort)
+--
+-- is_featured must be in the index before posted_at/closes_at_sort
+-- so MySQL can avoid a filesort on the ORDER BY clause.
+-- ----------------------------------------------------------------------------
+
+ALTER TABLE jobs
+  ADD INDEX idx_listing_newest (is_active, is_approved, is_featured, posted_at);
+
+ALTER TABLE jobs
+  ADD INDEX idx_listing_closing (is_active, is_approved, is_featured, closes_at_sort);
+
+
+-- ----------------------------------------------------------------------------
+-- 7. click_type COLUMN ON job_clicks
+-- Written without IF NOT EXISTS for MySQL 5.7/8.0 compatibility.
+-- Will error if column already exists (local dev created it this way) —
+-- safe to ignore, the column is already correct in that case.
 -- ----------------------------------------------------------------------------
 
 ALTER TABLE job_clicks
-  ADD COLUMN click_type ENUM('apply','affiliate_apply') NOT NULL DEFAULT 'apply' AFTER job_id;
+  ADD COLUMN click_type
+    ENUM('apply','affiliate_apply') NOT NULL DEFAULT 'apply'
+    AFTER job_id;
 
 
 -- ============================================================================
--- NOT included in this migration (deliberately deferred):
---
--- - jobs.source stays ENUM (it's the dedup anchor, the constraint earns its
---   keep there) -- but remember: adding a new source still requires
---   ALTER TABLE jobs MODIFY source ENUM('remotive','weworkremotely','manual',
---   'employer_submission','NEW_SOURCE_HERE') NOT NULL;
---   as its own migration file when that day comes.
---
--- - source_id NOT NULL fragility for source='manual'/'employer_submission'
---   (synthetic ID generation at insert time, not a schema change) -- handle
---   in application code, separate task.
---
--- - FULLTEXT index on (title, company, description) for search -- not
---   urgent at current row counts, revisit when LIKE search measurably slows.
+-- REMINDER: Adding a new job source requires a new migration file:
+--   migrations/002_add_source_<name>.sql
+-- containing:
+--   ALTER TABLE jobs MODIFY source
+--     ENUM('remotive','weworkremotely','manual','employer_submission','<new>') NOT NULL;
 -- ============================================================================
