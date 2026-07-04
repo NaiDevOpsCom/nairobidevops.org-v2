@@ -49,8 +49,8 @@ $expired = $stmt->rowCount();
 $duration = (int) round((microtime(true) - $startTime) * 1000); // ms
 
 $db->prepare("
-    INSERT INTO sync_log (source, jobs_expired, duration_sec, errors)
-    VALUES ('expire', :expired, :duration, NULL)
+    INSERT INTO sync_log (source, jobs_expired, duration_sec, errors, status)
+    VALUES ('expire', :expired, :duration, NULL, 'success')
 ")->execute([
     ':expired'  => $expired,
     ':duration' => $duration,

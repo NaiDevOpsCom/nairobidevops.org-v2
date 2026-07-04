@@ -750,14 +750,15 @@ $duration  = time() - $startTime;
 $errorText = empty($errors) ? null : implode("\n", $errors);
 
 $db->prepare("
-    INSERT INTO sync_log (source, jobs_fetched, jobs_inserted, jobs_skipped, duration_sec, errors)
-    VALUES ('weworkremotely', :fetched, :inserted, :skipped, :duration, :errors)
+    INSERT INTO sync_log (source, jobs_fetched, jobs_inserted, jobs_skipped, duration_sec, errors, status)
+    VALUES ('weworkremotely', :fetched, :inserted, :skipped, :duration, :errors, :status)
 ")->execute([
     ':fetched'  => $totalFetched,
     ':inserted' => $totalInserted,
     ':skipped'  => $totalSkipped + $totalExcluded,
     ':duration' => $duration,
     ':errors'   => $errorText,
+    ':status'   => empty($errors) ? 'success' : 'partial',
 ]);
 
 // ── Summary ───────────────────────────────────────────────────────────────────
