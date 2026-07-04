@@ -44,7 +44,7 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- the 'success' default only applies to rows created by older code.
 SET @sql = (SELECT IF(
     @status_column_added = '1',
-    "UPDATE sync_log SET status = CASE WHEN COALESCE(TRIM(errors), '') = '' THEN 'success' ELSE 'failed' END",
+    'UPDATE sync_log SET status = CASE WHEN COALESCE(TRIM(errors), \'\') = \'\' THEN \'success\' ELSE \'failed\' END',
     'SELECT 1'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
