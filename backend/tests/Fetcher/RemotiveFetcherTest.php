@@ -30,7 +30,7 @@ final class RemotiveFetcherTest extends TestCase
     }
 
     #[Test]
-    public function it_returns_partial_results_when_one_category_fails(): void
+    public function it_throws_on_partial_failure_when_one_category_fails(): void
     {
         $client = $this->createMock(HttpClientInterface::class);
 
@@ -76,7 +76,7 @@ final class RemotiveFetcherTest extends TestCase
             ->method('get')
             ->willReturn(['status' => 429, 'body' => '', 'error' => '']);
 
-        $fetcher = new RemotiveFetcher($client);
+        $fetcher = new RemotiveFetcher($client, initialBackoffMs: 1, rateLimitBackoffMs: 1);
 
         $this->expectException(SourceUnavailableException::class);
         $fetcher->fetch();

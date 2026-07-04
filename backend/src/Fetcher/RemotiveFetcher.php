@@ -24,7 +24,6 @@ final class RemotiveFetcher implements JobFetcherInterface
     private const BASE_URL = 'https://remotive.com/api/remote-jobs';
     private const USER_AGENT = 'NairobiDevOps-JobsBot/1.0 (nairobidevops.org)';
     public const MAX_ATTEMPTS = 3;
-    private const INITIAL_BACKOFF_MS = 500;
 
     /** @var string[] Remotive category slugs to fetch, per the PRD's Tier 1 source spec */
     public const CATEGORIES = ['devops-sysadmin', 'software-dev', 'cloud'];
@@ -33,6 +32,8 @@ final class RemotiveFetcher implements JobFetcherInterface
         private readonly HttpClientInterface $httpClient,
         private readonly int $timeoutSeconds = 20,
         private readonly int $limitPerCategory = 100,
+        private readonly int $initialBackoffMs = 500,
+        private readonly int $rateLimitBackoffMs = 30_000,
     ) {
     }
 
@@ -53,7 +54,11 @@ final class RemotiveFetcher implements JobFetcherInterface
         $allJobs = [];
         $categoryErrors = [];
 
-        foreach (self::CATEGORIES as $category) {
+        foreach (self::CATEGORIES as $i => $category) {
+            if ($i > 0) {
+                usleep(1_000_000); // 1s pacing between categories
+            }
+
             try {
                 $allJobs = [...$allJobs, ...$this->fetchCategory($category)];
             } catch (SourceUnavailableException $e) {
@@ -93,7 +98,10 @@ final class RemotiveFetcher implements JobFetcherInterface
                 $lastError = $e;
 
                 if ($attempt < self::MAX_ATTEMPTS) {
-                    $backoffMs = self::INITIAL_BACKOFF_MS * (2 ** ($attempt - 1));
+                    $isRateLimit = str_contains($e->getMessage(), 'Rate limited');
+                    $backoffMs = $isRateLimit
+                        ? $this->rateLimitBackoffMs
+                        : $this->initialBackoffMs * (2 ** ($attempt - 1));
                     usleep($backoffMs * 1000);
                 }
             }

@@ -39,9 +39,12 @@ SET @sql = (SELECT IF(
     'SELECT 1'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- Also backfill status for rows where errors exist — but note: future INSERTs
+-- in sync_*.php now set status explicitly ('success'/'partial'/'failed'), so
+-- the 'success' default only applies to rows created by older code.
 SET @sql = (SELECT IF(
     @status_column_added = '1',
-    'UPDATE sync_log SET status = CASE WHEN COALESCE(TRIM(errors), \"\") = \"\" THEN \'success\' ELSE \'failed\' END',
+    "UPDATE sync_log SET status = CASE WHEN COALESCE(TRIM(errors), '') = '' THEN 'success' ELSE 'failed' END",
     'SELECT 1'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 

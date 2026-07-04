@@ -6,10 +6,15 @@ require_once \dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Migration\MigrationRunner;
 
-$runner = new MigrationRunner(getDB(), \dirname(__DIR__) . '/migrations');
-$runner->ensureMigrationsTableExists();
+try {
+    $runner = new MigrationRunner(getDB(), \dirname(__DIR__) . '/migrations');
+    $runner->ensureMigrationsTableExists();
 
-$pending = $runner->pendingMigrations();
+    $pending = $runner->pendingMigrations();
+} catch (RuntimeException $e) {
+    echo 'FAILED: ' . $e->getMessage() . "\n";
+    exit(1);
+}
 
 if (empty($pending)) {
     echo "No pending migrations.\n";

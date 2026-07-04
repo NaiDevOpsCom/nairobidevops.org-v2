@@ -1,4 +1,4 @@
--- 001_initial_schema.sql
+-- 003_initial_schema.sql
 -- Canonical starting schema. Idempotent — safe on a fresh DB or one that
 -- already has some/all of these objects (should no-op, not error).
 
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS sync_log (
 
 CREATE TABLE IF NOT EXISTS notifications_log (
     id                INT PRIMARY KEY AUTO_INCREMENT,
-    channel           ENUM('telegram','discord','whatsapp','twitter','linkedin') NOT NULL,
+    channel           VARCHAR(50) NOT NULL,
     notification_type ENUM('daily_digest','weekly_roundup','instant_alert') NOT NULL,
     job_ids           JSON,
     message_preview   TEXT,
@@ -65,6 +65,18 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     version    VARCHAR(20) PRIMARY KEY,
     filename   VARCHAR(255) NOT NULL,
     applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS job_clicks (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    job_id      INT          NOT NULL,
+    click_type  ENUM('apply','affiliate_apply') NOT NULL DEFAULT 'apply',
+    clicked_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_job_id  (job_id),
+    INDEX idx_clicked (clicked_at),
+    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── Guarded column repairs for partially-created tables (safe to re-run) ───
@@ -247,7 +259,7 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = (SELECT IF(
     NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
                 WHERE table_schema=@schema AND table_name='notifications_log' AND column_name='channel'),
-    'ALTER TABLE notifications_log ADD COLUMN channel ENUM(\'telegram\',\'discord\',\'whatsapp\',\'twitter\',\'linkedin\') NOT NULL', 'SELECT 1'));
+    'ALTER TABLE notifications_log ADD COLUMN channel VARCHAR(50) NOT NULL', 'SELECT 1'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = (SELECT IF(

@@ -9,7 +9,7 @@ namespace App\Contracts;
  * return raw, unvalidated response data as an array of per-job records.
  *
  * No parsing into the internal schema here (that's JobNormalizerInterface's
- * job) and no DB access here (that's JobRepositoryInterface's job). This
+ * job) and no DB access here (that's the repository/persistence layer's job). This
  * separation is what lets "Remotive is down" degrade independently of
  * "We Work Remotely succeeded" — each fetcher fails or succeeds on its own.
  */

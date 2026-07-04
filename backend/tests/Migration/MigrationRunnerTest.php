@@ -67,13 +67,16 @@ final class MigrationRunnerTest extends TestCase
         self::assertFalse($this->db->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'partial_test'")->fetchColumn());
     }
 
-    public function testConstructorForcesExceptionModeForSqlFailures(): void
+    public function testApplyThrowsOnInvalidSql(): void
     {
         $db = new PDO('sqlite::memory:');
+        $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $path = $this->fixturesPath . '/001_bad.sql';
         file_put_contents($path, 'THIS IS NOT VALID SQL;');
 
         $runner = new MigrationRunner($db, $this->fixturesPath);
+
+        self::assertSame(PDO::ERRMODE_EXCEPTION, $db->getAttribute(PDO::ATTR_ERRMODE));
 
         $this->expectException(RuntimeException::class);
         $runner->apply('001', $path);

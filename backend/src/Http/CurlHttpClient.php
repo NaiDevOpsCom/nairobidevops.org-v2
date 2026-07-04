@@ -23,13 +23,17 @@ final class CurlHttpClient implements HttpClientInterface
             throw new SourceUnavailableException("cURL failed to initialize for {$url}");
         }
 
-        curl_setopt_array($ch, [
+        $ok = curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $timeoutSeconds,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_HTTPHEADER     => $headerLines,
         ]);
+        if ($ok === false) {
+            throw new SourceUnavailableException("cURL failed to set options for {$url}");
+        }
 
         $response = curl_exec($ch);
         $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);

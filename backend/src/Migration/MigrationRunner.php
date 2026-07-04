@@ -42,7 +42,7 @@ final class MigrationRunner
     {
         $stmt = $this->db->query('SELECT version FROM schema_migrations ORDER BY version');
 
-        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
     /**
@@ -99,22 +99,15 @@ final class MigrationRunner
 
         $this->db->beginTransaction();
 
+        // NOTE: MySQL DDL (ALTER TABLE, CREATE TABLE) auto-commits and cannot
+        // be rolled back. The transaction here primarily protects the
+        // schema_migrations INSERT — migration SQL files use idempotent guards
+        // (IF NOT EXISTS, information_schema checks) to handle partial DDL.
         try {
-            // exec() (not query()) — migration files contain multi-statement
-            // SQL (PREPARE/EXECUTE blocks), which query() cannot run.
-            $result = $this->db->exec($sql);
-            if ($result === false) {
-                throw new MigrationException("Migration {$version} failed: exec() returned false");
-            }
-
-            $stmt = $this->db->prepare(
+            $this->db->exec($sql);
+            $this->db->prepare(
                 'INSERT INTO schema_migrations (version, filename) VALUES (?, ?)'
-            );
-            if ($stmt === false) {
-                throw new MigrationException("Migration {$version} failed: could not prepare migration record insert");
-            }
-
-            $stmt->execute([$version, basename($filepath)]);
+            )->execute([$version, basename($filepath)]);
 
             $this->db->commit();
         } catch (PDOException $e) {
