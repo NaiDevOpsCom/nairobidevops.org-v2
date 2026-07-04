@@ -38,7 +38,7 @@ This document describes the error handling security measures implemented in the 
 
 ### Global Error Boundary
 
-**File**: [`client/src/components/ErrorBoundary.tsx`](../../client/src/components/ErrorBoundary.tsx)
+**File**: [`frontend/client/src/components/ErrorBoundary.tsx`](../../../frontend/client/src/components/ErrorBoundary.tsx)
 
 A React Error Boundary wraps the entire application to catch unhandled JavaScript errors in any component.
 
@@ -80,7 +80,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 
 ### Source Map Configuration
 
-**File**: [`vite.config.ts`](../../vite.config.ts)
+**File**: [`frontend/vite.config.ts`](../../../frontend/vite.config.ts)
 
 Source maps are conditionally disabled based on environment:
 

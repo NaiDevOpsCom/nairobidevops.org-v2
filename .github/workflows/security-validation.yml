@@ -22,7 +22,9 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  # write required for dependency-review-action to post
+  # the failure summary comment (comment-summary-in-pr: on-failure)
+  pull-requests: write
 
 jobs:
   security-validation:
@@ -118,11 +120,15 @@ jobs:
         with:
           base-ref: ${{ github.event.pull_request.base.sha }}
           head-ref: ${{ github.event.pull_request.head.sha }}
-          fail-on-severity: ${{ inputs.fail-level }}
-          allow-licenses: MIT, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, Unlicense, CC0-1.0
-          comment-summary-in-pr: never
-          license-check: true
-          vulnerability-check: true
+          # License policy is managed in .github/dependency-review-config.yml
+          # to ensure compound SPDX expressions (e.g. "ISC AND JSON AND MIT")
+          # are parsed as atomic allow-list entries (not split on comma).
+          # The inline allow-licenses string format does not reliably handle
+          # compound expressions — use the external YAML list format instead.
+          config-file: .github/dependency-review-config.yml
+          # Show review summary on PR when checks fail so developers
+          # understand why the scan blocked their PR.
+          comment-summary-in-pr: on-failure
 
       - name: Upload Audit Results
         if: always()

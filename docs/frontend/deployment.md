@@ -8,7 +8,7 @@ The project uses GitHub Actions for CI/CD, deploying to a cPanel-hosted server v
 
 ## Deployment Workflow
 
-Production deployment is defined in [.github/workflows/deploy.yml](../.github/workflows/deploy.yml). Staging deployment is defined in [.github/workflows/staging-deploy.yml](../.github/workflows/staging-deploy.yml).
+Production and staging deployment workflows are defined as GitHub Actions (`.github/workflows/`).
 
 ### Triggers
 
