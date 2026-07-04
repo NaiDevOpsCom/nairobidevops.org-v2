@@ -121,34 +121,41 @@ The frontend dev server runs at `http://localhost:5173`.
 ### Backend Setup
 
 1. **Install dependencies:**
+
    ```bash
    cd backend
    composer install
    ```
 
 2. **Configure environment:**
+
    ```bash
    cp config.example.php config.local.php
    ```
+
    Edit `config.local.php` and update `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` for your local MySQL setup.
 
 3. **Create database and import schema:**
+
    ```bash
    mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS nairobidevops_jobs_local;"
    mysql -u root -p nairobidevops_jobs_local < schema.sql
    ```
 
 4. **Verify database connection:**
+
    ```bash
    php backend/check_db.php
    ```
 
 5. **Start the development server:**
+
    ```bash
    php -S localhost:8000
    ```
 
 6. **Test the API:**
+
    ```
    http://localhost:8000/?action=jobs
    ```
@@ -197,7 +204,7 @@ The frontend dev server runs at `http://localhost:5173`.
 
 ## Testing
 
-### Frontend
+### Frontend Tests
 
 Tests use **Vitest**. Run from the `frontend/` directory:
 
@@ -208,7 +215,7 @@ npm run test:coverage   # With coverage report
 npm run test:ui         # Vitest UI dashboard
 ```
 
-### Backend
+### Backend Tests
 
 Tests use **PHPUnit**. Run from the `backend/` directory:
 
@@ -223,18 +230,19 @@ The test suite uses a dedicated database (`nairobidevops_jobs_test` — configur
 
 ## Code Quality
 
-### Frontend
+### Frontend Code Quality
 
 - **ESLint** — configured in `frontend/eslint.config.js`
 - **Prettier** — configured in `frontend/.prettierrc`
 - **TypeScript** — strict mode in `frontend/tsconfig.json`
 
 Run all checks together:
+
 ```bash
 cd frontend && npm run check
 ```
 
-### Backend
+### Backend Code Quality
 
 - **PHP-CS-Fixer** — PSR-12 rules with additional conventions (configured in `backend/.php-cs-fixer.php`)
 
@@ -251,10 +259,12 @@ composer format         # Auto-fix style issues
 The project uses GitHub Actions for deployment. See the [Deployment Guide](./docs/frontend/DEPLOYMENT-GUIDE.md) and [deployment documentation](./docs/frontend/deployment.md) for workflow details.
 
 **Deployment environments:**
+
 - **Production**: `main` branch → cPanel (nairobidevops.org)
 - **Staging**: feature/bugfix branches → cPanel subdomain
 
 **Security features:**
+
 - Atomic symlink-based releases with zero-downtime rollback
 - Shared secret store outside web root (`~/config/secrets.env.php`)
 - IP-based rate limiting and origin validation

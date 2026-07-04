@@ -229,9 +229,9 @@ $errorsStr = empty($errors) ? null : implode(' | ', \array_slice($errors, 0, 10)
 
 $log = $db->prepare("
     INSERT INTO sync_log
-        (source, jobs_fetched, jobs_inserted, jobs_skipped, duration_sec, errors)
+        (source, jobs_fetched, jobs_inserted, jobs_skipped, duration_sec, errors, status)
     VALUES
-        ('remotive', :fetched, :inserted, :skipped, :duration, :errors)
+        ('remotive', :fetched, :inserted, :skipped, :duration, :errors, :status)
 ");
 $log->execute([
     ':fetched'  => $totalFetched,
@@ -239,6 +239,7 @@ $log->execute([
     ':skipped'  => $totalSkipped,
     ':duration' => $duration,
     ':errors'   => $errorsStr,
+    ':status'   => empty($errors) ? 'success' : 'partial',
 ]);
 
 // ── Output (visible when run manually via CLI) ────────────────────────────────

@@ -1,5 +1,6 @@
 <?php
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../helpers.php';
@@ -40,9 +41,7 @@ class HelpersTest extends TestCase
     // isNonTechRole() — the hard block list checked FIRST in mapRoleType()
     // ════════════════════════════════════════════════════════════════════
 
-    /**
-     * @dataProvider nonTechTitleProvider
-     */
+    #[DataProvider('nonTechTitleProvider')]
     public function testIsNonTechRoleBlocksNonDevOpsDisciplines(string $title): void
     {
         $this->assertTrue(
