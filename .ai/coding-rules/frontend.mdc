@@ -1,0 +1,26 @@
+---
+description: Frontend development rules for the NDC React SPA. Applies to all .tsx/.ts files in the frontend directory.
+globs: "frontend/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Frontend Rules
+
+## Project
+NDC (Nairobi DevOps Community) website — React 19, TypeScript 6, Vite 8, Tailwind v4, shadcn/ui, Wouter, TanStack Query 5.
+
+## Conventions
+- Pages in `client/src/pages/`, components in `client/src/components/`, UI primitives in `components/ui/`
+- Use `@/` alias for `client/src/`, `@shared/` for `shared/`
+- Import order: builtin → external → internal → parent → sibling → index (ESLint-enforced)
+- Use Wouter for routing, not React Router
+- Use TanStack React Query for server state, not fetch/axios directly
+- Use `cn()` from `@/lib/utils` for conditional Tailwind classes
+- Support dark mode via ThemeContext: `dark:` Tailwind prefix
+- No inline styles — Tailwind classes only
+- Path alias `@/` maps to `client/src/`
+
+## Hardened Build
+- Production drops all console/debugger at esbuild AND terser levels
+- No sourcemaps in production builds
+- `npm run build:prod` for hardened build, `npm run build` for standard

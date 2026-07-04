@@ -95,7 +95,7 @@ if (existsSync(hookFile)) {
 const hookContent = `#!/usr/bin/env sh
 # ---------------------------------------------------------------
 # Pre-commit quality gate — installed by scripts/setup-git-hooks.js
-# Runs all frontend and backend quality checks before every commit.
+# Runs quality checks and captures a session log before every commit.
 # ---------------------------------------------------------------
 
 # Allow bypassing in emergencies with: git commit --no-verify
@@ -110,8 +110,12 @@ echo "   (bypass with: git commit --no-verify)"
 echo ""
 
 npm run check
+CHECK_STATUS=$?
 
-STATUS=$?
+# Capture session log (non-blocking — runs even if checks fail for audit trail)
+npm run session-log --silent -- --message "auto: pre-commit snapshot" 2>/dev/null || true
+
+STATUS=$CHECK_STATUS
 
 if [ "$STATUS" -ne 0 ]; then
   echo ""
@@ -139,4 +143,5 @@ try {
 
 console.log("✅ Pre-commit hook installed at .git/hooks/pre-commit");
 console.log("   It will run `npm run check` before every commit.");
+console.log("   SonarQube analysis runs in CI (not locally).");
 console.log("   To bypass in an emergency: git commit --no-verify");

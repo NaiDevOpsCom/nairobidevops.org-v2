@@ -31,7 +31,13 @@
     "sitemap:generate": "tsx scripts/generate-sitemap.ts",
     "sitemap:validate": "tsx scripts/validate-sitemap.ts",
     "sitemap:deploy": "bash scripts/deploy-sitemap.sh",
-    "sitemap:test": "tsx scripts/test-strict-validation.ts"
+    "sitemap:test": "tsx scripts/test-strict-validation.ts",
+    "sync-skills": "node .ai/automation/sync-skills.mjs",
+    "sync-rules": "node .ai/automation/sync-rules.mjs",
+    "sync": "npm run sync-skills && npm run sync-rules",
+    "session-log": "node .ai/automation/session-log.mjs",
+    "check:workspace": "node .ai/automation/check-freshness.mjs",
+    "workspace:report": "node .ai/automation/workspace-report.mjs"
   },
   "dependencies": {
     "@cloudinary/react": "^1.14.4",

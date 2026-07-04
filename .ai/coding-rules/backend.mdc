@@ -1,0 +1,36 @@
+---
+description: Backend PHP API development rules. Applies to all .php files in the backend directory.
+globs: "backend/**/*.php"
+alwaysApply: false
+---
+
+# Backend Rules
+
+## Architecture
+- Single entry point: `backend/index.php` dispatches via `?action=` parameter
+- Endpoints in `backend/endpoints/`, each loaded via `require_once`
+- PDO singleton via `getDB()` in `db.php`
+- Utility functions in `helpers.php`
+
+## Coding Standards
+- PSR-12 enforced by PHP-CS-Fixer. Run `composer cs-fix` before committing
+- `declare(strict_types=1)` in all new endpoint files
+- Use typed properties and return types
+- Short array syntax, no unused imports
+
+## Database
+- All queries use PDO prepared statements — never interpolate values into SQL
+- Connection: `PDO::ATTR_EMULATE_PREPARES => false` for real prepared statements
+- Error mode: `PDO::ERRMODE_EXCEPTION`
+- Fetch mode: `PDO::FETCH_ASSOC`
+
+## Security
+- All user input sanitized via `sanitizeString()` (decode → strip → trim)
+- URLs validated for http/https scheme via `filter_var`
+- Employer submissions use `strip_tags` + `htmlspecialchars` with ENT_QUOTES
+- CORS allowlist in `index.php` — add new origins to `$allowedOrigins`
+
+## Responses
+- All responses use `respondJson()` which sets status, Content-Type, encodes JSON, and exits
+- Error responses: `{'error': 'message'}` with appropriate HTTP status
+- Never expose stack traces or SQL in production error messages
