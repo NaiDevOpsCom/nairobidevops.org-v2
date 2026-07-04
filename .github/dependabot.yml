@@ -101,3 +101,13 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+
+  - package-ecosystem: "composer"
+    directory: "/backend"
+    target-branch: "pre-staging"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "composer"

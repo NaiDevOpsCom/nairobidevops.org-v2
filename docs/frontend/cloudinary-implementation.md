@@ -10,7 +10,7 @@ The integration consists of a React frontend and a PHP-based backend proxy to se
 
 The Cloudinary integration uses a hardened proxy layer to securely interact with the Admin API.
 
-- **File**: `client/public/api/imagesCloudinary.php`
+- **File**: `frontend/client/public/api/imagesCloudinary.php`
 - **Security Logic**:
   - **Shared Config**: Use `config-loader.php` to load credentials from `~/config/secrets.env.php`.
   - **Utilities**: Use `security-utils.php` for origin validation and rate limiting.
@@ -38,18 +38,18 @@ Secrets are managed centrally via GitHub Secrets and injected into a shared dire
 
 ### 2. React Frontend Integration
 
-#### Types (`src/types/cloudinary.ts`)
+#### Types (`frontend/client/src/types/cloudinary.ts`)
 
 Defines the structure for Cloudinary resources and response objects.
 
-#### Hook (`src/hooks/useCloudinaryFolder.ts`)
+#### Hook (`frontend/client/src/hooks/useCloudinaryFolder.ts`)
 
 A custom hook used to fetch and manage image data from Cloudinary.
 
 - **Parameters**: `folder` (the target Cloudinary folder).
 - **Features**: Loading states, error handling, pagination (`next_cursor`), and retry logic.
 
-#### Component (`src/components/CloudinaryImage.tsx`)
+#### Component (`frontend/client/src/components/CloudinaryImage.tsx`)
 
 A wrapper around `@cloudinary/react`'s `AdvancedImage`.
 
@@ -79,7 +79,7 @@ To add a new image folder for fetching on the frontend, follow these three steps
 
 Add the new folder name to the `$allowedFolders` whitelist in the Cloudinary proxy file:
 
-- **Source path**: `client/public/api/imagesCloudinary.php` (edit this first)
+- **Source path**: `frontend/client/public/api/imagesCloudinary.php` (edit this first)
 - **Deployed path**: `public_html/api/imagesCloudinary.php` (where the file exists on the server)
 
 Locate the `$allowedFolders` variable in `imagesCloudinary.php` and add your new folder:
@@ -94,7 +94,7 @@ $allowedFolders = [
 
 ### 2. Update Frontend Types
 
-Add the folder name to the `CloudinaryFolder` union type in `client/src/types/cloudinary.ts`:
+Add the folder name to the `CloudinaryFolder` union type in `frontend/client/src/types/cloudinary.ts`:
 
 ```typescript
 export type CloudinaryFolder = "ndcCampusTour" | "ndcPartners" | "yourNewFolderName";

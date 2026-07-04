@@ -24,7 +24,7 @@ The mission of the Nairobi DevOps Community is to build and maintain a secure, t
 If you are a developer contributing to this project, please ensure you follow these security guidelines:
 
 1. **Keep Dependencies Updated**: Review and merge Dependabot PRs promptly.
-2. **Review CSP for New Services**: If you add a new external API or tracking script, update [`security-policy.json`](../../security-policy.json).
+2. **Review CSP for New Services**: If you add a new external API or tracking script, update [`security-policy.json`](../../../frontend/security-policy.json).
 3. **Use Safe Navigation**: Never use `window.location` directly with user input; always use the `safeNavigate` utility.
 4. **Secrets Management**: Never commit API keys or secrets to the repository. Use environment variables.
 
