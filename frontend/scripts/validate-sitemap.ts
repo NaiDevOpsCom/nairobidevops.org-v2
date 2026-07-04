@@ -81,13 +81,11 @@ function isValidIsoDate(dateStr: string): boolean {
     const parts = dateStr.split("T");
     if (parts.length !== 2) return false;
 
-    const [datePart, timeZonePart] = parts;
-
     // Validate date portion
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(parts[0])) return false;
 
     // Separate time from optional timezone suffix
-    const tzMatch = /^(.+?)(Z|[+-]\d{2}:\d{2})?$/.exec(timeZonePart);
+    const tzMatch = /^(.+?)(Z|[+-]\d{2}:\d{2})?$/.exec(parts[1]);
     if (!tzMatch) return false;
 
     const timePart = tzMatch[1];
@@ -114,13 +112,13 @@ function validateLastmod(dateStr: string, loc: string): void {
     // Strict calendar check: ensure the date part represents a valid calendar day
     // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
     const datePart = dateStr.split("T")[0];
-    const [y, m, d] = datePart.split("-").map(Number);
-    const testDate = new Date(Date.UTC(y, m - 1, d));
+    const dateParts = datePart.split("-").map(Number);
+    const testDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]));
 
     if (
-      testDate.getUTCFullYear() !== y ||
-      testDate.getUTCMonth() + 1 !== m ||
-      testDate.getUTCDate() !== d
+      testDate.getUTCFullYear() !== dateParts[0] ||
+      testDate.getUTCMonth() + 1 !== dateParts[1] ||
+      testDate.getUTCDate() !== dateParts[2]
     ) {
       fail(`Invalid calendar date: ${dateStr} in ${loc}`);
     }
@@ -192,11 +190,10 @@ function validateSitemap(): void {
   let urlErrorCount = 0;
   const originalFail = fail;
   // wrap fail to track URL specific errors
-  const urlFail = (msg: string) => {
+  fail = (msg: string) => {
     urlErrorCount++;
     originalFail(msg);
   };
-  fail = urlFail;
 
   try {
     const content = validateSitemapFileStructure();
@@ -236,23 +233,27 @@ function validateRobotsTxt(): void {
   pass(`robots.txt exists (${byteSize} bytes)`);
 
   // Check for Sitemap directive (case-insensitive)
-  const sitemapDirective = /^sitemap:\s*https?:\/\/.+\/sitemap\.xml$/im;
-  if (sitemapDirective.test(content)) {
-    pass("robots.txt contains Sitemap directive");
-  } else {
-    fail("robots.txt missing valid 'Sitemap:' directive");
-  }
+  const sitemapLine = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.toLowerCase().startsWith("sitemap:"));
 
-  // Check Sitemap URL is HTTPS
-  const sitemapUrlPattern = /^sitemap:\s*(.+)$/im;
-  const sitemapUrlMatch = sitemapUrlPattern.exec(content);
-  if (sitemapUrlMatch) {
-    const sitemapUrl = sitemapUrlMatch[1].trim();
+  if (sitemapLine) {
+    const sitemapUrl = sitemapLine.slice(8).trim();
+
+    if (sitemapUrl.toLowerCase().endsWith("/sitemap.xml")) {
+      pass("robots.txt contains Sitemap directive");
+    } else {
+      fail("robots.txt missing valid 'Sitemap:' directive");
+    }
+
     if (sitemapUrl.startsWith("https://")) {
       pass("Sitemap URL uses HTTPS");
     } else {
       fail(`Sitemap URL in robots.txt is not HTTPS: ${sitemapUrl}`);
     }
+  } else {
+    fail("robots.txt missing valid 'Sitemap:' directive");
   }
 }
 

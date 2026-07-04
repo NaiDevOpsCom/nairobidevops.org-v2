@@ -9,8 +9,10 @@ import semver from "semver";
 const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const packageJsonPath = path.join(__dirname, "..", "package.json");
-const lockFilePath = path.join(__dirname, "..", "package-lock.json");
+
+let targetDir = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, "..");
+let packageJsonPath = path.join(targetDir, "package.json");
+let lockFilePath = path.join(targetDir, "package-lock.json");
 
 function maxVersion(versions) {
   return versions.reduce((highest, next) => {
@@ -201,9 +203,18 @@ async function run() {
   );
 }
 
-try {
+export async function runForDir(dir) {
+  targetDir = path.resolve(dir);
+  packageJsonPath = path.join(targetDir, "package.json");
+  lockFilePath = path.join(targetDir, "package-lock.json");
   await run();
-} catch (error) {
-  console.error("Node engine check failed:", error);
-  process.exit(1);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  try {
+    await run();
+  } catch (error) {
+    console.error("Node engine check failed:", error);
+    process.exit(1);
+  }
 }
