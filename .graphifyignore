@@ -1,0 +1,15 @@
+# Files/directories to exclude from graphify knowledge graph
+# Uses .gitignore syntax. Evaluated AFTER .gitignore (can only exclude more).
+node_modules/
+vendor/
+dist/
+coverage/
+.git/
+.jetro/
+.jet*
+.kiro/
+.qoder/
+.qodo/
+.cache/
+.cursor/
+.agents/

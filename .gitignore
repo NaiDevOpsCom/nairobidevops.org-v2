@@ -73,16 +73,27 @@ npm-debug.log*
 # Ignore local-only files
 *.localqodana.sarif.json
 
+# ===== AI Workspace — ephemeral data (canonical .ai/ is committed) =====
+.ai/memory/session-log/*
+.ai/memory/active-context.md.local
+
+# Graphify knowledge graph — commit graphify-out/ but ignore local cache
+graphify-out/cost.json
+graphify-out/cache/
+
 # Ignore local AI / tool state and generated config
 .agents/
+.claude/
 .cursor/
 .jetro/
 .kiro/
 .mcp.json
 .windsurfrules
+.windsurf/rules/
 AGENT.md
 CLAUDE.md
 .github/copilot-instructions.md
+.github/instructions/
 
 
 
@@ -95,6 +106,9 @@ backend/composer.phar
 backend/.phpunit.cache/
 backend/.php-cs-fixer.cache
 backend/test_res.txt
+
+# SonarQube scanner cache
+.scannerwork/
 
 # Composer Installer
 composer-setup.php
