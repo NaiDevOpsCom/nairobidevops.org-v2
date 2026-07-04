@@ -34,7 +34,156 @@ function pass(msg: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Sitemap validation
+// Sitemap validation helpers
+// ---------------------------------------------------------------------------
+
+function validateSitemapFileStructure(): string | null {
+  const sitemapPath = path.join(DIST_DIR, "sitemap.xml");
+  // 1. Existence check
+  if (!fs.existsSync(sitemapPath)) {
+    fail("sitemap.xml not found in dist/");
+    return null;
+  }
+
+  const content = fs.readFileSync(sitemapPath, "utf-8").trim();
+  const byteSize = Buffer.byteLength(content, "utf8");
+
+  // 2. Non-empty check
+  if (byteSize === 0) {
+    fail("sitemap.xml is empty");
+    return null;
+  }
+  pass(`sitemap.xml exists (${byteSize} bytes)`);
+
+  // 3. XML declaration
+  if (content.startsWith('<?xml version="1.0"')) {
+    pass("Valid XML declaration present");
+  } else {
+    fail('Missing or malformed XML declaration (expected <?xml version="1.0"...?>)');
+  }
+
+  // 4. Namespace check
+  const namespacePattern = /xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9"/;
+  if (namespacePattern.test(content)) {
+    pass("Correct sitemap namespace");
+  } else {
+    fail(
+      'Missing required sitemap namespace: xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
+    );
+  }
+
+  return content;
+}
+
+function isValidIsoDate(dateStr: string): boolean {
+  if (dateStr.includes("T")) {
+    // Split into date, time, and optional timezone parts
+    const parts = dateStr.split("T");
+    if (parts.length !== 2) return false;
+
+    const [datePart, timeZonePart] = parts;
+
+    // Validate date portion
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false;
+
+    // Separate time from optional timezone suffix
+    const tzMatch = /^(.+?)(Z|[+-]\d{2}:\d{2})?$/.exec(timeZonePart);
+    if (!tzMatch) return false;
+
+    const timePart = tzMatch[1];
+
+    // Validate time portion: HH:MM, optionally HH:MM:SS or HH:MM:SS.sss
+    if (!/^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(timePart)) return false;
+
+    return true;
+  }
+  const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+  return dateOnlyPattern.test(dateStr);
+}
+
+function validateLastmod(dateStr: string, loc: string): void {
+  // ISO 8601 date-only (YYYY-MM-DD) or full datetime with optional timezone offset
+  if (isValidIsoDate(dateStr)) {
+    // Validate actual date value
+    const parsed = new Date(dateStr);
+    if (Number.isNaN(parsed.getTime())) {
+      fail(`Unparseable <lastmod> date: ${dateStr} in ${loc}`);
+      return;
+    }
+
+    // Strict calendar check: ensure the date part represents a valid calendar day
+    // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
+    const datePart = dateStr.split("T")[0];
+    const [y, m, d] = datePart.split("-").map(Number);
+    const testDate = new Date(Date.UTC(y, m - 1, d));
+
+    if (
+      testDate.getUTCFullYear() !== y ||
+      testDate.getUTCMonth() + 1 !== m ||
+      testDate.getUTCDate() !== d
+    ) {
+      fail(`Invalid calendar date: ${dateStr} in ${loc}`);
+    }
+  } else {
+    fail(`Invalid <lastmod> date format: ${dateStr} in ${loc}`);
+  }
+}
+
+function validateUrlBlock(block: string, seenUrls: Set<string>): void {
+  const locPattern = /<loc>(.*?)<\/loc>/;
+  const lastmodPattern = /<lastmod>(.*?)<\/lastmod>/;
+
+  const locMatch = locPattern.exec(block);
+  const lastmodMatch = lastmodPattern.exec(block);
+
+  if (!locMatch) {
+    fail("URL entry missing <loc> element");
+    return;
+  }
+
+  const loc = locMatch[1];
+
+  // HTTPS check
+  if (!loc.startsWith("https://")) {
+    fail(`URL is not HTTPS: ${loc}`);
+  }
+
+  // Well-formed URL check
+  try {
+    new URL(loc);
+  } catch {
+    fail(`Malformed URL: ${loc}`);
+  }
+
+  // Duplicate check
+  if (seenUrls.has(loc)) {
+    fail(`Duplicate URL: ${loc}`);
+  }
+  seenUrls.add(loc);
+
+  // Lastmod date validation
+  if (lastmodMatch) {
+    validateLastmod(lastmodMatch[1], loc);
+  }
+}
+
+function validateSitemapUrls(content: string): void {
+  // 5. Extract and validate <url> entries
+  const urlBlocks = content.match(/<url>[\s\S]*?<\/url>/g);
+  if (!urlBlocks || urlBlocks.length === 0) {
+    fail("No <url> entries found in sitemap");
+    return;
+  }
+  pass(`Found ${urlBlocks.length} URL entries`);
+
+  const seenUrls = new Set<string>();
+  for (const block of urlBlocks) {
+    validateUrlBlock(block, seenUrls);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main Sitemap validation entrypoint
 // ---------------------------------------------------------------------------
 
 function validateSitemap(): void {
@@ -50,117 +199,12 @@ function validateSitemap(): void {
   fail = urlFail;
 
   try {
-    const sitemapPath = path.join(DIST_DIR, "sitemap.xml");
-
-    // 1. Existence check
-    if (!fs.existsSync(sitemapPath)) {
-      fail("sitemap.xml not found in dist/");
-      return;
-    }
-
-    const content = fs.readFileSync(sitemapPath, "utf-8").trim();
-    const byteSize = Buffer.byteLength(content, "utf8");
-
-    // 2. Non-empty check
-    if (byteSize === 0) {
-      fail("sitemap.xml is empty");
-      return;
-    }
-    pass(`sitemap.xml exists (${byteSize} bytes)`);
-
-    // 3. XML declaration
-    if (!content.startsWith('<?xml version="1.0"')) {
-      fail('Missing or malformed XML declaration (expected <?xml version="1.0"...?>)');
-    } else {
-      pass("Valid XML declaration present");
-    }
-
-    // 4. Namespace check
-    const namespacePattern = /xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9"/;
-    if (!namespacePattern.test(content)) {
-      fail(
-        'Missing required sitemap namespace: xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
-      );
-    } else {
-      pass("Correct sitemap namespace");
-    }
-
-    // 5. Extract and validate <url> entries
-    const urlBlocks = content.match(/<url>[\s\S]*?<\/url>/g);
-    if (!urlBlocks || urlBlocks.length === 0) {
-      fail("No <url> entries found in sitemap");
-      return;
-    }
-    pass(`Found ${urlBlocks.length} URL entries`);
-
-    // 6. Validate each URL entry
-    const locPattern = /<loc>(.*?)<\/loc>/;
-    const lastmodPattern = /<lastmod>(.*?)<\/lastmod>/;
-    const seenUrls = new Set<string>();
-
-    for (const block of urlBlocks) {
-      const locMatch = block.match(locPattern);
-      const lastmodMatch = block.match(lastmodPattern);
-
-      if (!locMatch) {
-        fail("URL entry missing <loc> element");
-        continue;
+    const content = validateSitemapFileStructure();
+    if (content !== null) {
+      validateSitemapUrls(content);
+      if (urlErrorCount === 0) {
+        pass("All URL entries validated");
       }
-
-      const loc = locMatch[1];
-
-      // HTTPS check
-      if (!loc.startsWith("https://")) {
-        fail(`URL is not HTTPS: ${loc}`);
-      }
-
-      // Well-formed URL check
-      try {
-        new URL(loc);
-      } catch {
-        fail(`Malformed URL: ${loc}`);
-      }
-
-      // Duplicate check
-      if (seenUrls.has(loc)) {
-        fail(`Duplicate URL: ${loc}`);
-      }
-      seenUrls.add(loc);
-
-      // Lastmod date validation
-      if (lastmodMatch) {
-        const dateStr = lastmodMatch[1];
-        // ISO 8601 date-only (YYYY-MM-DD) or full datetime with optional timezone offset
-        const isoDatePattern =
-          /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
-        if (!isoDatePattern.test(dateStr)) {
-          fail(`Invalid <lastmod> date format: ${dateStr} in ${loc}`);
-        }
-        // Validate actual date value
-        const parsed = new Date(dateStr);
-        if (isNaN(parsed.getTime())) {
-          fail(`Unparseable <lastmod> date: ${dateStr} in ${loc}`);
-          continue;
-        }
-
-        // Strict calendar check: ensure the date part represents a valid calendar day
-        // (prevents normalization e.g. 2024-02-30 -> 2024-03-01)
-        const datePart = dateStr.split("T")[0];
-        const [y, m, d] = datePart.split("-").map(Number);
-        const testDate = new Date(Date.UTC(y, m - 1, d));
-
-        if (
-          testDate.getUTCFullYear() !== y ||
-          testDate.getUTCMonth() + 1 !== m ||
-          testDate.getUTCDate() !== d
-        ) {
-          fail(`Invalid calendar date: ${dateStr} in ${loc}`);
-        }
-      }
-    }
-
-    if (urlErrorCount === 0) {
-      pass("All URL entries validated");
     }
   } finally {
     // Restore global fail
@@ -193,20 +237,21 @@ function validateRobotsTxt(): void {
 
   // Check for Sitemap directive (case-insensitive)
   const sitemapDirective = /^sitemap:\s*https?:\/\/.+\/sitemap\.xml$/im;
-  if (!sitemapDirective.test(content)) {
-    fail("robots.txt missing valid 'Sitemap:' directive");
-  } else {
+  if (sitemapDirective.test(content)) {
     pass("robots.txt contains Sitemap directive");
+  } else {
+    fail("robots.txt missing valid 'Sitemap:' directive");
   }
 
   // Check Sitemap URL is HTTPS
-  const sitemapUrlMatch = content.match(/^sitemap:\s*(.+)$/im);
+  const sitemapUrlPattern = /^sitemap:\s*(.+)$/im;
+  const sitemapUrlMatch = sitemapUrlPattern.exec(content);
   if (sitemapUrlMatch) {
     const sitemapUrl = sitemapUrlMatch[1].trim();
-    if (!sitemapUrl.startsWith("https://")) {
-      fail(`Sitemap URL in robots.txt is not HTTPS: ${sitemapUrl}`);
-    } else {
+    if (sitemapUrl.startsWith("https://")) {
       pass("Sitemap URL uses HTTPS");
+    } else {
+      fail(`Sitemap URL in robots.txt is not HTTPS: ${sitemapUrl}`);
     }
   }
 }
