@@ -42,19 +42,19 @@ The project consists of two main parts:
 
 Key directories:
 
-| Directory                                              | Purpose                            |
-| ------------------------------------------------------ | ---------------------------------- |
-| `frontend/client/src/`                                 | Application source code            |
-| `frontend/client/src/components/`                      | Reusable UI components             |
-| `frontend/client/src/pages/`                           | Page-level components              |
-| `frontend/client/src/data/`                            | Static data (testimonials, etc.)   |
-| `frontend/client/src/hooks/`                           | Custom React hooks                 |
-| `frontend/client/src/types/`                           | TypeScript type definitions        |
-| `frontend/client/src/utils/`                           | Utility functions                  |
-| `frontend/client/public/`                              | Static assets                      |
-| `frontend/shared/`                                     | Shared config (routes, constants)  |
-| `frontend/scripts/`                                    | Build/utility scripts              |
-| `frontend/security-policy.json`                        | Security headers policy            |
+| Directory                         | Purpose                           |
+| --------------------------------- | --------------------------------- |
+| `frontend/client/src/`            | Application source code           |
+| `frontend/client/src/components/` | Reusable UI components            |
+| `frontend/client/src/pages/`      | Page-level components             |
+| `frontend/client/src/data/`       | Static data (testimonials, etc.)  |
+| `frontend/client/src/hooks/`      | Custom React hooks                |
+| `frontend/client/src/types/`      | TypeScript type definitions       |
+| `frontend/client/src/utils/`      | Utility functions                 |
+| `frontend/client/public/`         | Static assets                     |
+| `frontend/shared/`                | Shared config (routes, constants) |
+| `frontend/scripts/`               | Build/utility scripts             |
+| `frontend/security-policy.json`   | Security headers policy           |
 
 ---
 
@@ -67,13 +67,13 @@ Key directories:
 
 Key directories:
 
-| Directory                  | Purpose                                         |
-| -------------------------- | ----------------------------------------------- |
-| `backend/endpoints/`       | API endpoint handlers (get_jobs, submit, track) |
-| `backend/cron/works/`      | Job sync scripts (Remotive, WWR, expire, clean) |
-| `backend/cron/notification`| Notification dispatchers (digest, weekly)       |
-| `backend/tests/`           | PHPUnit tests                                   |
-| `backend/vendor/`          | Composer dependencies                           |
+| Directory                   | Purpose                                         |
+| --------------------------- | ----------------------------------------------- |
+| `backend/endpoints/`        | API endpoint handlers (get_jobs, submit, track) |
+| `backend/cron/works/`       | Job sync scripts (Remotive, WWR, expire, clean) |
+| `backend/cron/notification` | Notification dispatchers (digest, weekly)       |
+| `backend/tests/`            | PHPUnit tests                                   |
+| `backend/vendor/`           | Composer dependencies                           |
 
 ---
 
@@ -81,21 +81,21 @@ Key directories:
 
 Most project documentation is located in the root-level [`docs/`](./docs/) directory.
 
-| Document                                                 | Description                                           |
-| -------------------------------------------------------- | ----------------------------------------------------- |
-| [Contributing Guide](./docs/CONTRIBUTING.md)             | Development workflow, branching, PR process           |
-| [Security Headers](./docs/frontend/SECURITY-HEADERS.md)  | Single-source-of-truth for HTTP security headers      |
-| [Deployment Guide](./docs/frontend/DEPLOYMENT-GUIDE.md)  | cPanel deployment (staging/production)               |
-| [Deployment (CI/CD)](./docs/frontend/deployment.md)      | GitHub Actions, atomic releases, rollback             |
-| [Sitemap Guide](./docs/frontend/SITEMAP-GUIDE.md)        | Sitemap & robots.txt automation                       |
-| [Cloudinary Integration](./docs/frontend/cloudinary-implementation.md) | Image proxy architecture               |
-| [Security Overview](./docs/frontend/security/README.md)  | Security architecture index                           |
-| [Browser Security Headers](./docs/frontend/security/browser-security-headers.md) | HTTP header details       |
-| [Content Security Policy](./docs/frontend/security/content-security-policy.md) | CSP configuration           |
-| [Supply Chain Security](./docs/frontend/security/dependency-supply-chain-security.md) | Dependabot & deps |
-| [Safe Redirection](./docs/frontend/security/safe-redirection.md) | Open redirect prevention               |
-| [Error Handling](./docs/frontend/security/error-handling.md) | Error boundaries & source maps         |
-| [Content Guide](./frontend/CONTENT_GUIDE.md)             | Data file conventions for frontend content             |
+| Document                                                                              | Description                                      |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| [Contributing Guide](./docs/CONTRIBUTING.md)                                          | Development workflow, branching, PR process      |
+| [Security Headers](./docs/frontend/SECURITY-HEADERS.md)                               | Single-source-of-truth for HTTP security headers |
+| [Deployment Guide](./docs/frontend/DEPLOYMENT-GUIDE.md)                               | cPanel deployment (staging/production)           |
+| [Deployment (CI/CD)](./docs/frontend/deployment.md)                                   | GitHub Actions, atomic releases, rollback        |
+| [Sitemap Guide](./docs/frontend/SITEMAP-GUIDE.md)                                     | Sitemap & robots.txt automation                  |
+| [Cloudinary Integration](./docs/frontend/cloudinary-implementation.md)                | Image proxy architecture                         |
+| [Security Overview](./docs/frontend/security/README.md)                               | Security architecture index                      |
+| [Browser Security Headers](./docs/frontend/security/browser-security-headers.md)      | HTTP header details                              |
+| [Content Security Policy](./docs/frontend/security/content-security-policy.md)        | CSP configuration                                |
+| [Supply Chain Security](./docs/frontend/security/dependency-supply-chain-security.md) | Dependabot & deps                                |
+| [Safe Redirection](./docs/frontend/security/safe-redirection.md)                      | Open redirect prevention                         |
+| [Error Handling](./docs/frontend/security/error-handling.md)                          | Error boundaries & source maps                   |
+| [Content Guide](./frontend/CONTENT_GUIDE.md)                                          | Data file conventions for frontend content       |
 
 ---
 
@@ -166,39 +166,39 @@ The frontend dev server runs at `http://localhost:5173`.
 
 ### Frontend (`frontend/`)
 
-| Command                        | Description                              |
-| ------------------------------ | ---------------------------------------- |
-| `npm run dev`                  | Start Vite dev server                    |
-| `npm run build`                | Production build (lint + typecheck + format + build) |
-| `npm run build:staging`        | Staging build                           |
-| `npm run preview`              | Preview production build locally         |
-| `npm run lint`                 | Run ESLint                               |
-| `npm run lint:fix`             | Run ESLint with auto-fix                 |
-| `npm run format`               | Format all files with Prettier           |
-| `npm run format:check`         | Check formatting without modifying       |
-| `npm run typecheck`            | TypeScript type checking (`tsc --noEmit`)|
-| `npm run check`                | Run all checks (lint + typecheck + format)|
-| `npm run test`                 | Run Vitest tests                         |
-| `npm run test:watch`           | Run tests in watch mode                  |
-| `npm run test:coverage`        | Run tests with coverage report           |
-| `npm run test:ui`              | Run tests with Vitest UI                 |
-| `npm run sitemap:generate`     | Generate `sitemap.xml`                   |
-| `npm run sitemap:validate`     | Validate sitemap and robots.txt          |
-| `npm run security:generate`    | Generate `.htaccess` from policy         |
+| Command                     | Description                                          |
+| --------------------------- | ---------------------------------------------------- |
+| `npm run dev`               | Start Vite dev server                                |
+| `npm run build`             | Production build (lint + typecheck + format + build) |
+| `npm run build:staging`     | Staging build                                        |
+| `npm run preview`           | Preview production build locally                     |
+| `npm run lint`              | Run ESLint                                           |
+| `npm run lint:fix`          | Run ESLint with auto-fix                             |
+| `npm run format`            | Format all files with Prettier                       |
+| `npm run format:check`      | Check formatting without modifying                   |
+| `npm run typecheck`         | TypeScript type checking (`tsc --noEmit`)            |
+| `npm run check`             | Run all checks (lint + typecheck + format)           |
+| `npm run test`              | Run Vitest tests                                     |
+| `npm run test:watch`        | Run tests in watch mode                              |
+| `npm run test:coverage`     | Run tests with coverage report                       |
+| `npm run test:ui`           | Run tests with Vitest UI                             |
+| `npm run sitemap:generate`  | Generate `sitemap.xml`                               |
+| `npm run sitemap:validate`  | Validate sitemap and robots.txt                      |
+| `npm run security:generate` | Generate `.htaccess` from policy                     |
 
 ### Backend (`backend/`)
 
-| Command                       | Description                              |
-| ----------------------------- | ---------------------------------------- |
-| `composer install`            | Install PHP dependencies                 |
-| `composer update`             | Update PHP dependencies                  |
-| `composer test`               | Run PHPUnit tests                        |
-| `composer test:coverage`      | Run tests with HTML coverage report      |
-| `composer format`             | Fix code style with PHP-CS-Fixer         |
-| `composer format:check`       | Check code style (dry run, no changes)   |
-| `composer audit`              | Audit Composer dependencies for vulnerabilities |
-| `php -S localhost:8000`       | Start PHP built-in server                |
-| `php backend/check_db.php`    | Verify database connection               |
+| Command                    | Description                                     |
+| -------------------------- | ----------------------------------------------- |
+| `composer install`         | Install PHP dependencies                        |
+| `composer update`          | Update PHP dependencies                         |
+| `composer test`            | Run PHPUnit tests                               |
+| `composer test:coverage`   | Run tests with HTML coverage report             |
+| `composer format`          | Fix code style with PHP-CS-Fixer                |
+| `composer format:check`    | Check code style (dry run, no changes)          |
+| `composer audit`           | Audit Composer dependencies for vulnerabilities |
+| `php -S localhost:8000`    | Start PHP built-in server                       |
+| `php backend/check_db.php` | Verify database connection                      |
 
 ---
 

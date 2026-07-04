@@ -194,6 +194,7 @@ We use a branching model based on `main` and `pre-dev` (staging) branches:
 - **Best Practices**: Stricter rules are in place. Address warnings (e.g., regarding impure functions) rather than suppressing them.
 
 **Run all frontend checks together:**
+
 ```bash
 cd frontend && npm run check
 ```
@@ -269,27 +270,27 @@ chore(deps): bump react-query version
 
 ### Frontend (`frontend/`)
 
-| Command              | Description                              |
-| -------------------- | ---------------------------------------- |
-| `npm run dev`        | Start Vite dev server                    |
-| `npm run build`      | Production build                         |
-| `npm run preview`    | Preview production build                 |
-| `npm run test`       | Run Vitest tests                         |
-| `npm run test:watch` | Run tests in watch mode                  |
-| `npm run lint`       | Run ESLint checks                        |
-| `npm run lint:fix`   | Run ESLint with auto-fix                 |
-| `npm run format`     | Format all files with Prettier           |
-| `npm run format:check` | Check formatting without modifying     |
-| `npm run typecheck`  | TypeScript type checking                 |
-| `npm run check`      | Run all checks (lint + typecheck + format)|
+| Command                | Description                                |
+| ---------------------- | ------------------------------------------ |
+| `npm run dev`          | Start Vite dev server                      |
+| `npm run build`        | Production build                           |
+| `npm run preview`      | Preview production build                   |
+| `npm run test`         | Run Vitest tests                           |
+| `npm run test:watch`   | Run tests in watch mode                    |
+| `npm run lint`         | Run ESLint checks                          |
+| `npm run lint:fix`     | Run ESLint with auto-fix                   |
+| `npm run format`       | Format all files with Prettier             |
+| `npm run format:check` | Check formatting without modifying         |
+| `npm run typecheck`    | TypeScript type checking                   |
+| `npm run check`        | Run all checks (lint + typecheck + format) |
 
 ### Backend (`backend/`)
 
-| Command                   | Description                              |
-| ------------------------- | ---------------------------------------- |
-| `composer install`        | Install PHP dependencies                 |
-| `composer test`           | Run PHPUnit tests                        |
-| `composer test:coverage`  | Run tests with coverage report           |
-| `composer format`         | Fix code style with PHP-CS-Fixer         |
-| `composer format:check`   | Check code style (dry run)               |
-| `composer audit`          | Audit dependencies for vulnerabilities   |
+| Command                  | Description                            |
+| ------------------------ | -------------------------------------- |
+| `composer install`       | Install PHP dependencies               |
+| `composer test`          | Run PHPUnit tests                      |
+| `composer test:coverage` | Run tests with coverage report         |
+| `composer format`        | Fix code style with PHP-CS-Fixer       |
+| `composer format:check`  | Check code style (dry run)             |
+| `composer audit`         | Audit dependencies for vulnerabilities |

@@ -60,7 +60,7 @@ The Error Boundary is automatically active. No additional configuration is neede
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <App />
-  </ErrorBoundary>
+  </ErrorBoundary>,
 );
 ```
 

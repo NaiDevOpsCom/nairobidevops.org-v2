@@ -48,7 +48,7 @@ function generateCSPString(cspConfig) {
       // Any other shape is unexpected and should surface a configuration error
       console.error(
         `Error: Invalid CSP directive value for "${key}" in ${POLICY_PATH}. ` +
-        `Expected boolean, string, or array; received: ${JSON.stringify(value)}`
+          `Expected boolean, string, or array; received: ${JSON.stringify(value)}`
       );
       process.exit(1);
       return ""; // unreachable (process.exit terminates first); keeps the callback's return type consistent
@@ -95,11 +95,7 @@ function buildApacheConfigRules(policy) {
 
   options.forEach((option) => {
     if (option === "-Indexes") {
-      rules.push(
-        "  <IfModule mod_autoindex.c>",
-        `    Options ${option}`,
-        "  </IfModule>"
-      );
+      rules.push("  <IfModule mod_autoindex.c>", `    Options ${option}`, "  </IfModule>");
     } else if (option === "-MultiViews") {
       rules.push(
         "  <IfModule mod_negotiation.c>",
@@ -127,7 +123,7 @@ function buildProxyRules(policy) {
       const identifier = proxy.source || `at index ${index}`;
       throw new Error(
         `Invalid or missing "apacheRewrite" for proxy "${identifier}". ` +
-        `Expected non-empty string, received: ${JSON.stringify(proxy.apacheRewrite)}`
+          `Expected non-empty string, received: ${JSON.stringify(proxy.apacheRewrite)}`
       );
     }
 

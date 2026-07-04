@@ -115,8 +115,7 @@ type TooltipContentProps = React.ComponentProps<"div"> & {
   payload?: RechartsPayloadItem[];
   label?: unknown;
   labelFormatter?:
-    | ((label: unknown, payload?: RechartsPayloadItem[]) => React.ReactNode)
-    | undefined;
+    ((label: unknown, payload?: RechartsPayloadItem[]) => React.ReactNode) | undefined;
   labelClassName?: string;
   formatter?:
     | ((
