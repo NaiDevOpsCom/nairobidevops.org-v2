@@ -12,15 +12,15 @@
  * Or:  npm run check:workspace
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
-import { join, dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const AI_DIR = join(ROOT, '.ai');
 
-const REFS_PATTERN = /\.ai\/[\w\-\/]+\.(?:mdc|mjs|md)/g;
+const REFS_PATTERN = /\.ai\/[\w\-/]+\.(?:mdc|mjs|md)/g;
 
 let errors = 0;
 let warnings = 0;
@@ -51,11 +51,12 @@ function checkDirectories() {
 
   for (const d of required) {
     const p = join(AI_DIR, d);
-    if (!existsSync(p)) err(`Required directory missing: .ai/${d}/`);
-    else {
+    if (existsSync(p)) {
       const files = readdirSync(p).filter(f => !f.startsWith('.'));
       if (files.length === 0) warn(`Directory .ai/${d}/ is empty`);
       else ok(`.ai/${d}/ (${files.length} entries)`);
+    } else {
+      err(`Required directory missing: .ai/${d}/`);
     }
   }
 
@@ -76,12 +77,10 @@ function checkCrossReferences() {
     for (const ref of refs) {
       refCount++;
       // Resolve relative to ROOT (references are repo-relative paths)
-      let target = join(ROOT, ref.replace(/\//g, '\\'));
-      // Handle Windows path normalization
-      target = resolve(target);
+      const target = resolve(ROOT, ref);
       if (!existsSync(target)) {
         brokenCount++;
-        const rel = file.replace(ROOT, '').replace(/^[/\\]/, '');
+        const rel = file.replaceAll(ROOT, '').replace(/^[/\\]/, '');
         err(`Broken ref in ${rel}: \`${ref}\``);
       }
     }

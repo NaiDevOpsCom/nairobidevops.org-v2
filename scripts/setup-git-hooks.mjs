@@ -98,6 +98,12 @@ const hookContent = `#!/usr/bin/env sh
 # Runs quality checks and captures a session log before every commit.
 # ---------------------------------------------------------------
 
+# Strict mode: catch unset variables and pipe failures.
+# set -e is intentionally omitted — npm run check exit code is captured
+# explicitly so npm run session-log can always run for audit trail.
+set -u
+set -o pipefail
+
 # Allow bypassing in emergencies with: git commit --no-verify
 # This should ONLY be used in genuine emergencies.
 

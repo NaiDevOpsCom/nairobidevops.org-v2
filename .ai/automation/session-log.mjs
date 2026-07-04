@@ -23,6 +23,12 @@ function run(cmd) {
   } catch { return '(error running command)'; }
 }
 
+function getLastTag() {
+  try {
+    return execSync('git describe --tags --abbrev=0', { cwd: ROOT, encoding: 'utf8', stdio: 'pipe' }).trim();
+  } catch { return '(no tags)'; }
+}
+
 function sanitise(s) {
   return s.replace(/["'`]/g, '').replace(/[<>|]/g, '-').slice(0, 120);
 }
@@ -43,7 +49,7 @@ function capture() {
   const dirtyCount = uncommitted === '(error running command)' ? 0 : uncommitted.split('\n').filter(l => l).length;
   const diffStat = run('git diff --stat');
   const nodeVer = run('node --version');
-  const lastTag = run('git describe --tags --abbrev=0 2>nul || echo "(no tags)"');
+  const lastTag = getLastTag();
 
   // Determine current phase from active-context.md
   let phase = 'Unknown';

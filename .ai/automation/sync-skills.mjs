@@ -1,17 +1,19 @@
 /**
- * sync-skills.js
+ * sync-skills.mjs
  *
  * Syncs SKILL.md files from .ai/skills/ (canonical source)
  * to .claude/skills/ and .agents/skills/ (tool-specific locations).
  *
- * Run: node .ai/automation/sync-skills.js
+ * Run: node .ai/automation/sync-skills.mjs
  * Or:  npm run sync-skills
  */
 
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
 
-const ROOT = resolve(import.meta.dirname, "../..");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, "../..");
 const SOURCE = join(ROOT, ".ai/skills");
 const TARGETS = [".claude/skills", ".agents/skills"];
 
