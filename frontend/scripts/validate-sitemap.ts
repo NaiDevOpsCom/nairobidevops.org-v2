@@ -79,7 +79,7 @@ function validateSitemap(): void {
     const namespacePattern = /xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9"/;
     if (!namespacePattern.test(content)) {
       fail(
-        "Missing required sitemap namespace: xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"",
+        'Missing required sitemap namespace: xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
       );
     } else {
       pass("Correct sitemap namespace");
@@ -131,7 +131,8 @@ function validateSitemap(): void {
       if (lastmodMatch) {
         const dateStr = lastmodMatch[1];
         // ISO 8601 date-only (YYYY-MM-DD) or full datetime with optional timezone offset
-        const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
+        const isoDatePattern =
+          /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/;
         if (!isoDatePattern.test(dateStr)) {
           fail(`Invalid <lastmod> date format: ${dateStr} in ${loc}`);
         }
@@ -166,7 +167,6 @@ function validateSitemap(): void {
     fail = originalFail;
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // Robots.txt validation

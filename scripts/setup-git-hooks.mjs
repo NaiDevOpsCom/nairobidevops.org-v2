@@ -83,8 +83,12 @@ if (existsSync(hookFile)) {
     console.log("✅ Pre-commit hook already installed and up to date.");
     process.exit(0);
   }
-  console.warn("⚠️  A pre-commit hook already exists and does not contain `npm run check`.");
-  console.warn("   Overwriting it. Your previous hook is lost — check .git/hooks/pre-commit if needed.");
+  console.warn(
+    "⚠️  A pre-commit hook already exists and does not contain `npm run check`.",
+  );
+  console.warn(
+    "   Overwriting it. Your previous hook is lost — check .git/hooks/pre-commit if needed.",
+  );
 }
 
 // Write the pre-commit hook script.

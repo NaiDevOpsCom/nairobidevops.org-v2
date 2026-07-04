@@ -97,7 +97,10 @@ $allowedFolders = [
 Add the folder name to the `CloudinaryFolder` union type in `frontend/client/src/types/cloudinary.ts`:
 
 ```typescript
-export type CloudinaryFolder = "ndcCampusTour" | "ndcPartners" | "yourNewFolderName";
+export type CloudinaryFolder =
+  | "ndcCampusTour"
+  | "ndcPartners"
+  | "yourNewFolderName";
 ```
 
 ### 3. Implement in Component
