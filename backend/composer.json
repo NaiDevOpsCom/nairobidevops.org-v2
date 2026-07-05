@@ -29,14 +29,10 @@
     "format:check": "@php vendor/bin/php-cs-fixer fix --dry-run --diff",
     "test": "@php vendor/bin/phpunit",
     "test:coverage": "@php vendor/bin/phpunit --coverage-html coverage",
-    "migrate": "@php cron/migrate.php",
-    "audit": "@composer audit"
-  },
+    "migrate": "@php cron/migrate.php"
+},
   "config": {
     "optimize-autoloader": true,
-    "sort-packages": true,
-    "platform": {
-      "php": "8.5.7"
-    }
+    "sort-packages": true
   }
 }

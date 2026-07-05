@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Helpers;
+
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../../helpers.php';
 
 class HelpersTest extends TestCase
 {
@@ -194,15 +198,63 @@ class HelpersTest extends TestCase
         $this->assertSame('Uncategorised', mapRoleType('Senior Shopify Web Developer'));
     }
 
-    public function testMapRoleTypeNeverPromotesReactNativeDeveloperToFrontend(): void
+    #[DataProvider('uncategorisedTitleProvider')]
+    public function testMapRoleTypeReturnsUncategorisedForKnownNonTechTitles(string $title): void
     {
-        // Would otherwise match isFrontendRole()'s 'react native' check —
-        // isNonTechRole() must intercept it first since it's mobile dev, not DevOps
-        $this->assertSame('Uncategorised', mapRoleType('Senior React Native Developer'));
+        $this->assertSame('Uncategorised', mapRoleType($title));
     }
 
-    public function testMapRoleTypeNeverPromotesWebDesignerToDevOps(): void
+    public static function uncategorisedTitleProvider(): array
     {
-        $this->assertSame('Uncategorised', mapRoleType('Freelance Web Designer'));
+        return [
+            'react native developer'            => ['Senior React Native Developer'],
+            'web designer'                      => ['Freelance Web Designer'],
+        ];
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // sanitizeUrl()
+    // ════════════════════════════════════════════════════════════════════
+
+    public function testSanitizeUrlReturnsValidHttpsUrl(): void
+    {
+        $url = 'https://remotive.com/job/123';
+        $this->assertSame($url, sanitizeUrl($url));
+    }
+
+    public function testSanitizeUrlReturnsValidHttpUrl(): void
+    {
+        $url = 'http://example.com/apply';
+        $this->assertSame($url, sanitizeUrl($url));
+    }
+
+    public function testSanitizeUrlRejectsNonHttpScheme(): void
+    {
+        $this->assertNull(sanitizeUrl('ftp://files.example.com/resume'));
+        $this->assertNull(sanitizeUrl('javascript:alert(1)'));
+    }
+
+    public function testSanitizeUrlReturnsNullForNull(): void
+    {
+        $this->assertNull(sanitizeUrl(null));
+    }
+
+    public function testSanitizeUrlReturnsNullForEmptyString(): void
+    {
+        $this->assertNull(sanitizeUrl(''));
+    }
+
+    public function testSanitizeUrlReturnsNullForPlainString(): void
+    {
+        $this->assertNull(sanitizeUrl('not-a-url-at-all'));
+    }
+
+    public function testSanitizeUrlStripsHtmlEntitiesBeforeValidating(): void
+    {
+        // HTML-encoded URL — sanitizeString() decodes entities first
+        $this->assertSame(
+            'https://example.com/job?id=1&ref=ndc',
+            sanitizeUrl('https://example.com/job?id=1&amp;ref=ndc')
+        );
     }
 }

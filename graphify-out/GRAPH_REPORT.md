@@ -1,16 +1,16 @@
-# Graph Report - ndc-redesign-website  (2026-07-04)
+# Graph Report - ndc-redesign-website  (2026-07-06)
 
 ## Corpus Check
-- 294 files · ~156,323 words
+- 301 files · ~162,294 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2770 nodes · 3540 edges · 219 communities (204 shown, 15 thin omitted)
+- 2861 nodes · 3681 edges · 227 communities (206 shown, 21 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 26 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `40b3f859`
+- Built from commit: `0e064dd4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -199,12 +199,20 @@
 - [[_COMMUNITY_Community 210|Community 210]]
 - [[_COMMUNITY_Community 211|Community 211]]
 - [[_COMMUNITY_Community 212|Community 212]]
+- [[_COMMUNITY_Community 213|Community 213]]
 - [[_COMMUNITY_Community 214|Community 214]]
 - [[_COMMUNITY_Community 215|Community 215]]
 - [[_COMMUNITY_Community 216|Community 216]]
 - [[_COMMUNITY_Community 217|Community 217]]
 - [[_COMMUNITY_Community 218|Community 218]]
 - [[_COMMUNITY_Community 219|Community 219]]
+- [[_COMMUNITY_Community 220|Community 220]]
+- [[_COMMUNITY_Community 221|Community 221]]
+- [[_COMMUNITY_Community 222|Community 222]]
+- [[_COMMUNITY_Community 223|Community 223]]
+- [[_COMMUNITY_Community 224|Community 224]]
+- [[_COMMUNITY_Community 225|Community 225]]
+- [[_COMMUNITY_Community 226|Community 226]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `cn()` - 80 edges
@@ -215,8 +223,8 @@
 6. `mapRoleType()` - 28 edges
 7. `scripts` - 27 edges
 8. `HelpersTest` - 26 edges
-9. `Eventspage()` - 25 edges
-10. `Installer` - 22 edges
+9. `HelpersTest` - 26 edges
+10. `Eventspage()` - 25 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `proxyRunMiddleware()` --calls--> `getProxyCacheDir()`  [INFERRED]
@@ -230,11 +238,11 @@
 - `InteractiveImageBentoGallery()` --calls--> `cn()`  [EXTRACTED]
   frontend/client/src/components/ui/bento-gallery.tsx → frontend/client/src/lib/utils.ts
 
-## Communities (219 total, 15 thin omitted)
+## Communities (227 total, 21 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.10
-Nodes (27): SocialIconLink(), SocialIconLinkProps, ANIMATION_VARIANTS, faqDataByCategory, communityGallery, teamGallery, Statistic, statisticsData (+19 more)
+Cohesion: 0.11
+Nodes (23): SocialIconLink(), SocialIconLinkProps, ANIMATION_VARIANTS, communityGallery, teamGallery, Statistic, teamData, TeamMember (+15 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.05
@@ -249,24 +257,24 @@ Cohesion: 0.07
 Nodes (28): useIsMobile(), Separator, Sidebar, SidebarContent, SidebarContext, SidebarContextProps, SidebarFooter, SidebarGroup (+20 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.10
-Nodes (23): Job, JobFilters, JobsApiResponse, JobSource, LocationType, RoleType, SortOption, useJobs() (+15 more)
+Cohesion: 0.16
+Nodes (14): useJobs(), countActiveFilters(), CURRENCY_SYMBOLS, currencySymbol(), DEFAULT_FILTERS, FilterPanel(), formatPostedAt(), formatSalary() (+6 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.13
 Nodes (23): HeroSlideData, heroSlidesData, containerVariants, Direction, HeroCarousel(), bgVariant, contentVariant, HeroSlide() (+15 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (24): CommunityEvent, CommunityProject, events, projects, RecordedSession, recordedSessions, allData, CampusTourSection() (+16 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.16
-Nodes (23): EventCard(), EventCardProps, LumaEventsList(), useLumaEvents(), fetchLumaEvents(), ICALTime, LumaEvent, Badge() (+15 more)
+Cohesion: 0.18
+Nodes (20): EventCard(), EventCardProps, LumaEventsList(), useLumaEvents(), fetchLumaEvents(), ICALTime, LumaEvent, Carousel (+12 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.10
-Nodes (12): AccordionContent, AccordionItem, AccordionTrigger, Checkbox, HoverCardContent, PopoverContent, Progress, RadioGroup (+4 more)
+Cohesion: 0.13
+Nodes (18): cn(), Checkbox, HoverCardContent, Logo, LogoCard(), LogoCardProps, NdcCampusLogos(), NdcCampusLogosProps (+10 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.14
@@ -301,16 +309,16 @@ Cohesion: 0.18
 Nodes (13): buildApacheConfigRules(), buildHeaderRules(), buildProxyRules(), __dirname, escapeHeaderValue(), __filename, generateCSPString(), generateHtaccess() (+5 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.22
-Nodes (15): FeaturedEvent, featuredEvents, UpcomingEvent, upcomingEvents, AdsLogo(), EventsTypeSection(), EventType, eventTypes (+7 more)
+Cohesion: 0.16
+Nodes (18): FeaturedEvent, featuredEvents, UpcomingEvent, upcomingEvents, AdsLogo(), EventsTypeSection(), EventType, eventTypes (+10 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.03
 Nodes (59): dependencies, class-variance-authority, @cloudinary/react, @cloudinary/url-gen, clsx, cmdk, date-fns, embla-carousel (+51 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.15
-Nodes (5): RouteDefinition, routePaths, routes, pathToComponent, RoutePath
+Cohesion: 0.16
+Nodes (9): Navbar(), Theme, ThemeContext, ThemeContextType, ThemeProvider(), ThemeProviderProps, useTheme(), pathToComponent (+1 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.12
@@ -321,16 +329,16 @@ Cohesion: 0.25
 Nodes (10): Author, authorMercy, BlogData, BlogPost, blogPosts, AuthorMeta(), BlogPage(), CategoryBadge() (+2 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.17
-Nodes (23): Action, ActionType, addToRemoveQueue(), dispatch(), genId(), listeners, memoryState, reducer() (+15 more)
+Cohesion: 0.13
+Nodes (28): Action, ActionType, addToRemoveQueue(), dispatch(), genId(), listeners, memoryState, reducer() (+20 more)
 
 ### Community 25 - "Community 25"
 Cohesion: 0.19
 Nodes (6): ErrorBoundary, ErrorBoundaryProps, ErrorBoundaryState, isDevelopment(), styles, rootElement
 
 ### Community 26 - "Community 26"
-Cohesion: 0.18
-Nodes (10): buildSitemapXml(), __dirname, DIST_DIR, __filename, generateSitemap(), getBlogSlugs(), ROOT_DIR, SitemapEntry (+2 more)
+Cohesion: 0.14
+Nodes (13): buildSitemapXml(), __dirname, DIST_DIR, __filename, generateSitemap(), getBlogSlugs(), ROOT_DIR, SitemapEntry (+5 more)
 
 ### Community 27 - "Community 27"
 Cohesion: 0.22
@@ -341,8 +349,8 @@ Cohesion: 0.30
 Nodes (13): __dirname, DIST_DIR, fail(), __filename, isValidIsoDate(), pass(), ROOT_DIR, validateLastmod() (+5 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.18
-Nodes (15): Navbar(), Theme, ThemeContext, ThemeContextType, ThemeProvider(), ThemeProviderProps, useTheme(), SheetContent (+7 more)
+Cohesion: 0.22
+Nodes (8): SheetContent, SheetContentProps, SheetDescription, SheetFooter(), SheetHeader(), SheetOverlay, SheetTitle, sheetVariants
 
 ### Community 30 - "Community 30"
 Cohesion: 0.03
@@ -353,7 +361,7 @@ Cohesion: 0.18
 Nodes (10): backupPath, __dirname, distDir, __filename, files, robotsBackupPath, robotsPath, ROOT_DIR (+2 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.23
+Cohesion: 0.21
 Nodes (13): Pagination(), ButtonProps, buttonVariants, Calendar(), CalendarProps, Pagination(), PaginationContent, PaginationEllipsis() (+5 more)
 
 ### Community 33 - "Community 33"
@@ -389,8 +397,8 @@ Cohesion: 0.25
 Nodes (7): SelectContent, SelectItem, SelectLabel, SelectScrollDownButton, SelectScrollUpButton, SelectSeparator, SelectTrigger
 
 ### Community 41 - "Community 41"
-Cohesion: 0.10
-Nodes (22): cn(), Breadcrumb, BreadcrumbEllipsis(), BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator() (+14 more)
+Cohesion: 0.12
+Nodes (13): Breadcrumb, BreadcrumbEllipsis(), BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator(), DrawerContent (+5 more)
 
 ### Community 42 - "Community 42"
 Cohesion: 0.29
@@ -408,10 +416,6 @@ Nodes (4): existing, gitBin, hookFile, hooksDir
 Cohesion: 0.39
 Nodes (5): RecordedVideoCard(), RecordedVideoCardProps, extractYouTubeId(), getYouTubeThumbnail(), YOUTUBE_THUMBNAIL_PLACEHOLDER_SVG
 
-### Community 46 - "Community 46"
-Cohesion: 0.67
-Nodes (5): apiRequest(), getQueryFn(), queryClient, throwIfResNotOk(), UnauthorizedBehavior
-
 ### Community 48 - "Community 48"
 Cohesion: 0.40
 Nodes (4): InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot
@@ -425,8 +429,8 @@ Cohesion: 0.50
 Nodes (3): TabsContent, TabsList, TabsTrigger
 
 ### Community 51 - "Community 51"
-Cohesion: 0.33
-Nodes (8): createSeededRandom(), seededShuffle(), Logo, LogoCard(), LogoCardProps, NdcCampusLogos(), NdcCampusLogosProps, Skeleton()
+Cohesion: 0.19
+Nodes (12): faqDataByCategory, statisticsData, AfricaDevOpsSummitSection(), AboutSection(), iconMap, FAQSection(), JoinCommunity(), CATEGORY_BACKGROUNDS (+4 more)
 
 ### Community 52 - "Community 52"
 Cohesion: 0.36
@@ -465,8 +469,8 @@ Cohesion: 0.07
 Nodes (28): autoload, autoload-dev, psr-4, files, psr-4, config, optimize-autoloader, platform (+20 more)
 
 ### Community 97 - "Community 97"
-Cohesion: 0.11
-Nodes (19): SEOProps, FAQCategory, FAQData, faqDataFlat, FAQItem, getFAQsByCategory(), GalleryImage, AfricaDevOpsSummitSection() (+11 more)
+Cohesion: 0.16
+Nodes (13): SEOProps, FAQCategory, FAQData, faqDataFlat, FAQItem, getFAQsByCategory(), GalleryImage, EVENTS_FAQ_SCHEMA (+5 more)
 
 ### Community 98 - "Community 98"
 Cohesion: 0.07
@@ -932,22 +936,34 @@ Nodes (3): code:powershell (& (Get-Content graphify-out\.graphify_python) -m gra
 Cohesion: 0.67
 Nodes (3): code:powershell (@'), code:block26 (Graph complete. Outputs in PATH_TO_DIR/graphify-out/), Step 9 - Save manifest, update cost tracker, clean up, and report
 
+### Community 221 - "Community 221"
+Cohesion: 0.18
+Nodes (9): Job, JobFilters, JobsApiResponse, JobSource, LocationType, RoleType, SortOption, UseJobsResult (+1 more)
+
+### Community 225 - "Community 225"
+Cohesion: 0.29
+Nodes (6): DialogContent, DialogDescription, DialogFooter(), DialogHeader(), DialogOverlay, DialogTitle
+
+### Community 226 - "Community 226"
+Cohesion: 0.50
+Nodes (3): AccordionContent, AccordionItem, AccordionTrigger
+
 ## Knowledge Gaps
 - **1473 isolated node(s):** `__dirname`, `ROOT`, `AI_DIR`, `__dirname`, `ROOT` (+1468 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cn()` connect `Community 41` to `Community 3`, `Community 4`, `Community 7`, `Community 8`, `Community 13`, `Community 14`, `Community 17`, `Community 19`, `Community 22`, `Community 24`, `Community 27`, `Community 29`, `Community 32`, `Community 33`, `Community 35`, `Community 36`, `Community 37`, `Community 38`, `Community 39`, `Community 40`, `Community 48`, `Community 50`, `Community 51`, `Community 52`, `Community 182`, `Community 113`?**
-  _High betweenness centrality (0.019) - this node is a cross-community bridge._
+- **Why does `cn()` connect `Community 8` to `Community 3`, `Community 4`, `Community 7`, `Community 13`, `Community 14`, `Community 17`, `Community 19`, `Community 22`, `Community 24`, `Community 27`, `Community 29`, `Community 32`, `Community 33`, `Community 35`, `Community 36`, `Community 37`, `Community 38`, `Community 39`, `Community 40`, `Community 41`, `Community 48`, `Community 50`, `Community 51`, `Community 52`, `Community 182`, `Community 225`, `Community 226`, `Community 113`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
 - **Why does `currencySymbol()` connect `Community 4` to `Community 1`?**
-  _High betweenness centrality (0.014) - this node is a cross-community bridge._
+  _High betweenness centrality (0.013) - this node is a cross-community bridge._
 - **What connects `__dirname`, `ROOT`, `AI_DIR` to the rest of the system?**
   _1473 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.09948979591836735 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1064102564102564 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.05499735589635114 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**

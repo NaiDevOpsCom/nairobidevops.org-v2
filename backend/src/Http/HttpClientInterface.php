@@ -12,7 +12,7 @@ interface HttpClientInterface
 {
     /**
      * @param array<string, string> $headers
-     * @return array{status: int, body: string, error: string}
+     * @return array{status: int, body: string, error: string, headers: array<string, string>}
      */
     public function get(string $url, array $headers, int $timeoutSeconds): array;
 }
