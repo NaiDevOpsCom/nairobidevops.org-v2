@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Helpers;
+
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../../helpers.php';
 
 class HelpersTest extends TestCase
 {
@@ -194,15 +198,26 @@ class HelpersTest extends TestCase
         $this->assertSame('Uncategorised', mapRoleType('Senior Shopify Web Developer'));
     }
 
-    public function testMapRoleTypeNeverPromotesReactNativeDeveloperToFrontend(): void
+    #[DataProvider('uncategorisedTitleProvider')]
+    public function testMapRoleTypeReturnsUncategorisedForKnownNonTechTitles(string $title): void
     {
-        // Would otherwise match isFrontendRole()'s 'react native' check —
-        // isNonTechRole() must intercept it first since it's mobile dev, not DevOps
-        $this->assertSame('Uncategorised', mapRoleType('Senior React Native Developer'));
+        $this->assertSame('Uncategorised', mapRoleType($title));
     }
 
-    public function testMapRoleTypeNeverPromotesWebDesignerToDevOps(): void
+    public static function uncategorisedTitleProvider(): array
     {
-        $this->assertSame('Uncategorised', mapRoleType('Freelance Web Designer'));
+        return [
+            'unknown title'                     => ['Operations Specialist'],
+            'civil engineer'                    => ['EIT - Civil - Anchorage, AK'],
+            'licensed civil engineer'           => ['Licensed Civil Engineer - Site Design'],
+            'electrical engineer'               => ['Electrical Engineer - Tonawanda, NY'],
+            'sales engineer'                    => ['Sales Engineer (Remote, US Based)'],
+            'director title'                    => ['Director of Strategic Accounts'],
+            'ai research'                       => ['AI Research Engineer'],
+            'oracle cloud finance'              => ['Oracle Cloud Finance Manager'],
+            'shopify developer'                 => ['Senior Shopify Web Developer'],
+            'react native developer'            => ['Senior React Native Developer'],
+            'web designer'                      => ['Freelance Web Designer'],
+        ];
     }
 }

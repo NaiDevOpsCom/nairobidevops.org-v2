@@ -834,18 +834,21 @@ function fetchJSON(string $url, ?string $responseKey = 'jobs', int $timeout = 20
  */
 function validateHttpResponse(string|bool $response, int $httpCode, string $curlErr, string $url): ?string
 {
+    $error = null;
+
     if ($curlErr !== '') {
-        fwrite(STDERR, "[fetchJSON] cURL error for {$url}: {$curlErr}\n");
+        $error = "cURL error for {$url}: {$curlErr}";
+    } elseif ($httpCode !== 200) {
+        $error = "HTTP {$httpCode} for {$url}";
+    } elseif (empty($response)) {
+        $error = "Empty response for {$url}";
+    }
+
+    if ($error !== null) {
+        fwrite(STDERR, "[fetchJSON] {$error}\n");
         return null;
     }
-    if ($httpCode !== 200) {
-        fwrite(STDERR, "[fetchJSON] HTTP {$httpCode} for {$url}\n");
-        return null;
-    }
-    if (empty($response)) {
-        fwrite(STDERR, "[fetchJSON] Empty response for {$url}\n");
-        return null;
-    }
+
     return (string) $response;
 }
 
@@ -1076,47 +1079,64 @@ function sendDiscord(string $message): array
         : [$discordMsg];
 
     foreach ($chunks as $i => $chunk) {
-        $disableSsl = filter_var(getenv('DISABLE_SSL_VERIFY'), FILTER_VALIDATE_BOOLEAN)
-            || !\defined('APP_ENV')
-            || (APP_ENV !== 'production' && APP_ENV !== 'staging');
+        $result = sendDiscordChunk($chunk);
 
-        $payload = json_encode([
-            'content'          => $chunk,
-            'username'         => 'NairobiDevOps Jobs',
-            'allowed_mentions' => ['parse' => []],
-        ]);
-
-        $ch = curl_init(DISCORD_WEBHOOK_URL);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_SSL_VERIFYPEER => !$disableSsl,
-            CURLOPT_SSL_VERIFYHOST => $disableSsl ? 0 : 2,
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr  = curl_error($ch);
-        if (\PHP_VERSION_ID < 80000) {
-            curl_close($ch);
-        }
-
-        $error = null;
-        if ($curlErr) {
-            $error = "cURL: {$curlErr}";
-        } elseif ($httpCode !== 200 && $httpCode !== 204) {
-            $error = "HTTP {$httpCode}: " . substr($response, 0, 150);
-        }
-        if ($error !== null) {
-            return [false, $error];
+        if ($result[0] === false) {
+            return $result;
         }
 
         if ($i < \count($chunks) - 1) {
-            usleep(500_000); // 0.5s between chunks — avoid Discord rate limit
+            usleep(500_000);
         }
+    }
+
+    return [true, null];
+}
+
+/**
+ * Send a single chunk to the Discord webhook.
+ *
+ * Extracted from sendDiscord() to keep per-chunk HTTP logic isolated
+ * and reduce cognitive complexity in the parent function.
+ *
+ * @param string $chunk  Single message chunk (≤ 2000 chars)
+ * @return array{0: bool, 1: string|null}
+ */
+function sendDiscordChunk(string $chunk): array
+{
+    $disableSsl = filter_var(getenv('DISABLE_SSL_VERIFY'), FILTER_VALIDATE_BOOLEAN)
+        || !\defined('APP_ENV')
+        || (APP_ENV !== 'production' && APP_ENV !== 'staging');
+
+    $payload = json_encode([
+        'content'          => $chunk,
+        'username'         => 'NairobiDevOps Jobs',
+        'allowed_mentions' => ['parse' => []],
+    ]);
+
+    $ch = curl_init(DISCORD_WEBHOOK_URL);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_SSL_VERIFYPEER => !$disableSsl,
+        CURLOPT_SSL_VERIFYHOST => $disableSsl ? 0 : 2,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    if (\PHP_VERSION_ID < 80000) {
+        curl_close($ch);
+    }
+
+    if ($curlErr) {
+        return [false, "cURL: {$curlErr}"];
+    }
+    if ($httpCode !== 200 && $httpCode !== 204) {
+        return [false, "HTTP {$httpCode}: " . substr($response, 0, 150)];
     }
 
     return [true, null];

@@ -45,6 +45,7 @@ Desktop.ini
 *.njsproj
 *.sln
 *.sw?
+.vscode/settings.json
 
 # ===== Tests / Coverage =====
 coverage/
@@ -74,6 +75,10 @@ npm-debug.log*
 *.localqodana.sarif.json
 
 # Ignore local AI / tool state and generated config
+.ai/
+.claude/
+.windsurf/
+.github/instructions/
 .agents/
 .cursor/
 .jetro/
@@ -84,7 +89,16 @@ AGENT.md
 CLAUDE.md
 .github/copilot-instructions.md
 
-
+# Ignore generated analysis / tooling output
+graphify-out/
+*.pyc
+__pycache__/
+.phpunit.result.cache
+.phpunit.cache/
+*.tmp
+*.bak
+*.orig
+*.rej
 
 # Backend
 backend/config.php

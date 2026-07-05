@@ -23,6 +23,21 @@ final class CurlHttpClient implements HttpClientInterface
             throw new SourceUnavailableException("cURL failed to initialize for {$url}");
         }
 
+        $responseHeaders = [];
+        $headerCallback = static function (string $headerLine) use (&$responseHeaders): int {
+            $trimmed = trim($headerLine);
+            if ($trimmed === '') {
+                return strlen($headerLine);
+            }
+
+            $parts = explode(':', $trimmed, 2);
+            if (count($parts) === 2) {
+                $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+            }
+
+            return strlen($headerLine);
+        };
+
         $ok = curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => $timeoutSeconds,
@@ -30,6 +45,7 @@ final class CurlHttpClient implements HttpClientInterface
             CURLOPT_MAXREDIRS      => 3,
             CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_HTTPHEADER     => $headerLines,
+            CURLOPT_HEADERFUNCTION => $headerCallback,
         ]);
         if ($ok === false) {
             throw new SourceUnavailableException("cURL failed to set options for {$url}");
@@ -38,12 +54,12 @@ final class CurlHttpClient implements HttpClientInterface
         $response = curl_exec($ch);
         $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error    = curl_error($ch);
-        curl_close($ch);
 
         return [
             'status' => (int) $status,
             'body'   => $response === false ? '' : (string) $response,
             'error'  => $error,
+            'headers' => $responseHeaders,
         ];
     }
 }
