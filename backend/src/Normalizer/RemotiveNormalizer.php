@@ -117,6 +117,15 @@ final class RemotiveNormalizer
             if (!isset($rawJob[$field]) || $rawJob[$field] === '') {
                 throw new InvalidArgumentException("remotive: missing required field '{$field}'");
             }
+            if ($field === 'id') {
+                if (!\is_string($rawJob[$field]) && !\is_int($rawJob[$field])) {
+                    throw new InvalidArgumentException("remotive: required field '{$field}' must be a string or integer");
+                }
+            } else {
+                if (!\is_string($rawJob[$field])) {
+                    throw new InvalidArgumentException("remotive: required field '{$field}' must be a string");
+                }
+            }
         }
     }
 
@@ -162,6 +171,7 @@ final class RemotiveNormalizer
     {
         try {
             $date = new DateTimeImmutable($raw, new DateTimeZone('UTC'));
+            $date = $date->setTimezone(new DateTimeZone('UTC'));
         } catch (Exception) {
             return null;
         }
@@ -175,21 +185,19 @@ final class RemotiveNormalizer
             return null;
         }
 
+        $result = null;
         $sanitized = sanitizeString((string) $value);
-        if ($sanitized === '') {
-            return null;
+        if ($sanitized !== '') {
+            $normalized = filter_var($sanitized, \FILTER_VALIDATE_URL);
+            if ($normalized !== false) {
+                $scheme = strtolower((string) parse_url($normalized, \PHP_URL_SCHEME));
+                if (\in_array($scheme, ['http', 'https'], true)) {
+                    $result = $normalized;
+                }
+            }
         }
 
-        $normalized = filter_var($sanitized, \FILTER_VALIDATE_URL);
-        if ($normalized === false) {
-            return null;
-        }
-
-        // FILTER_VALIDATE_URL accepts ftp:// and other schemes by default;
-        // whitelist only http/https for job apply URLs.
-        $scheme = strtolower((string) parse_url($normalized, \PHP_URL_SCHEME));
-
-        return \in_array($scheme, ['http', 'https'], true) ? $normalized : null;
+        return $result;
     }
 
     /**

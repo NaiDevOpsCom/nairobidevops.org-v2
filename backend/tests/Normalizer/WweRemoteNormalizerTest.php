@@ -217,6 +217,32 @@ final class WweRemoteNormalizerTest extends TestCase
         self::assertSame('DevOps Engineer', $results[0]['title']);
     }
 
+    #[Test]
+    public function normalizeThrowsWhenLinkIsInvalidUrl(): void
+    {
+        $normalizer = new WweRemoteNormalizer();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/invalid apply URL/i');
+
+        $normalizer->normalize($this->rawItem([
+            'link' => 'not-a-valid-url',
+        ]));
+    }
+
+    #[Test]
+    public function normalizeThrowsWhenLinkHasNonHttpScheme(): void
+    {
+        $normalizer = new WweRemoteNormalizer();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/invalid apply URL/i');
+
+        $normalizer->normalize($this->rawItem([
+            'link' => 'gopher://weworkremotely.com/remote-jobs/example-job',
+        ]));
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>

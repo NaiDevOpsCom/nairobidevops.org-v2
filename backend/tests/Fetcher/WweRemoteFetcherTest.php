@@ -36,7 +36,7 @@ final class WweRemoteFetcherTest extends TestCase
     public function sourceNameIsWeworkremotely(): void
     {
         $client = $this->createMock(HttpClientInterface::class);
-        $fetcher = new WweRemoteFetcher($client);
+        $fetcher = $this->createFetcher($client);
 
         self::assertSame('weworkremotely', $fetcher->sourceName());
     }
@@ -51,7 +51,7 @@ final class WweRemoteFetcherTest extends TestCase
                 ['guid' => 'guid-1', 'title' => 'Company A: Senior DevOps Engineer at Remote'],
             ])));
 
-        $fetcher = new WweRemoteFetcher($client);
+        $fetcher = $this->createFetcher($client);
         $items = $fetcher->fetch();
 
         // One matching item per feed x 3 feeds
@@ -61,7 +61,7 @@ final class WweRemoteFetcherTest extends TestCase
     }
 
     #[Test]
-    public function fetchReturnsPartialResultsWhenOneFeedFailsAfterRetries(): void
+    public function fetchThrowsOnPartialFailureWhenOneFeedFailsAfterRetries(): void
     {
         $client = $this->createMock(HttpClientInterface::class);
 
@@ -77,12 +77,12 @@ final class WweRemoteFetcherTest extends TestCase
                 ]));
             });
 
-        $fetcher = new WweRemoteFetcher($client);
-        $items = $fetcher->fetch();
+        $fetcher = $this->createFetcher($client);
 
-        // Two healthy feeds succeed, the third's failure is swallowed —
-        // partial success never throws, matching RemotiveFetcher's contract
-        self::assertCount(2, $items);
+        $this->expectException(SourceUnavailableException::class);
+        $this->expectExceptionMessageMatches('/partial failures/i');
+
+        $fetcher->fetch();
     }
 
     #[Test]
@@ -135,7 +135,7 @@ final class WweRemoteFetcherTest extends TestCase
         $client = $this->createMock(HttpClientInterface::class);
         $client->method('get')->willReturn($this->okResponse('<not-valid-xml'));
 
-        $fetcher = new WweRemoteFetcher($client);
+        $fetcher = $this->createFetcher($client);
 
         $this->expectException(SourceUnavailableException::class);
 
@@ -204,7 +204,7 @@ final class WweRemoteFetcherTest extends TestCase
             ['guid' => 'guid-incomplete', 'title' => '', 'omitPubDate' => true],
         ])));
 
-        $fetcher = new WweRemoteFetcher($client);
+        $fetcher = $this->createFetcher($client);
         $items = $fetcher->fetch();
 
         self::assertNotEmpty($items);

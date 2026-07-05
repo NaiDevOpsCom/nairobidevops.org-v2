@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Fetcher;
 
+use App\Contracts\JobFetcherInterface;
 use App\Exception\SourceUnavailableException;
 use App\Http\HttpClientInterface;
 use DateTimeImmutable;
@@ -24,7 +25,7 @@ use SimpleXMLElement;
  * json_decode(), and shape validation checks for $xml->channel->item
  * existing rather than a "jobs" array key).
  */
-final class WweRemoteFetcher
+final class WweRemoteFetcher implements JobFetcherInterface
 {
     private const USER_AGENT = 'NairobiDevOps-JobsBot/1.0 (nairobidevops.org)';
     private const MAX_ATTEMPTS = 3;
@@ -81,10 +82,12 @@ final class WweRemoteFetcher
             }
         }
 
-        if (empty($allItems) && !empty($feedErrors)) {
-            throw new SourceUnavailableException(
-                'weworkremotely fetch failed for all feeds: ' . implode('; ', $feedErrors)
-            );
+        if (!empty($feedErrors)) {
+            $message = empty($allItems)
+                ? 'weworkremotely fetch failed for all feeds: ' . implode('; ', $feedErrors)
+                : 'weworkremotely fetch had partial failures: ' . implode('; ', $feedErrors);
+
+            throw new SourceUnavailableException($message);
         }
 
         return $allItems;
@@ -106,18 +109,7 @@ final class WweRemoteFetcher
                 $lastError = $e;
 
                 if ($attempt < self::MAX_ATTEMPTS) {
-                    $isRateLimit = str_contains($e->getMessage(), 'Rate limited');
-                    $retryAfterSeconds = null;
-                    if ($isRateLimit && preg_match('/Retry-After=(\d+)/', $e->getMessage(), $matches)) {
-                        $retryAfterSeconds = (int) $matches[1];
-                    }
-
-                    $backoffMs = $retryAfterSeconds !== null
-                        ? $retryAfterSeconds * 1000
-                        : ($isRateLimit
-                            ? self::RATE_LIMIT_BACKOFF_MS
-                            : self::INITIAL_BACKOFF_MS * (2 ** ($attempt - 1)));
-
+                    $backoffMs = $this->getBackoffMs($e, $attempt);
                     ($this->sleeper)($backoffMs * 1000);
                 }
             }
@@ -127,6 +119,20 @@ final class WweRemoteFetcher
             "weworkremotely feed '{$url}' failed after " . self::MAX_ATTEMPTS . ' attempts: '
                 . ($lastError?->getMessage() ?? 'unknown error')
         );
+    }
+
+    private function getBackoffMs(SourceUnavailableException $e, int $attempt): int
+    {
+        $isRateLimit = str_contains($e->getMessage(), 'Rate limited');
+        if ($isRateLimit && preg_match('/Retry-After=(\d+)/', $e->getMessage(), $matches)) {
+            return (int) $matches[1] * 1000;
+        }
+
+        if ($isRateLimit) {
+            return self::RATE_LIMIT_BACKOFF_MS;
+        }
+
+        return self::INITIAL_BACKOFF_MS * (2 ** ($attempt - 1));
     }
 
     /**
@@ -192,14 +198,17 @@ final class WweRemoteFetcher
             return (int) $retryAfter;
         }
 
+        $result = null;
         try {
             $date = new DateTimeImmutable($retryAfter, new DateTimeZone('UTC'));
             $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
             $seconds = $date->getTimestamp() - $now->getTimestamp();
-            return $seconds > 0 ? $seconds : 0;
+            $result = $seconds > 0 ? $seconds : 0;
         } catch (Exception) {
-            return null;
+            // Keep $result as null
         }
+
+        return $result;
     }
 
     /**
@@ -211,7 +220,7 @@ final class WweRemoteFetcher
     private function parseAndValidate(string $body): array
     {
         $previousUseErrors = libxml_use_internal_errors(true);
-        $xml = simplexml_load_string($body, SimpleXMLElement::class, LIBXML_NOCDATA);
+        $xml = simplexml_load_string($body, SimpleXMLElement::class, LIBXML_NOCDATA | LIBXML_NONET);
         $xmlErrors = libxml_get_errors();
         libxml_clear_errors();
         libxml_use_internal_errors($previousUseErrors);

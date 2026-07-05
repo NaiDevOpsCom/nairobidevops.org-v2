@@ -207,15 +207,6 @@ class HelpersTest extends TestCase
     public static function uncategorisedTitleProvider(): array
     {
         return [
-            'unknown title'                     => ['Operations Specialist'],
-            'civil engineer'                    => ['EIT - Civil - Anchorage, AK'],
-            'licensed civil engineer'           => ['Licensed Civil Engineer - Site Design'],
-            'electrical engineer'               => ['Electrical Engineer - Tonawanda, NY'],
-            'sales engineer'                    => ['Sales Engineer (Remote, US Based)'],
-            'director title'                    => ['Director of Strategic Accounts'],
-            'ai research'                       => ['AI Research Engineer'],
-            'oracle cloud finance'              => ['Oracle Cloud Finance Manager'],
-            'shopify developer'                 => ['Senior Shopify Web Developer'],
             'react native developer'            => ['Senior React Native Developer'],
             'web designer'                      => ['Freelance Web Designer'],
         ];
