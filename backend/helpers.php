@@ -15,6 +15,7 @@
  * │                                                                         │
  * │ Input sanitisation                                                      │
  * │   sanitizeString()       Decode entities + strip tags + trim            │
+ * │   sanitizeUrl()          Validate & sanitise a URL (http/https only)     │
  * │   cleanDescription()     HTML job description → clean plain text        │
  * │                                                                         │
  * │ Role classification                                                      │
@@ -103,6 +104,42 @@ function sanitizeString(string $val): string
 {
     $decoded = html_entity_decode(trim($val), ENT_QUOTES | ENT_HTML5, 'UTF-8');
     return trim(strip_tags($decoded));
+}
+
+/**
+ * Validate and sanitise a URL value from an external API.
+ *
+ * Accepts a raw mixed value (string, null, or empty string). Returns the
+ * sanitised URL when it passes all checks, or null when:
+ *   - the value is null or an empty string
+ *   - it is not a structurally valid URL (filter_var)
+ *   - its scheme is not 'http' or 'https'
+ *
+ * Used by RemotiveNormalizer and WweRemoteNormalizer so URL validation
+ * has a single source of truth — update here if the rules ever change.
+ *
+ * @param mixed $value  Raw URL from the source API
+ * @return string|null  Validated URL or null
+ */
+function sanitizeUrl(mixed $value): ?string
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+
+    $result = null;
+    $sanitized = sanitizeString((string) $value);
+    if ($sanitized !== '') {
+        $normalized = filter_var($sanitized, FILTER_VALIDATE_URL);
+        if ($normalized !== false) {
+            $scheme = strtolower((string) parse_url($normalized, PHP_URL_SCHEME));
+            if (\in_array($scheme, ['http', 'https'], true)) {
+                $result = $normalized;
+            }
+        }
+    }
+
+    return $result;
 }
 
 /**

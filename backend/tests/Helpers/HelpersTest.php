@@ -211,4 +211,50 @@ class HelpersTest extends TestCase
             'web designer'                      => ['Freelance Web Designer'],
         ];
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // sanitizeUrl()
+    // ════════════════════════════════════════════════════════════════════
+
+    public function testSanitizeUrlReturnsValidHttpsUrl(): void
+    {
+        $url = 'https://remotive.com/job/123';
+        $this->assertSame($url, sanitizeUrl($url));
+    }
+
+    public function testSanitizeUrlReturnsValidHttpUrl(): void
+    {
+        $url = 'http://example.com/apply';
+        $this->assertSame($url, sanitizeUrl($url));
+    }
+
+    public function testSanitizeUrlRejectsNonHttpScheme(): void
+    {
+        $this->assertNull(sanitizeUrl('ftp://files.example.com/resume'));
+        $this->assertNull(sanitizeUrl('javascript:alert(1)'));
+    }
+
+    public function testSanitizeUrlReturnsNullForNull(): void
+    {
+        $this->assertNull(sanitizeUrl(null));
+    }
+
+    public function testSanitizeUrlReturnsNullForEmptyString(): void
+    {
+        $this->assertNull(sanitizeUrl(''));
+    }
+
+    public function testSanitizeUrlReturnsNullForPlainString(): void
+    {
+        $this->assertNull(sanitizeUrl('not-a-url-at-all'));
+    }
+
+    public function testSanitizeUrlStripsHtmlEntitiesBeforeValidating(): void
+    {
+        // HTML-encoded URL — sanitizeString() decodes entities first
+        $this->assertSame(
+            'https://example.com/job?id=1&ref=ndc',
+            sanitizeUrl('https://example.com/job?id=1&amp;ref=ndc')
+        );
+    }
 }

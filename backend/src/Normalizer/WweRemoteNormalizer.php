@@ -80,7 +80,7 @@ final class WweRemoteNormalizer
             throw new InvalidArgumentException('weworkremotely: company or title empty after sanitization');
         }
 
-        $applyUrl = $this->sanitizeUrl($rawItem['link']);
+        $applyUrl = sanitizeUrl($rawItem['link']);
         if ($applyUrl === null) {
             throw new InvalidArgumentException('weworkremotely: invalid apply URL');
         }
@@ -179,26 +179,6 @@ final class WweRemoteNormalizer
         return gmdate('Y-m-d H:i:s', $timestamp);
     }
 
-    private function sanitizeUrl(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $result = null;
-        $sanitized = sanitizeString((string) $value);
-        if ($sanitized !== '') {
-            $normalized = filter_var($sanitized, \FILTER_VALIDATE_URL);
-            if ($normalized !== false) {
-                $scheme = strtolower((string) parse_url($normalized, \PHP_URL_SCHEME));
-                if (\in_array($scheme, ['http', 'https'], true)) {
-                    $result = $normalized;
-                }
-            }
-        }
-
-        return $result;
-    }
 
     /**
      * @param array<string, mixed> $rawItem
