@@ -1,0 +1,33 @@
+---
+description: TypeScript coding conventions. Applies to all .ts and .tsx files across the project.
+globs: "**/*.{ts,tsx,mts,cts}"
+alwaysApply: false
+---
+
+# TypeScript Rules
+
+## Strict Mode
+- `strict: true` in tsconfig — no implicit any, strict null checks
+- No `any` type — use `unknown` + type guards instead
+- No `// @ts-ignore` or `// @ts-expect-error` without a documented reason
+- No non-null assertions (`!`) unless proven safe
+
+## Naming
+- Interfaces and types: PascalCase, no `I` prefix
+- Functions and variables: camelCase
+- React components: PascalCase
+- Custom hooks: camelCase with `use` prefix
+- Files: PascalCase for components, camelCase for utilities
+
+## Exports
+- Named exports for components and utilities
+- Default exports only for page components (for route lazy loading)
+
+## Imports
+- Use path aliases: `@/` for `client/src/`, `@shared/` for `shared/`
+- Relative imports only within the same directory
+
+## Patterns
+- Use discriminated unions for complex states (loading, success, error, idle)
+- Use type guards over type assertions
+- Prefer `interface` for public API shapes, `type` for unions/computed types
