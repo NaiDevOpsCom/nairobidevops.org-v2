@@ -27,15 +27,15 @@ final class CurlHttpClient implements HttpClientInterface
         $headerCallback = static function (string $headerLine) use (&$responseHeaders): int {
             $trimmed = trim($headerLine);
             if ($trimmed === '') {
-                return strlen($headerLine);
+                return \strlen($headerLine);
             }
 
             $parts = explode(':', $trimmed, 2);
-            if (count($parts) === 2) {
+            if (\count($parts) === 2) {
                 $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
             }
 
-            return strlen($headerLine);
+            return \strlen($headerLine);
         };
 
         $ok = curl_setopt_array($ch, [

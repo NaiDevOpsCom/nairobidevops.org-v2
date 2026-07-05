@@ -136,7 +136,7 @@ final class WweRemoteNormalizer
     {
         $parts = explode(': ', $rawTitle, 2);
 
-        if (count($parts) !== 2) {
+        if (\count($parts) !== 2) {
             throw new InvalidArgumentException(
                 "weworkremotely: title has no 'Company: Title' separator: '{$rawTitle}'"
             );
@@ -156,7 +156,7 @@ final class WweRemoteNormalizer
      */
     private function extractLocationSuffix(string $title): array
     {
-        if (preg_match('/^(.+?)\s+at\s+(.+)$/i', $title, $matches) === 1) {
+        if (preg_match('/^(.+)\s+at\s+(.+)$/i', $title, $matches) === 1) {
             return [trim($matches[1]), sanitizeString($matches[2])];
         }
 

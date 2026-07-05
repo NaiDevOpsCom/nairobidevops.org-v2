@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Normalizer;
 
+use DateTimeImmutable;
+use DateTimeZone;
+use Exception;
 use InvalidArgumentException;
 
 /**
@@ -139,11 +142,11 @@ final class RemotiveNormalizer
      */
     private function normalizeTags(mixed $tags): array
     {
-        if (!is_array($tags)) {
+        if (!\is_array($tags)) {
             return [];
         }
 
-        $scalarTags = array_filter($tags, static fn (mixed $tag): bool => is_scalar($tag));
+        $scalarTags = array_filter($tags, static fn (mixed $tag): bool => \is_scalar($tag));
         $sanitizedTags = array_map(
             static fn (mixed $tag): string => sanitizeString((string) $tag),
             $scalarTags
@@ -158,8 +161,8 @@ final class RemotiveNormalizer
     private function toMysqlDatetime(string $raw): ?string
     {
         try {
-            $date = new \DateTimeImmutable($raw, new \DateTimeZone('UTC'));
-        } catch (\Exception) {
+            $date = new DateTimeImmutable($raw, new DateTimeZone('UTC'));
+        } catch (Exception) {
             return null;
         }
 
@@ -186,7 +189,7 @@ final class RemotiveNormalizer
         // whitelist only http/https for job apply URLs.
         $scheme = strtolower((string) parse_url($normalized, \PHP_URL_SCHEME));
 
-        return in_array($scheme, ['http', 'https'], true) ? $normalized : null;
+        return \in_array($scheme, ['http', 'https'], true) ? $normalized : null;
     }
 
     /**

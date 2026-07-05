@@ -6,6 +6,9 @@ namespace App\Fetcher;
 
 use App\Exception\SourceUnavailableException;
 use App\Http\HttpClientInterface;
+use DateTimeImmutable;
+use DateTimeZone;
+use Exception;
 use SimpleXMLElement;
 
 /**
@@ -190,11 +193,11 @@ final class WweRemoteFetcher
         }
 
         try {
-            $date = new \DateTimeImmutable($retryAfter, new \DateTimeZone('UTC'));
-            $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+            $date = new DateTimeImmutable($retryAfter, new DateTimeZone('UTC'));
+            $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
             $seconds = $date->getTimestamp() - $now->getTimestamp();
             return $seconds > 0 ? $seconds : 0;
-        } catch (\Exception) {
+        } catch (Exception) {
             return null;
         }
     }
