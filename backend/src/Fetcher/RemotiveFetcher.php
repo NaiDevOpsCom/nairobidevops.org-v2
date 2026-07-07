@@ -23,17 +23,27 @@ final class RemotiveFetcher implements JobFetcherInterface
 {
     private const BASE_URL = 'https://remotive.com/api/remote-jobs';
     private const USER_AGENT = 'NairobiDevOps-JobsBot/1.0 (nairobidevops.org)';
-    public const MAX_ATTEMPTS = 3;
+    private const MAX_ATTEMPTS = 3;
+    private const INITIAL_BACKOFF_MS = 500;
 
     /** @var string[] Remotive category slugs to fetch, per the PRD's Tier 1 source spec */
-    public const CATEGORIES = ['devops-sysadmin', 'software-dev', 'cloud'];
+    private const CATEGORIES = ['devops-sysadmin', 'software-dev', 'cloud'];
+
+    /**
+     * Populated by the most recent fetch() call — the categories that failed
+     * even though the overall call didn't throw (i.e. at least one other
+     * category succeeded). Without this, a 2-of-3-categories-failed run
+     * would silently report as a full success to the caller, which is
+     * exactly the "don't fail silently" rule the brief calls out.
+     *
+     * @var string[]
+     */
+    private array $lastCategoryErrors = [];
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly int $timeoutSeconds = 20,
         private readonly int $limitPerCategory = 100,
-        private readonly int $initialBackoffMs = 500,
-        private readonly int $rateLimitBackoffMs = 30_000,
     ) {
     }
 
@@ -45,20 +55,18 @@ final class RemotiveFetcher implements JobFetcherInterface
     /**
      * @return array<int, array<string, mixed>>
      *
-     * @throws SourceUnavailableException if any category fails after retries.
-     *         Partial success is still surfaced to the caller so the fetcher
-     *         does not silently return a partial result.
+     * @throws SourceUnavailableException only if every category fails after
+     *         retries. Partial success (some categories fail, others succeed)
+     *         returns what succeeded — call getCategoryErrors() afterward to
+     *         see which categories degraded, so the caller can log it rather
+     *         than treating a partial run as a clean success.
      */
     public function fetch(): array
     {
         $allJobs = [];
         $categoryErrors = [];
 
-        foreach (self::CATEGORIES as $i => $category) {
-            if ($i > 0) {
-                usleep(1_000_000); // 1s pacing between categories
-            }
-
+        foreach (self::CATEGORIES as $category) {
             try {
                 $allJobs = [...$allJobs, ...$this->fetchCategory($category)];
             } catch (SourceUnavailableException $e) {
@@ -66,15 +74,28 @@ final class RemotiveFetcher implements JobFetcherInterface
             }
         }
 
-        if (!empty($categoryErrors)) {
-            $message = empty($allJobs)
-                ? 'Remotive fetch failed for all categories: ' . implode('; ', $categoryErrors)
-                : 'Remotive fetch had partial failures: ' . implode('; ', $categoryErrors);
+        $this->lastCategoryErrors = $categoryErrors;
 
-            throw new SourceUnavailableException($message);
+        if (empty($allJobs) && !empty($categoryErrors)) {
+            throw new SourceUnavailableException(
+                'Remotive fetch failed for all categories: ' . implode('; ', $categoryErrors)
+            );
         }
 
         return $allJobs;
+    }
+
+    /**
+     * Per-category failures from the most recent fetch() call that did NOT
+     * cause fetch() to throw (i.e. at least one other category still
+     * succeeded). Empty array means either fetch() hasn't been called yet,
+     * or every category succeeded.
+     *
+     * @return string[]
+     */
+    public function getCategoryErrors(): array
+    {
+        return $this->lastCategoryErrors;
     }
 
     /**
@@ -98,10 +119,7 @@ final class RemotiveFetcher implements JobFetcherInterface
                 $lastError = $e;
 
                 if ($attempt < self::MAX_ATTEMPTS) {
-                    $isRateLimit = str_contains($e->getMessage(), 'Rate limited');
-                    $backoffMs = $isRateLimit
-                        ? $this->rateLimitBackoffMs
-                        : $this->initialBackoffMs * (2 ** ($attempt - 1));
+                    $backoffMs = self::INITIAL_BACKOFF_MS * (2 ** ($attempt - 1));
                     usleep($backoffMs * 1000);
                 }
             }
