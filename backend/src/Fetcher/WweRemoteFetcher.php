@@ -186,10 +186,8 @@ final class WweRemoteFetcher implements JobFetcherInterface
             throw new SourceUnavailableException('Response missing expected channel structure');
         }
 
-        // A valid feed with zero items is not an error — return early with
-        // an empty list, matching RemotiveFetcher's zero-results contract.
         if (!isset($xml->channel->item)) {
-            return [];
+            throw new SourceUnavailableException('Response missing expected channel/item structure');
         }
 
         $items = [];
