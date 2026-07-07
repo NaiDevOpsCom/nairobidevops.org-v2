@@ -207,8 +207,9 @@ final class JobRepository
         $where = ['is_active = 1', 'is_approved = 1'];
         $params = [];
 
-        if (!empty($filters['q'])) {
-            $like = '%' . $filters['q'] . '%';
+        if (isset($filters['q']) && $filters['q'] !== '') {
+            $escapedQ = addcslashes($filters['q'], '%_');
+            $like = '%' . $escapedQ . '%';
             $where[] = '(title LIKE :q_title OR company LIKE :q_company OR description LIKE :q_description)';
             $params['q_title'] = $like;
             $params['q_company'] = $like;
@@ -253,6 +254,10 @@ final class JobRepository
 
         $perPage = max(1, min(50, (int) ($filters['per_page'] ?? 20)));
         $page = max(1, (int) ($filters['page'] ?? 1));
+        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 0;
+        if ($totalPages > 0 && $page > $totalPages) {
+            $page = $totalPages;
+        }
         $offset = ($page - 1) * $perPage;
 
         $stmt = $this->db->prepare(
@@ -388,5 +393,21 @@ final class JobRepository
             'closes_at' => $job['closes_at'] ?? null,
             'tags' => isset($job['tags']) ? json_encode(array_values($job['tags'])) : null,
         ];
+    }
+
+    /**
+     * ISO timestamp of the most recent non-failed sync run, across all sources.
+     */
+    public function getLastSyncedAt(): ?string
+    {
+        $timestamp = $this->db
+            ->query("SELECT MAX(ran_at) FROM sync_log WHERE status <> 'failed'")
+            ->fetchColumn();
+
+        if ($timestamp === false || $timestamp === null) {
+            return null;
+        }
+
+        return str_replace(' ', 'T', (string) $timestamp);
     }
 }

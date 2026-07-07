@@ -88,7 +88,8 @@ Thumbs.db
 
 ## --- Secrets (should never be indexed or sent as context) ---
 .env
-.env.*
+.env.local
+.env.*.local
 *.pem
 *.key
 secrets/

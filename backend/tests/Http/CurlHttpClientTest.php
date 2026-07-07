@@ -13,7 +13,7 @@ final class CurlHttpClientTest extends TestCase
 {
     #[Test]
     #[DataProvider('environments')]
-    public function forEnvironmentEnablesSslVerificationOnlyForProtectedEnvironments(
+    public function forEnvironmentEnablesSslVerificationUnlessKnownDevEnvironment(
         ?string $appEnv,
         bool $expectedVerifySsl,
     ): void {
@@ -30,9 +30,11 @@ final class CurlHttpClientTest extends TestCase
         return [
             'production always verifies' => ['production', true],
             'staging always verifies' => ['staging', true],
+            'undefined APP_ENV verifies (fail-closed)' => [null, true],
+            'unrecognized value verifies (fail-closed)' => ['qa', true],
             'local does not verify' => ['local', false],
-            'undefined APP_ENV does not verify' => [null, false],
-            'unrecognized value does not verify' => ['qa', false],
+            'development does not verify' => ['development', false],
+            'test does not verify' => ['test', false],
         ];
     }
 

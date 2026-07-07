@@ -11,10 +11,19 @@ $renames = @(
 
 foreach ($r in $renames) {
     if (Test-Path $r.Path) {
-        $tmp = $r.Path + '.tmp'
-        Rename-Item -Path $r.Path -NewName (Split-Path $tmp -Leaf)
-        Rename-Item -Path (Join-Path (Split-Path $r.Path) (Split-Path $tmp -Leaf)) -NewName $r.New
-        Write-Host "Fixed: $($r.Path) -> $($r.New)"
+        try {
+            $tmp = $r.Path + '.tmp'
+            Rename-Item -Path $r.Path -NewName (Split-Path $tmp -Leaf) -ErrorAction Stop
+            Rename-Item -Path (Join-Path (Split-Path $r.Path) (Split-Path $tmp -Leaf)) -NewName $r.New -ErrorAction Stop
+            Write-Host "Fixed: $($r.Path) -> $($r.New)"
+        } catch {
+            Write-Host "ERROR renaming $($r.Path): $_"
+            # Attempt rollback: if .tmp exists, rename back to original name
+            if (Test-Path $tmp) {
+                Rename-Item -Path $tmp -NewName (Split-Path $r.Path -Leaf) -ErrorAction SilentlyContinue
+                Write-Host "Rolled back: $tmp -> $($r.Path)"
+            }
+        }
     } else {
         Write-Host "Not found (check path): $($r.Path)"
     }

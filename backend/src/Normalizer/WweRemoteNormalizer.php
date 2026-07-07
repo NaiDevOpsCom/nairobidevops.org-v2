@@ -116,8 +116,8 @@ final class WweRemoteNormalizer
             );
         }
 
-        $cleanTitle = sanitizeString($title);
-        $cleanCompany = sanitizeString($company);
+        $cleanTitle = mb_substr(sanitizeString($title), 0, 255);
+        $cleanCompany = mb_substr(sanitizeString($company), 0, 255);
         $cleanDescription = cleanDescription((string) ($raw['description'] ?? ''));
 
         $postedAt = null;
@@ -136,12 +136,12 @@ final class WweRemoteNormalizer
             'apply_url' => $applyUrl,
             'affiliate_apply_url' => buildAffiliateUrl($applyUrl, self::SOURCE),
             'source' => self::SOURCE,
-            'source_id' => $guid,
+            'source_id' => mb_substr($guid, 0, 255),
             // Non-negotiable: classification always goes through the shared
             // helpers.php function, never reimplemented per source.
             'role_type' => mapRoleType($cleanTitle),
             'location_type' => 'international_remote',
-            'location_detail' => $locationDetail !== null ? sanitizeString($locationDetail) : null,
+            'location_detail' => $locationDetail !== null ? mb_substr(sanitizeString($locationDetail), 0, 255) : null,
             'africa_friendly' => 0,
             // Deliberately null — see class docblock. WWR's RSS has no
             // discrete salary field; scanning free text is not done here.
@@ -190,7 +190,7 @@ final class WweRemoteNormalizer
         $found = [];
 
         foreach (self::TAG_KEYWORDS as $keyword) {
-            if (str_contains($lower, $keyword)) {
+            if (preg_match('/\b' . preg_quote($keyword, '/') . '\b/i', $lower)) {
                 $found[] = $keyword;
             }
         }
@@ -217,7 +217,7 @@ final class WweRemoteNormalizer
 
         $locationDetail = null;
 
-        if (preg_match('/^(.*)\s+at\s+([^:]+)$/i', $rest, $matches) === 1) {
+        if (preg_match('/^(.*)\s*at\s+([^:]+)$/i', $rest, $matches) === 1) {
             $rest = trim($matches[1]);
             $locationDetail = trim($matches[2]);
         }

@@ -520,8 +520,17 @@ const WORLDWIDE_LOCATION_PHRASES = [
 const NON_AFRICA_ONLY_PHRASES = [
     'usa only', 'us only', 'united states only', 'u.s. only',
     'canada only', 'uk only', 'united kingdom only',
+    'germany only', 'france only', 'spain only', 'italy only',
+    'netherlands only', 'portugal only', 'poland only', 'sweden only',
+    'norway only', 'denmark only', 'finland only', 'switzerland only',
+    'austria only', 'belgium only', 'ireland only',
+    'india only', 'china only', 'japan only', 'singapore only',
+    'south korea only', 'taiwan only', 'australia only', 'new zealand only',
     'eu only', 'european union only', 'europe only',
-    'australia only', 'apac only', 'latam only', 'latin america only',
+    'apac only', 'latam only', 'latin america only',
+    'uae only', 'united arab emirates only', 'saudi arabia only',
+    'israel only', 'turkey only',
+    'mexico only', 'brazil only', 'argentina only', 'colombia only',
 ];
 
 /**
@@ -584,7 +593,9 @@ function isLocationExcludedForAfrica(?string $locationDetail): bool
         return false;
     }
 
-    $normalized = strtolower(trim($locationDetail));
+    $normalized = function_exists('mb_strtolower')
+        ? mb_strtolower(trim($locationDetail), 'UTF-8')
+        : strtolower(trim($locationDetail));
 
     // Check the more-specific "-only" restrictions first so that a value like
     // "Remote (US Only)" is caught as excluded before the broader worldwide

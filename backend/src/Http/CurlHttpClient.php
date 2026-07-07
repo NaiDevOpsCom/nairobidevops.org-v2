@@ -11,14 +11,11 @@ use App\Exception\SourceUnavailableException;
  *
  * SSL certificate verification is environment-driven via forEnvironment()
  * rather than hardcoded:
- *   - 'production' and 'staging' → ALWAYS verify. No override exists for
- *     these two, by design — a stray env var or config typo must never be
- *     able to silently weaken verification against a real deployment target.
- *   - anything else (local, undefined APP_ENV, a typo'd value) → verification
- *     is relaxed. Windows PHP builds commonly ship without a CA bundle at
- *     all, so every request otherwise fails with "SSL certificate problem:
- *     unable to get local issuer certificate" before ever reaching
- *     RemotiveFetcher's retry logic.
+ *   - 'local', 'development', 'test' → verification relaxed (Windows PHP
+ *     builds commonly ship without a CA bundle).
+ *   - anything else (production, staging, undefined APP_ENV, a typo'd
+ *     value) → ALWAYS verify. This ensures a stray env var or config typo
+ *     can never silently weaken verification against a real deployment target.
  *
  * Redirects are restricted to HTTPS only (CURLOPT_REDIR_PROTOCOLS) so a
  * malicious or misconfigured redirect can't silently downgrade a request
@@ -26,7 +23,7 @@ use App\Exception\SourceUnavailableException;
  */
 final class CurlHttpClient implements HttpClientInterface
 {
-    private const PROTECTED_ENVIRONMENTS = ['production', 'staging'];
+    private const DEV_ENVIRONMENTS = ['local', 'development', 'test'];
 
     public function __construct(private readonly bool $verifySsl = true)
     {
@@ -39,9 +36,9 @@ final class CurlHttpClient implements HttpClientInterface
     public static function forEnvironment(?string $appEnv): self
     {
         $normalizedEnv = $appEnv !== null ? strtolower(trim($appEnv)) : null;
-        $isProtectedEnvironment = \in_array($normalizedEnv, self::PROTECTED_ENVIRONMENTS, true);
+        $isDevEnvironment = \in_array($normalizedEnv, self::DEV_ENVIRONMENTS, true);
 
-        return new self($isProtectedEnvironment);
+        return new self(!$isDevEnvironment);
     }
 
     /**

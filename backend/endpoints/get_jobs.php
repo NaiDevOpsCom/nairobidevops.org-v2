@@ -37,6 +37,7 @@ if (!\function_exists('respond')) {
 }
 
 const ALLOWED_SORTS = ['newest', 'closing_soon', 'salary_desc'];
+/** Reduced from 100 to 50 for performance — keep in sync with frontend useJobs.ts */
 const MAX_PER_PAGE = 50;
 
 /**
@@ -103,15 +104,7 @@ function formatIsoDate(?string $mysqlDatetime): ?string
     return str_replace(' ', 'T', $mysqlDatetime);
 }
 
-/** ISO timestamp of the most recent non-failed sync run, across all sources. */
-function getLastSyncedAt(PDO $db): ?string
-{
-    $timestamp = $db
-        ->query("SELECT MAX(ran_at) FROM sync_log WHERE status <> 'failed'")
-        ->fetchColumn();
 
-    return $timestamp !== false && $timestamp !== null ? formatIsoDate((string) $timestamp) : null;
-}
 
 // ── Parse + validate query params ───────────────────────────────────────────
 
@@ -162,6 +155,6 @@ respond(200, [
     'page' => $result['page'],
     'per_page' => $result['per_page'],
     'total_pages' => $totalPages,
-    'last_updated' => getLastSyncedAt($db),
+    'last_updated' => $repository->getLastSyncedAt(),
     'jobs' => array_map('formatJobForApi', $result['jobs']),
 ]);

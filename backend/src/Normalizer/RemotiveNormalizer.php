@@ -55,6 +55,11 @@ final class RemotiveNormalizer
         $dropped = [];
 
         foreach ($rawJobs as $raw) {
+            if (!\is_array($raw)) {
+                $dropped[] = ['reason' => 'Record is not an array', 'raw' => $raw];
+                continue;
+            }
+
             try {
                 $normalized[] = $this->normalizeOne($raw);
             } catch (InvalidArgumentException $e) {
@@ -91,12 +96,23 @@ final class RemotiveNormalizer
             throw new InvalidArgumentException("Remotive record {$sourceId}: missing/empty \"company_name\"");
         }
 
-        if (!\is_string($applyUrl) || filter_var($applyUrl, FILTER_VALIDATE_URL) === false) {
+        if (!\is_string($applyUrl) || filter_var($applyUrl, FILTER_VALIDATE_URL) === false
+            || (!str_starts_with($applyUrl, 'http://') && !str_starts_with($applyUrl, 'https://'))
+        ) {
             throw new InvalidArgumentException("Remotive record {$sourceId}: missing/invalid \"url\"");
         }
 
         $cleanTitle = sanitizeString($title);
         $cleanCompany = sanitizeString($company);
+
+        if (trim($cleanTitle) === '') {
+            throw new InvalidArgumentException("Remotive record {$sourceId}: title is empty after sanitization");
+        }
+
+        if (trim($cleanCompany) === '') {
+            throw new InvalidArgumentException("Remotive record {$sourceId}: company is empty after sanitization");
+        }
+
         $cleanDescription = cleanDescription((string) ($raw['description'] ?? ''));
 
         $salary = parseSalary((string) ($raw['salary'] ?? ''));
@@ -110,7 +126,9 @@ final class RemotiveNormalizer
         }
 
         $companyLogoUrl = $raw['company_logo'] ?? null;
-        if (!\is_string($companyLogoUrl) || filter_var($companyLogoUrl, FILTER_VALIDATE_URL) === false) {
+        if (!\is_string($companyLogoUrl) || filter_var($companyLogoUrl, FILTER_VALIDATE_URL) === false
+            || (!str_starts_with($companyLogoUrl, 'http://') && !str_starts_with($companyLogoUrl, 'https://'))
+        ) {
             $companyLogoUrl = null;
         }
 

@@ -30,7 +30,7 @@ use App\Repository\JobRepository;
 
 $startTime = microtime(true);
 
-$appEnv = \defined('APP_ENV') ? APP_ENV : null;
+$appEnv = \defined('APP_ENV') ? APP_ENV : (getenv('APP_ENV') ?: null);
 
 $httpClient = CurlHttpClient::forEnvironment($appEnv);
 $fetcher    = new WweRemoteFetcher($httpClient);
@@ -126,17 +126,3 @@ foreach ($errors as $error) {
     echo "  ! {$error}\n";
 }
 
-// ── Purge old sync_log rows for this source (keep only the most recent) ─
-$logPrune = getDB()->prepare(
-    "DELETE FROM sync_log
-     WHERE source = 'weworkremotely'
-       AND id NOT IN (
-         SELECT id FROM (
-           SELECT id FROM sync_log
-           WHERE source = 'weworkremotely'
-           ORDER BY ran_at DESC, id DESC
-           LIMIT 1
-         ) AS keep_me
-       )"
-);
-$logPrune->execute();
