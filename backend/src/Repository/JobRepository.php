@@ -243,10 +243,12 @@ final class JobRepository
         $total = (int) $countStmt->fetchColumn();
 
         // Featured jobs always sort first, within whatever sort mode is active.
+        // Each branch appends `id DESC` as a stable unique tie-breaker so
+        // pagination is deterministic when two rows share the primary sort key.
         $orderBy = 'is_featured DESC, ' . match ($filters['sort'] ?? 'newest') {
-            'closing_soon' => 'closes_at IS NULL, closes_at ASC',
-            'salary_desc' => 'salary_max IS NULL, salary_max DESC',
-            default => 'posted_at DESC',
+            'closing_soon' => 'closes_at IS NULL, closes_at ASC, id DESC',
+            'salary_desc'  => 'salary_max IS NULL, salary_max DESC, id DESC',
+            default        => 'posted_at DESC, id DESC',
         };
 
         $perPage = max(1, min(50, (int) ($filters['per_page'] ?? 20)));

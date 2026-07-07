@@ -103,10 +103,12 @@ function formatIsoDate(?string $mysqlDatetime): ?string
     return str_replace(' ', 'T', $mysqlDatetime);
 }
 
-/** ISO timestamp of the most recent completed sync run, across all sources. */
+/** ISO timestamp of the most recent non-failed sync run, across all sources. */
 function getLastSyncedAt(PDO $db): ?string
 {
-    $timestamp = $db->query('SELECT MAX(ran_at) FROM sync_log')->fetchColumn();
+    $timestamp = $db
+        ->query("SELECT MAX(ran_at) FROM sync_log WHERE status <> 'failed'")
+        ->fetchColumn();
 
     return $timestamp !== false && $timestamp !== null ? formatIsoDate((string) $timestamp) : null;
 }
@@ -114,7 +116,7 @@ function getLastSyncedAt(PDO $db): ?string
 // ── Parse + validate query params ───────────────────────────────────────────
 
 $sortParam = $_GET['sort'] ?? 'newest';
-$sort = \in_array($sortParam, ALLOWED_SORTS, true) ? $sortParam : 'newest';
+$sort = \is_string($sortParam) && \in_array($sortParam, ALLOWED_SORTS, true) ? $sortParam : 'newest';
 
 $page = filter_var($_GET['page'] ?? 1, FILTER_VALIDATE_INT);
 $page = ($page !== false && $page > 0) ? $page : 1;
@@ -123,13 +125,17 @@ $perPage = filter_var($_GET['per_page'] ?? 20, FILTER_VALIDATE_INT);
 $perPage = ($perPage !== false && $perPage > 0) ? min($perPage, MAX_PER_PAGE) : 20;
 
 $filters = [
-    'q' => isset($_GET['q']) ? trim((string) $_GET['q']) : '',
-    'role_type' => parseCsvParam($_GET['role_type'] ?? null),
-    'location_type' => parseCsvParam($_GET['location_type'] ?? null),
-    'africa_friendly' => ($_GET['africa_friendly'] ?? null) === '1',
-    'experience_level' => parseCsvParam($_GET['experience_level'] ?? null),
-    'sort' => $sort,
-    'page' => $page,
+    'q' =>
+        isset($_GET['q']) && \is_string($_GET['q']) ? trim($_GET['q']) : '',
+    'role_type' =>
+        parseCsvParam(\is_string($_GET['role_type'] ?? null) ? $_GET['role_type'] : null),
+    'location_type' =>
+        parseCsvParam(\is_string($_GET['location_type'] ?? null) ? $_GET['location_type'] : null),
+    'africa_friendly' => (($_GET['africa_friendly'] ?? null) === '1'),
+    'experience_level' =>
+        parseCsvParam(\is_string($_GET['experience_level'] ?? null) ? $_GET['experience_level'] : null),
+    'sort'     => $sort,
+    'page'     => $page,
     'per_page' => $perPage,
 ];
 

@@ -94,6 +94,18 @@ final class WweRemoteNormalizer
             );
         }
 
+        if (trim($company) === '') {
+            throw new InvalidArgumentException(
+                "WWR item {$guid}: title \"{$rawTitle}\" has an empty company segment"
+            );
+        }
+
+        if (trim($title) === '') {
+            throw new InvalidArgumentException(
+                "WWR item {$guid}: title \"{$rawTitle}\" has an empty job title segment"
+            );
+        }
+
         // Not a malformed record — a valid job that's out of scope for this
         // board. Routed through the same dropped/logged path (never a
         // silent skip) so sync_wwremote.php's error log shows exactly how

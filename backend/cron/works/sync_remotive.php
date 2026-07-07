@@ -134,7 +134,7 @@ $logPrune = getDB()->prepare(
          SELECT id FROM (
            SELECT id FROM sync_log
            WHERE source = 'remotive'
-           ORDER BY ran_at DESC
+           ORDER BY ran_at DESC, id DESC
            LIMIT 1
          ) AS keep_me
        )"

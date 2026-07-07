@@ -182,17 +182,23 @@ final class WweRemoteFetcher implements JobFetcherInterface
             throw new SourceUnavailableException("Malformed XML: {$message}");
         }
 
+        if (!isset($xml->channel)) {
+            throw new SourceUnavailableException('Response missing expected channel structure');
+        }
+
+        // A valid feed with zero items is not an error — return early with
+        // an empty list, matching RemotiveFetcher's zero-results contract.
         if (!isset($xml->channel->item)) {
-            throw new SourceUnavailableException('Response missing expected channel/item structure');
+            return [];
         }
 
         $items = [];
         foreach ($xml->channel->item as $item) {
             $items[] = [
-                'title' => (string) $item->title,
-                'link' => (string) $item->link,
-                'guid' => (string) $item->guid,
-                'pubDate' => (string) $item->pubDate,
+                'title'       => (string) $item->title,
+                'link'        => (string) $item->link,
+                'guid'        => (string) $item->guid,
+                'pubDate'     => (string) $item->pubDate,
                 'description' => (string) $item->description,
             ];
         }

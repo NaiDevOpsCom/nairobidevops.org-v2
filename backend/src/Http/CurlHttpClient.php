@@ -38,7 +38,8 @@ final class CurlHttpClient implements HttpClientInterface
      */
     public static function forEnvironment(?string $appEnv): self
     {
-        $isProtectedEnvironment = \in_array($appEnv, self::PROTECTED_ENVIRONMENTS, true);
+        $normalizedEnv = $appEnv !== null ? strtolower(trim($appEnv)) : null;
+        $isProtectedEnvironment = \in_array($normalizedEnv, self::PROTECTED_ENVIRONMENTS, true);
 
         return new self($isProtectedEnvironment);
     }

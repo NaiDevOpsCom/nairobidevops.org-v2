@@ -586,19 +586,24 @@ function isLocationExcludedForAfrica(?string $locationDetail): bool
 
     $normalized = strtolower(trim($locationDetail));
 
-    foreach (WORLDWIDE_LOCATION_PHRASES as $phrase) {
-        if ($normalized === $phrase || str_contains($normalized, $phrase)) {
-            return false;
-        }
-    }
-
+    // Check the more-specific "-only" restrictions first so that a value like
+    // "Remote (US Only)" is caught as excluded before the broader worldwide
+    // check would short-circuit it as safe.
     foreach (NON_AFRICA_ONLY_PHRASES as $phrase) {
         if (str_contains($normalized, $phrase)) {
             return true;
         }
     }
 
-    return \in_array($normalized, NON_AFRICA_EXACT_LOCATIONS, true);
+    // A worldwide/generic-remote phrase means the role is open everywhere —
+    // not excluded. Checked after the "-only" loop so "Remote (US Only)"
+    // is never accidentally cleared by matching "remote" here.
+    $isWorldwide = array_filter(
+        WORLDWIDE_LOCATION_PHRASES,
+        static fn(string $phrase): bool => $normalized === $phrase || str_contains($normalized, $phrase),
+    ) !== [];
+
+    return !$isWorldwide && \in_array($normalized, NON_AFRICA_EXACT_LOCATIONS, true);
 }
 
 
@@ -1209,9 +1214,10 @@ function sendDiscord(string $message): array
  */
 function sendDiscordChunk(string $chunk, int $index, int $total): array
 {
+    // Delegate env-aware SSL decision to the same authority as CurlHttpClient::forEnvironment().
+    // Default is verified TLS; only an explicit opt-out flag relaxes it.
     $disableSsl = filter_var(getenv('DISABLE_SSL_VERIFY'), FILTER_VALIDATE_BOOLEAN)
-        || !\defined('APP_ENV')
-        || (APP_ENV !== 'production' && APP_ENV !== 'staging');
+        && !(defined('APP_ENV') && in_array(trim((string) APP_ENV), ['production', 'staging'], true));
 
     $payload = json_encode([
         'content'          => $chunk,
