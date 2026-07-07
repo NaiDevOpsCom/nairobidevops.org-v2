@@ -30,7 +30,13 @@ use App\Repository\JobRepository;
 
 $startTime = microtime(true);
 
-$appEnv = \defined('APP_ENV') ? APP_ENV : (getenv('APP_ENV') ?: null);
+$appEnv = null;
+if (\defined('APP_ENV')) {
+    $appEnv = APP_ENV;
+} else {
+    $envValue = getenv('APP_ENV');
+    $appEnv = $envValue !== false ? $envValue : null;
+}
 
 $httpClient = CurlHttpClient::forEnvironment($appEnv);
 $fetcher    = new WweRemoteFetcher($httpClient);
