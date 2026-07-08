@@ -227,6 +227,14 @@ final class WweRemoteNormalizer
             $locationDetail = trim($matches[2]);
         }
 
+        // Guard: if the title segment after splitting is itself just a bare
+        // "at <something>" pattern — meaning the real job title was empty
+        // before the location suffix (e.g. "Acme: at Nairobi") — treat it as
+        // an empty title so the caller's empty-title rejection fires.
+        if (preg_match('/^\s*at\s+\S/i', $rest) === 1) {
+            $rest = '';
+        }
+
         return [$company, $rest, $locationDetail];
     }
 }
