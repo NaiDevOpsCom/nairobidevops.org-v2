@@ -136,7 +136,7 @@ final class WweRemoteNormalizer
             'apply_url' => $applyUrl,
             'affiliate_apply_url' => buildAffiliateUrl($applyUrl, self::SOURCE),
             'source' => self::SOURCE,
-            'source_id' => strlen($guid) > 255
+            'source_id' => \strlen($guid) > 255
                 // Hash the full GUID so deduplication remains stable and
                 // collision-free. sha256 hex is 64 chars, well within the
                 // VARCHAR(255) column and the UNIQUE KEY unique_source_job.

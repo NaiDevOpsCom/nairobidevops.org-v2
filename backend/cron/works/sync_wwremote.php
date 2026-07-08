@@ -131,4 +131,3 @@ echo '  Errors        : ' . \count($errors) . "\n";
 foreach ($errors as $error) {
     echo "  ! {$error}\n";
 }
-

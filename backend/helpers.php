@@ -593,7 +593,7 @@ function isLocationExcludedForAfrica(?string $locationDetail): bool
         return false;
     }
 
-    $normalized = function_exists('mb_strtolower')
+    $normalized = \function_exists('mb_strtolower')
         ? mb_strtolower(trim($locationDetail), 'UTF-8')
         : strtolower(trim($locationDetail));
 
@@ -611,7 +611,7 @@ function isLocationExcludedForAfrica(?string $locationDetail): bool
     // is never accidentally cleared by matching "remote" here.
     $isWorldwide = array_filter(
         WORLDWIDE_LOCATION_PHRASES,
-        static fn(string $phrase): bool => $normalized === $phrase || str_contains($normalized, $phrase),
+        static fn (string $phrase): bool => $normalized === $phrase || str_contains($normalized, $phrase),
     ) !== [];
 
     return !$isWorldwide && \in_array($normalized, NON_AFRICA_EXACT_LOCATIONS, true);
@@ -1228,7 +1228,7 @@ function sendDiscordChunk(string $chunk, int $index, int $total): array
     // Delegate env-aware SSL decision to the same authority as CurlHttpClient::forEnvironment().
     // Default is verified TLS; only an explicit opt-out flag relaxes it.
     $disableSsl = filter_var(getenv('DISABLE_SSL_VERIFY'), FILTER_VALIDATE_BOOLEAN)
-        && !(defined('APP_ENV') && in_array(trim((string) APP_ENV), ['production', 'staging'], true));
+        && !(\defined('APP_ENV') && \in_array(trim((string) APP_ENV), ['production', 'staging'], true));
 
     $payload = json_encode([
         'content'          => $chunk,
