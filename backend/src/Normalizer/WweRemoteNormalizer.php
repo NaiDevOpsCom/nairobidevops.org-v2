@@ -136,7 +136,12 @@ final class WweRemoteNormalizer
             'apply_url' => $applyUrl,
             'affiliate_apply_url' => buildAffiliateUrl($applyUrl, self::SOURCE),
             'source' => self::SOURCE,
-            'source_id' => mb_substr($guid, 0, 255),
+            'source_id' => strlen($guid) > 255
+                // Hash the full GUID so deduplication remains stable and
+                // collision-free. sha256 hex is 64 chars, well within the
+                // VARCHAR(255) column and the UNIQUE KEY unique_source_job.
+                ? hash('sha256', $guid)
+                : $guid,
             // Non-negotiable: classification always goes through the shared
             // helpers.php function, never reimplemented per source.
             'role_type' => mapRoleType($cleanTitle),
@@ -217,7 +222,7 @@ final class WweRemoteNormalizer
 
         $locationDetail = null;
 
-        if (preg_match('/^(.*)\s*at\s+([^:]+)$/i', $rest, $matches) === 1) {
+        if (preg_match('/^(.+)\s+at\s+([^:]+)$/i', $rest, $matches) === 1) {
             $rest = trim($matches[1]);
             $locationDetail = trim($matches[2]);
         }

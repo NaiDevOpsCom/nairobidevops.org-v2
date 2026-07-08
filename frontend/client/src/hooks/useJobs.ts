@@ -56,7 +56,7 @@ export interface JobFilters {
   sort: SortOption;
   /** Current page number (1-indexed) */
   page: number;
-  /** Results per page (max 100) */
+  /** Results per page (max 50) */
   per_page: number;
 }
 
