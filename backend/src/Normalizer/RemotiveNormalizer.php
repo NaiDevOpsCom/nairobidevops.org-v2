@@ -4,149 +4,222 @@ declare(strict_types=1);
 
 namespace App\Normalizer;
 
-use DateTimeImmutable;
-use DateTimeZone;
-use Exception;
 use InvalidArgumentException;
+
+// helpers.php is global, non-namespaced, and shared by every source's
+// normalizer — see PRD §8. It is not part of the App\ PSR-4 tree, so it's
+// require_once'd here rather than autoloaded, matching the contract every
+// Fetcher/Normalizer pair follows.
+require_once \dirname(__DIR__, 2) . '/helpers.php';
 
 /**
  * Maps raw Remotive job dicts (as returned by RemotiveFetcher::fetch()) into
- * the unified internal jobs schema.
+ * the unified internal `jobs` schema consumed by JobRepository::upsert().
  *
- * Field mapping, per the PRD:
- *   id                  -> source_id (primary dedup anchor)
- *   title               -> title
- *   company_name        -> company
- *   company_logo        -> company_logo_url
- *   url                 -> apply_url, and the input to buildAffiliateUrl()
- *   tags                -> tags (JSON array)
- *   publication_date    -> posted_at
- *   salary              -> parsed via parseSalary() into salary_min/max/currency/period
- *   description         -> description (HTML stripped via cleanDescription())
+ * Field mapping (see PRD §7, Source 1: Remotive):
+ *   id               -> source_id
+ *   title            -> title            (via sanitizeString())
+ *   company_name     -> company          (via sanitizeString())
+ *   company_logo     -> company_logo_url (validated as a URL, dropped if not)
+ *   url              -> apply_url + affiliate_apply_url (via buildAffiliateUrl())
+ *   tags             -> tags             (each tag sanitized)
+ *   publication_date -> posted_at        (normalized to 'Y-m-d H:i:s')
+ *   salary           -> salary_min/max/currency/period (via parseSalary())
+ *   description      -> description      (via cleanDescription() — XSS defense)
  *
- * Role classification calls mapRoleType($title) — the job title, not
- * Remotive's own `category` field. Remotive's category taxonomy isn't the
- * same taxonomy isNonTechRole()/mapRoleType() encode, so using it directly
- * would be its own form of reimplementing classification per-source. This
- * class never reimplements or overrides that logic itself, even for
- * Remotive-specific title quirks. If a Remotive title pattern gets
- * misclassified, the fix belongs in helpers.php's isNonTechRole() block
- * list, not here.
+ * role_type is ALWAYS derived via mapRoleType($title) — never reimplemented
+ * here, per the non-negotiable rule in the PRD and task plan. location_type
+ * defaults to 'international_remote' and africa_friendly always defaults to
+ * 0, per PRD §6 — neither is ever inferred from source data.
+ *
+ * A malformed individual record (missing/invalid title, company, url, or id)
+ * is dropped and reported back via normalizeAll()'s `dropped` list — it never
+ * throws, so one bad record can't sink an otherwise-good batch. This mirrors
+ * RemotiveFetcher's own contract: shape validation stops the batch, per-record
+ * validation just logs and continues.
  */
 final class RemotiveNormalizer
 {
     private const SOURCE = 'remotive';
 
     /**
-     * @param array<int, array<string, mixed>> $rawJobs
-     * @return array<int, array<string, mixed>>
+     * @param array<int, array<string, mixed>> $rawJobs Raw dicts from RemotiveFetcher::fetch()
+     * @return array{
+     *     normalized: array<int, array<string, mixed>>,
+     *     dropped: array<int, array{reason: string, raw: array<string, mixed>}>
+     * }
      */
     public function normalizeAll(array $rawJobs): array
     {
         $normalized = [];
+        $dropped = [];
 
-        foreach ($rawJobs as $rawJob) {
+        foreach ($rawJobs as $raw) {
+            if (!\is_array($raw)) {
+                $dropped[] = ['reason' => 'Record is not an array', 'raw' => $raw];
+                continue;
+            }
+
             try {
-                $normalized[] = $this->normalize($rawJob);
+                $normalized[] = $this->normalizeOne($raw);
             } catch (InvalidArgumentException $e) {
-                $this->logDropped($rawJob, $e->getMessage());
+                $dropped[] = ['reason' => $e->getMessage(), 'raw' => $raw];
             }
         }
 
-        return $normalized;
+        return ['normalized' => $normalized, 'dropped' => $dropped];
     }
 
     /**
-     * @param array<string, mixed> $rawJob
+     * @param array<string, mixed> $raw
      * @return array<string, mixed>
      *
-     * @throws InvalidArgumentException on a required field missing, or
-     *         title/company empty after sanitization — callers should
-     *         catch this per-record (see normalizeAll()) rather than let
-     *         one malformed job sink the whole sync run.
+     * @throws InvalidArgumentException if a required field is missing or invalid.
+     *   Caught by normalizeAll() — never let this escape a batch run.
      */
-    public function normalize(array $rawJob): array
+    public function normalizeOne(array $raw): array
     {
-        $this->assertRequiredFields($rawJob);
-
-        $title = sanitizeString((string) $rawJob['title']);
-        $company = sanitizeString((string) $rawJob['company_name']);
-
-        if ($title === '' || $company === '') {
-            throw new InvalidArgumentException('remotive: title or company empty after sanitization');
-        }
-
-        $salary = parseSalary((string) ($rawJob['salary'] ?? ''));
-        $applyUrl = sanitizeUrl($rawJob['url']);
-
-        if ($applyUrl === null) {
-            throw new InvalidArgumentException('remotive: invalid apply URL');
-        }
-
-        return [
-            'source' => self::SOURCE,
-            'source_id' => (string) $rawJob['id'],
+        [
+            'sourceId' => $sourceId,
             'title' => $title,
             'company' => $company,
-            'company_logo_url' => $this->nullableSanitized($rawJob['company_logo'] ?? null),
-            'description' => cleanDescription((string) ($rawJob['description'] ?? '')),
+            'applyUrl' => $applyUrl,
+        ] = $this->validateRequiredFields($raw);
+
+        [
+            'cleanTitle' => $cleanTitle,
+            'cleanCompany' => $cleanCompany,
+        ] = $this->validateAndSanitizeStrings($sourceId, $title, $company);
+
+        $cleanDescription = cleanDescription((string) ($raw['description'] ?? ''));
+        $salary = parseSalary((string) ($raw['salary'] ?? ''));
+        $tags = $this->normalizeTags($raw['tags'] ?? null);
+        $companyLogoUrl = $this->normalizeCompanyLogoUrl($raw['company_logo'] ?? null);
+        $postedAt = $this->normalizePostedAt($raw['publication_date'] ?? null);
+
+        return [
+            'title' => $cleanTitle,
+            'company' => $cleanCompany,
+            'company_logo_url' => $companyLogoUrl,
+            'description' => $cleanDescription,
             'apply_url' => $applyUrl,
             'affiliate_apply_url' => buildAffiliateUrl($applyUrl, self::SOURCE),
-            'role_type' => mapRoleType($title),
+            'source' => self::SOURCE,
+            'source_id' => (string) $sourceId,
+            // Non-negotiable: classification always goes through the shared
+            // helpers.php function, never reimplemented per source.
+            'role_type' => mapRoleType($cleanTitle),
             'location_type' => 'international_remote',
-            'location_detail' => $this->nullableSanitized($rawJob['candidate_required_location'] ?? null),
+            'location_detail' => null,
             'africa_friendly' => 0,
             'salary_min' => $salary['salary_min'],
             'salary_max' => $salary['salary_max'],
             'salary_currency' => $salary['salary_currency'],
             'salary_period' => $salary['salary_period'],
             'experience_level' => null,
-            'tags' => $this->normalizeTags($rawJob['tags'] ?? []),
-            'posted_at' => isset($rawJob['publication_date']) && $rawJob['publication_date'] !== ''
-                ? $this->toMysqlDatetime((string) $rawJob['publication_date'])
-                : null,
+            'posted_at' => $postedAt,
+            'closes_at' => null,
+            'tags' => $tags,
         ];
     }
 
     /**
-     * @param array<string, mixed> $rawJob
+     * Validates and extracts required fields from a raw Remotive record.
+     *
+     * @param array<string, mixed> $raw
+     * @return array{sourceId: int|string, title: string, company: string, applyUrl: string}
+     * @throws InvalidArgumentException if any required field is missing or invalid
      */
-    private function assertRequiredFields(array $rawJob): void
+    private function validateRequiredFields(array $raw): array
     {
-        foreach (['id', 'title', 'company_name', 'url'] as $field) {
-            if (!isset($rawJob[$field]) || $rawJob[$field] === '') {
-                throw new InvalidArgumentException("remotive: missing required field '{$field}'");
-            }
-            if ($field === 'id') {
-                if (!\is_string($rawJob[$field]) && !\is_int($rawJob[$field])) {
-                    throw new InvalidArgumentException("remotive: required field '{$field}' must be a string or integer");
-                }
-            } else {
-                if (!\is_string($rawJob[$field])) {
-                    throw new InvalidArgumentException("remotive: required field '{$field}' must be a string");
-                }
-            }
+        $sourceId = $raw['id'] ?? null;
+        $title = $raw['title'] ?? null;
+        $company = $raw['company_name'] ?? null;
+        $applyUrl = $raw['url'] ?? null;
+
+        if ($sourceId === null || $sourceId === '') {
+            throw new InvalidArgumentException('Remotive record missing required field "id"');
         }
+
+        if (!\is_string($title) || trim($title) === '') {
+            throw new InvalidArgumentException("Remotive record {$sourceId}: missing/empty \"title\"");
+        }
+
+        if (!\is_string($company) || trim($company) === '') {
+            throw new InvalidArgumentException("Remotive record {$sourceId}: missing/empty \"company_name\"");
+        }
+
+        if (!\is_string($applyUrl) || filter_var($applyUrl, FILTER_VALIDATE_URL) === false
+            || (!str_starts_with($applyUrl, 'http://') && !str_starts_with($applyUrl, 'https://'))
+        ) {
+            throw new InvalidArgumentException("Remotive record {$sourceId}: missing/invalid \"url\"");
+        }
+
+        return ['sourceId' => $sourceId, 'title' => $title, 'company' => $company, 'applyUrl' => $applyUrl];
     }
 
     /**
-     * Sanitizes an optional string field, returning null for anything
-     * absent/empty rather than an empty string — keeps optional DB columns
-     * (company_logo_url, location_detail) genuinely NULL instead of ''.
+     * Sanitizes title and company strings, then validates they are non-empty
+     * after sanitization.
+     *
+     * @param int|string $sourceId Used in error messages only
+     * @param string $title Raw title from source
+     * @param string $company Raw company name from source
+     * @return array{cleanTitle: string, cleanCompany: string}
+     * @throws InvalidArgumentException if either string is empty after sanitization
      */
-    private function nullableSanitized(mixed $value): ?string
+    private function validateAndSanitizeStrings(int|string $sourceId, string $title, string $company): array
     {
-        if ($value === null || $value === '') {
+        $cleanTitle = sanitizeString($title);
+        $cleanCompany = sanitizeString($company);
+
+        if (trim($cleanTitle) === '') {
+            throw new InvalidArgumentException("Remotive record {$sourceId}: title is empty after sanitization");
+        }
+
+        if (trim($cleanCompany) === '') {
+            throw new InvalidArgumentException("Remotive record {$sourceId}: company is empty after sanitization");
+        }
+
+        return ['cleanTitle' => $cleanTitle, 'cleanCompany' => $cleanCompany];
+    }
+
+    /**
+     * Validates a company logo URL string. Returns null if the value is not a
+     * well-formed http/https URL.
+     */
+    private function normalizeCompanyLogoUrl(mixed $companyLogoUrl): ?string
+    {
+        if (!\is_string($companyLogoUrl) || filter_var($companyLogoUrl, FILTER_VALIDATE_URL) === false
+            || (!str_starts_with($companyLogoUrl, 'http://') && !str_starts_with($companyLogoUrl, 'https://'))
+        ) {
             return null;
         }
 
-        $sanitized = sanitizeString((string) $value);
-
-        return $sanitized ?: null;
+        return $companyLogoUrl;
     }
 
     /**
-     * @param mixed $tags
+     * Parses a publication date string into 'Y-m-d H:i:s' format.
+     * Returns null when the value is empty or unparseable.
+     */
+    private function normalizePostedAt(mixed $publicationDate): ?string
+    {
+        if (empty($publicationDate)) {
+            return null;
+        }
+
+        $timestamp = strtotime((string) $publicationDate);
+        if ($timestamp === false) {
+            return null;
+        }
+
+        return date('Y-m-d H:i:s', $timestamp);
+    }
+
+    /**
+     * Sanitizes a list of tags. Non-arrays are silently treated as empty.
+     *
      * @return string[]
      */
     private function normalizeTags(mixed $tags): array
@@ -155,37 +228,9 @@ final class RemotiveNormalizer
             return [];
         }
 
-        $scalarTags = array_filter($tags, static fn (mixed $tag): bool => \is_scalar($tag));
-        $sanitizedTags = array_map(
+        return array_values(array_map(
             static fn (mixed $tag): string => sanitizeString((string) $tag),
-            $scalarTags
-        );
-
-        return array_values(array_filter(
-            $sanitizedTags,
-            static fn (string $tag): bool => $tag !== ''
+            $tags,
         ));
-    }
-
-    private function toMysqlDatetime(string $raw): ?string
-    {
-        try {
-            $date = new DateTimeImmutable($raw, new DateTimeZone('UTC'));
-            $date = $date->setTimezone(new DateTimeZone('UTC'));
-        } catch (Exception) {
-            return null;
-        }
-
-        return $date->format('Y-m-d H:i:s');
-    }
-
-
-    /**
-     * @param array<string, mixed> $rawJob
-     */
-    private function logDropped(array $rawJob, string $reason): void
-    {
-        $id = $rawJob['id'] ?? 'unknown';
-        fwrite(STDERR, "[RemotiveNormalizer] Dropped record (id={$id}): {$reason}\n");
     }
 }

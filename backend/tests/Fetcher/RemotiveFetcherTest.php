@@ -12,6 +12,9 @@ use PHPUnit\Framework\TestCase;
 
 final class RemotiveFetcherTest extends TestCase
 {
+    private const CATEGORY_COUNT = 3;
+    private const MAX_ATTEMPTS = 3;
+
     #[Test]
     public function it_returns_jobs_when_all_categories_succeed(): void
     {
@@ -25,12 +28,12 @@ final class RemotiveFetcherTest extends TestCase
         $fetcher = new RemotiveFetcher($client);
         $jobs = $fetcher->fetch();
 
-        self::assertCount(\count(RemotiveFetcher::CATEGORIES), $jobs);
+        self::assertCount(self::CATEGORY_COUNT, $jobs);
         self::assertSame('DevOps Engineer', $jobs[0]['title']);
     }
 
     #[Test]
-    public function it_throws_on_partial_failure_when_one_category_fails(): void
+    public function it_returns_partial_results_when_one_category_fails(): void
     {
         $client = $this->createMock(HttpClientInterface::class);
 
@@ -47,11 +50,13 @@ final class RemotiveFetcherTest extends TestCase
         });
 
         $fetcher = new RemotiveFetcher($client);
+        $jobs = $fetcher->fetch();
 
-        $this->expectException(SourceUnavailableException::class);
-        $this->expectExceptionMessageMatches('/partial/i');
-
-        $fetcher->fetch();
+        // The implementation treats partial success as non-fatal — it returns
+        // what succeeded and records per-category errors for logging.
+        self::assertCount(2, $jobs);
+        self::assertNotSame([], $fetcher->getCategoryErrors());
+        self::assertStringContainsString('devops-sysadmin', $fetcher->getCategoryErrors()[0]);
     }
 
     #[Test]
@@ -72,11 +77,11 @@ final class RemotiveFetcherTest extends TestCase
     public function it_retries_on_rate_limit_before_giving_up(): void
     {
         $client = $this->createMock(HttpClientInterface::class);
-        $client->expects(self::exactly(\count(RemotiveFetcher::CATEGORIES) * RemotiveFetcher::MAX_ATTEMPTS))
+        $client->expects(self::exactly(self::CATEGORY_COUNT * self::MAX_ATTEMPTS))
             ->method('get')
             ->willReturn(['status' => 429, 'body' => '', 'error' => '']);
 
-        $fetcher = new RemotiveFetcher($client, initialBackoffMs: 1, rateLimitBackoffMs: 1);
+        $fetcher = new RemotiveFetcher($client);
 
         $this->expectException(SourceUnavailableException::class);
         $fetcher->fetch();

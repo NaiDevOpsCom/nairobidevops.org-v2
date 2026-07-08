@@ -6,186 +6,235 @@ namespace App\Normalizer;
 
 use InvalidArgumentException;
 
+// helpers.php is global, non-namespaced, shared by every source's normalizer.
+require_once \dirname(__DIR__, 2) . '/helpers.php';
+
 /**
- * Maps raw We Work Remotely RSS <item> dicts (as returned by
- * WweRemoteFetcher::fetch()) into the unified internal jobs schema.
+ * Maps raw We Work Remotely RSS items (from WweRemoteFetcher::fetch()) into
+ * the unified internal `jobs` schema consumed by JobRepository::upsert().
  *
- * Field mapping, per the PRD:
- *   <guid>                        -> source_id (primary dedup anchor)
- *   <title>, split on first ': ' -> company, title
- *   <link>                        -> apply_url
- *   <pubDate>                     -> posted_at
- *   <description>                 -> description (HTML stripped)
- *   mapRoleType($title)           -> role_type
+ * WWR title format is "Company: Job Title", optionally with a trailing
+ * " at Location" (e.g. "Andela: Senior DevOps Engineer at Anywhere in the
+ * World"). This normalizer splits on the first ": " to get company/title,
+ * then strips a trailing " at <location>" if present.
  *
- * Role classification is delegated entirely to mapRoleType()/isNonTechRole()
- * in helpers.php — this class never reimplements or overrides that logic,
- * even for WWR-specific title quirks. If a WWR title pattern gets
- * misclassified, the fix belongs in helpers.php's isNonTechRole() block
- * list, not here.
+ * role_type is ALWAYS derived via mapRoleType($title) — never reimplemented
+ * here, same non-negotiable rule as RemotiveNormalizer. location_type
+ * defaults to 'international_remote' and africa_friendly always defaults to
+ * 0, per PRD §6 — neither is ever inferred from source data.
  *
- * WWR's RSS feed has no structured salary field (unlike Remotive), so
- * salary_min/max/period are left null rather than guessed at from
- * free-text description.
+ * Salary is deliberately left null for every WWR job. WWR's RSS feed has no
+ * discrete salary field (see PRD §7, Source 2 field mapping — salary isn't
+ * listed), so there is nothing reliable to parse. Scanning the free-text
+ * description for numbers that look like a salary is NOT done here: a
+ * number pulled from arbitrary body text presented as a real salary is
+ * actively misleading, worse than showing "Salary not disclosed" honestly.
  *
- * Live feed data (checked manually against production WWR feeds, Jul
- * 2026) mostly does NOT include the " at Location" suffix the original
- * PRD spec assumed titles would have — most titles are plain
- * "Company: Job Title". extractLocationSuffix() only acts when that
- * pattern is actually present, and leaves location_detail null otherwise
- * rather than guessing.
+ * A malformed individual record (missing guid, unparseable "Company: Title"
+ * format, or invalid apply URL) is dropped and reported via normalizeAll()'s
+ * `dropped` list — it never throws, matching RemotiveNormalizer's contract.
  */
 final class WweRemoteNormalizer
 {
     private const SOURCE = 'weworkremotely';
 
     /**
-     * @param array<int, array<string, mixed>> $rawItems
-     * @return array<int, array<string, mixed>>
+     * @param array<int, array<string, mixed>> $rawItems Raw dicts from WweRemoteFetcher::fetch()
+     * @return array{
+     *     normalized: array<int, array<string, mixed>>,
+     *     dropped: array<int, array{reason: string, raw: array<string, mixed>}>
+     * }
      */
     public function normalizeAll(array $rawItems): array
     {
         $normalized = [];
+        $dropped = [];
 
-        foreach ($rawItems as $rawItem) {
+        foreach ($rawItems as $raw) {
             try {
-                $normalized[] = $this->normalize($rawItem);
+                $normalized[] = $this->normalizeOne($raw);
             } catch (InvalidArgumentException $e) {
-                $this->logDropped($rawItem, $e->getMessage());
+                $dropped[] = ['reason' => $e->getMessage(), 'raw' => $raw];
             }
         }
 
-        return $normalized;
+        return ['normalized' => $normalized, 'dropped' => $dropped];
     }
 
     /**
-     * @param array<string, mixed> $rawItem
+     * @param array<string, mixed> $raw
      * @return array<string, mixed>
      *
-     * @throws InvalidArgumentException on a required field missing, or a
-     *         title with no "Company: Title" separator — callers should
-     *         catch this per-record (see normalizeAll()) rather than let
-     *         one malformed item sink the whole sync run.
+     * @throws InvalidArgumentException if a required field is missing or invalid.
+     *   Caught by normalizeAll() — never let this escape a batch run.
      */
-    public function normalize(array $rawItem): array
+    public function normalizeOne(array $raw): array
     {
-        $this->assertRequiredFields($rawItem);
+        $guid = $raw['guid'] ?? null;
+        $rawTitle = $raw['title'] ?? null;
+        $applyUrl = $raw['link'] ?? null;
 
-        [$rawCompany, $rawTitle] = $this->splitCompanyAndTitle((string) $rawItem['title']);
-
-        $company = sanitizeString($rawCompany);
-        $title = sanitizeString($rawTitle);
-
-        if ($company === '' || $title === '') {
-            throw new InvalidArgumentException('weworkremotely: company or title empty after sanitization');
+        if (!\is_string($guid) || trim($guid) === '') {
+            throw new InvalidArgumentException('WWR item missing required field "guid"');
         }
 
-        $applyUrl = sanitizeUrl($rawItem['link']);
-        if ($applyUrl === null) {
-            throw new InvalidArgumentException('weworkremotely: invalid apply URL');
+        if (!\is_string($applyUrl) || filter_var($applyUrl, FILTER_VALIDATE_URL) === false) {
+            throw new InvalidArgumentException("WWR item {$guid}: missing/invalid \"link\"");
         }
 
-        [$title, $locationDetail] = $this->extractLocationSuffix($title);
+        if (!\is_string($rawTitle) || trim($rawTitle) === '') {
+            throw new InvalidArgumentException("WWR item {$guid}: missing/empty \"title\"");
+        }
+
+        [$company, $title, $locationDetail] = $this->splitTitle($rawTitle);
+
+        if ($company === null) {
+            throw new InvalidArgumentException(
+                "WWR item {$guid}: title \"{$rawTitle}\" doesn't match the expected \"Company: Title\" format"
+            );
+        }
+
+        if (trim($company) === '') {
+            throw new InvalidArgumentException(
+                "WWR item {$guid}: title \"{$rawTitle}\" has an empty company segment"
+            );
+        }
+
+        if (trim($title) === '') {
+            throw new InvalidArgumentException(
+                "WWR item {$guid}: title \"{$rawTitle}\" has an empty job title segment"
+            );
+        }
+
+        // Not a malformed record — a valid job that's out of scope for this
+        // board. Routed through the same dropped/logged path (never a
+        // silent skip) so sync_wwremote.php's error log shows exactly how
+        // many jobs were excluded and why, same as any other drop reason.
+        if (isLocationExcludedForAfrica($locationDetail)) {
+            throw new InvalidArgumentException(
+                "WWR item {$guid}: excluded — location \"{$locationDetail}\" restricts this role to a specific non-Africa location"
+            );
+        }
+
+        $cleanTitle = mb_substr(sanitizeString($title), 0, 255);
+        $cleanCompany = mb_substr(sanitizeString($company), 0, 255);
+        $cleanDescription = cleanDescription((string) ($raw['description'] ?? ''));
+
+        $postedAt = null;
+        if (!empty($raw['pubDate'])) {
+            $timestamp = strtotime((string) $raw['pubDate']);
+            if ($timestamp !== false) {
+                $postedAt = date('Y-m-d H:i:s', $timestamp);
+            }
+        }
 
         return [
-            'source' => self::SOURCE,
-            'source_id' => (string) $rawItem['guid'],
-            'title' => $title,
-            'company' => $company,
+            'title' => $cleanTitle,
+            'company' => $cleanCompany,
             'company_logo_url' => null,
-            'description' => cleanDescription((string) ($rawItem['description'] ?? '')),
+            'description' => $cleanDescription,
             'apply_url' => $applyUrl,
-            'affiliate_apply_url' => null,
-            'role_type' => mapRoleType($title),
+            'affiliate_apply_url' => buildAffiliateUrl($applyUrl, self::SOURCE),
+            'source' => self::SOURCE,
+            'source_id' => \strlen($guid) > 255
+                // Hash the full GUID so deduplication remains stable and
+                // collision-free. sha256 hex is 64 chars, well within the
+                // VARCHAR(255) column and the UNIQUE KEY unique_source_job.
+                ? hash('sha256', $guid)
+                : $guid,
+            // Non-negotiable: classification always goes through the shared
+            // helpers.php function, never reimplemented per source.
+            'role_type' => mapRoleType($cleanTitle),
             'location_type' => 'international_remote',
-            'location_detail' => $locationDetail,
+            'location_detail' => $locationDetail !== null ? mb_substr(sanitizeString($locationDetail), 0, 255) : null,
             'africa_friendly' => 0,
+            // Deliberately null — see class docblock. WWR's RSS has no
+            // discrete salary field; scanning free text is not done here.
             'salary_min' => null,
             'salary_max' => null,
             'salary_currency' => 'USD',
             'salary_period' => null,
             'experience_level' => null,
-            'tags' => [],
-            'posted_at' => isset($rawItem['pubDate']) && $rawItem['pubDate'] !== ''
-                ? $this->toMysqlDatetime((string) $rawItem['pubDate'])
-                : null,
+            'posted_at' => $postedAt,
+            'closes_at' => null,
+            'tags' => $this->extractTags($cleanTitle),
         ];
     }
 
     /**
-     * @param array<string, mixed> $rawItem
+     * Recognized tech-stack keywords extracted from a job title for display
+     * as tag pills on the frontend. Purely cosmetic/informational — this
+     * list has no bearing on role_type classification (mapRoleType() alone
+     * decides that) or on whether a job is stored at all. Ordered roughly
+     * specific-to-generic so a longer, more specific match isn't shadowed
+     * by checking a shorter generic one first (not that order matters here
+     * since every match is kept, but it reads more sensibly this way).
+     *
+     * @var string[]
      */
-    private function assertRequiredFields(array $rawItem): void
+    private const TAG_KEYWORDS = [
+        'kubernetes', 'k8s', 'terraform', 'ansible', 'helm', 'docker',
+        'jenkins', 'gitlab', 'github actions', 'ci/cd', 'cicd', 'argocd',
+        'prometheus', 'grafana', 'datadog', 'elasticsearch',
+        'aws', 'gcp', 'azure', 'cloudflare',
+        'linux', 'nginx', 'kafka', 'postgres', 'postgresql', 'mysql',
+        'mongodb', 'redis',
+        'python', 'golang', 'rust', 'java', 'kotlin', 'scala',
+        'ruby', 'rails', 'php', 'laravel', 'node.js', 'nodejs',
+        'typescript', 'javascript', 'react', 'vue', 'angular',
+        'graphql', 'grpc', 'microservices', 'serverless',
+        'devsecops', 'appsec',
+    ];
+
+    /**
+     * @return string[] Deduplicated, in first-seen order
+     */
+    private function extractTags(string $title): array
     {
-        foreach (['guid', 'title', 'link'] as $field) {
-            if (!isset($rawItem[$field]) || $rawItem[$field] === '') {
-                throw new InvalidArgumentException("weworkremotely: missing required field '{$field}'");
+        $lower = strtolower($title);
+        $found = [];
+
+        foreach (self::TAG_KEYWORDS as $keyword) {
+            if (preg_match('/\b' . preg_quote($keyword, '/') . '\b/i', $lower)) {
+                $found[] = $keyword;
             }
         }
+
+        return array_values(array_unique($found));
     }
 
     /**
-     * WWR titles arrive as "Company: Job Title". Split on the *first*
-     * ': ' only — job titles themselves sometimes contain a colon (e.g.
-     * "Acme: Senior Engineer: Platform Team"), and only the first one is
-     * the actual company/title boundary.
+     * Splits WWR's "Company: Job Title" (optionally "... at Location") format.
      *
-     * @return array{0: string, 1: string} [company, title]
-     *
-     * @throws InvalidArgumentException if no ': ' separator is found —
-     *         without it there's no reliable way to recover the company
-     *         name, so the record is dropped rather than stored with a
-     *         guessed or empty company.
+     * @return array{0: string|null, 1: string, 2: string|null} [company, title, locationDetail]
+     *   company is null if the raw title doesn't contain the expected ": " separator.
      */
-    private function splitCompanyAndTitle(string $rawTitle): array
+    private function splitTitle(string $rawTitle): array
     {
-        $parts = explode(': ', $rawTitle, 2);
+        $separatorPos = strpos($rawTitle, ': ');
 
-        if (\count($parts) !== 2) {
-            throw new InvalidArgumentException(
-                "weworkremotely: title has no 'Company: Title' separator: '{$rawTitle}'"
-            );
+        if ($separatorPos === false) {
+            return [null, $rawTitle, null];
         }
 
-        return [$parts[0], $parts[1]];
-    }
+        $company = substr($rawTitle, 0, $separatorPos);
+        $rest = substr($rawTitle, $separatorPos + 2);
 
-    /**
-     * Some WWR listings append " at <Location>" to the job title. This
-     * only fires when that exact pattern is present in the (already
-     * company-stripped) title — it does not force a location_detail
-     * guess when the suffix is absent, which live data shows is now the
-     * common case.
-     *
-     * @return array{0: string, 1: string|null} [title without suffix, location or null]
-     */
-    private function extractLocationSuffix(string $title): array
-    {
-        if (preg_match('/^(.+)\s+at\s+(.+)$/i', $title, $matches) === 1) {
-            return [trim($matches[1]), sanitizeString($matches[2])];
+        $locationDetail = null;
+
+        if (preg_match('/^(.+)\s+at\s+([^:]+)$/i', $rest, $matches) === 1) {
+            $rest = trim($matches[1]);
+            $locationDetail = trim($matches[2]);
         }
 
-        return [$title, null];
-    }
-
-    private function toMysqlDatetime(string $raw): ?string
-    {
-        $timestamp = strtotime($raw);
-
-        if ($timestamp === false) {
-            return null;
+        // Guard: if the title segment after splitting is itself just a bare
+        // "at <something>" pattern — meaning the real job title was empty
+        // before the location suffix (e.g. "Acme: at Nairobi") — treat it as
+        // an empty title so the caller's empty-title rejection fires.
+        if (preg_match('/^\s*at\s+\S/i', $rest) === 1) {
+            $rest = '';
         }
 
-        return gmdate('Y-m-d H:i:s', $timestamp);
-    }
-
-
-    /**
-     * @param array<string, mixed> $rawItem
-     */
-    private function logDropped(array $rawItem, string $reason): void
-    {
-        $guid = $rawItem['guid'] ?? 'unknown';
-        fwrite(STDERR, "[WweRemoteNormalizer] Dropped record (guid={$guid}): {$reason}\n");
+        return [$company, $rest, $locationDetail];
     }
 }

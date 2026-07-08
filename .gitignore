@@ -98,18 +98,13 @@ graphify-out/cache/
 AGENT.md
 CLAUDE.md
 .github/copilot-instructions.md
+.ai/
+.claude/
 .github/instructions/
-
-# Ignore generated analysis / tooling output
+.windsurf/
 graphify-out/
-*.pyc
-__pycache__/
-.phpunit.result.cache
-.phpunit.cache/
-*.tmp
-*.bak
-*.orig
-*.rej
+
+
 
 # Backend
 backend/config.php

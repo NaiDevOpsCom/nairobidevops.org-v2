@@ -21,6 +21,9 @@
  * │ Role classification                                                      │
  * │   mapRoleType()          Job title → frontend RoleType enum value       │
  * │                                                                         │
+ * │ Location eligibility                                                    │
+ * │   isLocationExcludedForAfrica()  location_detail → excluded? (bool)     │
+ * │                                                                         │
  * │ Salary parsing                                                          │
  * │   detectCurrency()       Extract currency code from salary string       │
  * │   detectPeriod()         Detect monthly/annual with magnitude heuristic │
@@ -426,10 +429,8 @@ function isDevOpsRole(string $lower): bool
         || str_contains($lower, 'release engineer')
         || str_contains($lower, 'build engineer')
         || str_contains($lower, 'mlops')
-        || str_contains($lower, 'dataops')
-        || str_contains($lower, 'ml engineer')
-        || str_contains($lower, 'ai engineer')
-        || str_contains($lower, 'data engineer');
+        || str_contains($lower, 'dataops');
+
 }
 
 /**
@@ -534,6 +535,127 @@ function isBackendRole(string $lower): bool
 
 
 // ════════════════════════════════════════════════════════════════════════════
+// LOCATION ELIGIBILITY (Africa-focused board)
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * location_detail values meaning "open to anyone, anywhere" — never treated
+ * as a restriction, regardless of what's in the exclude/exact-location
+ * lists below. Checked FIRST so a phrase like "Remote (Worldwide)" is never
+ * accidentally excluded by a later, broader match.
+ */
+const WORLDWIDE_LOCATION_PHRASES = [
+    'anywhere in the world', 'anywhere', 'worldwide', 'global',
+    'remote', 'fully remote', '100% remote',
+];
+
+/**
+ * Explicit "-only" style phrases naming a region that necessarily excludes
+ * Africa. Substring match is safe here — these phrases are unambiguous by
+ * construction; nobody writes "USA only" to mean anything else.
+ */
+const NON_AFRICA_ONLY_PHRASES = [
+    'usa only', 'us only', 'united states only', 'u.s. only',
+    'canada only', 'uk only', 'united kingdom only',
+    'germany only', 'france only', 'spain only', 'italy only',
+    'netherlands only', 'portugal only', 'poland only', 'sweden only',
+    'norway only', 'denmark only', 'finland only', 'switzerland only',
+    'austria only', 'belgium only', 'ireland only',
+    'india only', 'china only', 'japan only', 'singapore only',
+    'south korea only', 'taiwan only', 'australia only', 'new zealand only',
+    'eu only', 'european union only', 'europe only',
+    'apac only', 'latam only', 'latin america only',
+    'uae only', 'united arab emirates only', 'saudi arabia only',
+    'israel only', 'turkey only',
+    'mexico only', 'brazil only', 'argentina only', 'colombia only',
+];
+
+/**
+ * Specific countries, US states, and cities that — when the location_detail
+ * value IS one of these EXACTLY (not a substring within a longer sentence)
+ * — signal a role restricted to that one specific place. Deliberately
+ * exact-match: a location_detail that happens to *mention* one of these
+ * words inside a longer phrase (e.g. "Remote — open to Kenya or Germany")
+ * must NOT be excluded by this list; only a location_detail that IS just
+ * "Germany" should be.
+ *
+ * @var string[]
+ */
+const NON_AFRICA_EXACT_LOCATIONS = [
+    // Countries
+    'united states', 'usa', 'canada', 'mexico', 'brazil', 'argentina',
+    'colombia', 'chile', 'peru', 'uruguay', 'venezuela',
+    'united kingdom', 'uk', 'germany', 'france', 'spain', 'italy',
+    'netherlands', 'portugal', 'poland', 'sweden', 'norway', 'denmark',
+    'finland', 'switzerland', 'austria', 'belgium', 'ireland', 'ukraine',
+    'czech republic', 'romania', 'hungary', 'slovakia',
+    'australia', 'new zealand', 'india', 'china', 'japan', 'singapore',
+    'south korea', 'taiwan', 'vietnam', 'indonesia', 'malaysia', 'thailand',
+    'israel', 'turkey', 'uae', 'united arab emirates', 'saudi arabia',
+    // Common WWR US state / city values seen in practice
+    'new jersey', 'arkansas', 'california', 'new york', 'texas',
+    'washington', 'massachusetts', 'illinois', 'colorado', 'florida',
+    'san francisco', 'seattle', 'austin', 'chicago', 'boston',
+    'los angeles', 'amsterdam', 'são paulo', 'sao paulo',
+];
+
+/**
+ * Determine whether a location_detail string signals a role restricted to
+ * a specific place that necessarily excludes African-based applicants.
+ *
+ * Deliberately conservative, in this order:
+ *   1. "Anywhere in the world" / "Worldwide" / generic "Remote" → never excluded
+ *   2. An explicit "X only" phrase naming a non-Africa region → excluded
+ *   3. location_detail that IS EXACTLY one specific non-Africa country/
+ *      state/city (not a substring within a longer sentence) → excluded
+ *   4. Anything else (blank location_detail, or a location mentioning
+ *      multiple regions, or a phrase not in either list) → NOT excluded.
+ *      Ambiguous cases default to inclusion rather than silently dropping
+ *      a possibly-eligible job.
+ *
+ * This does NOT set or infer `africa_friendly` — that flag stays
+ * admin-only and defaults to 0 always, per the PRD. This function answers
+ * a narrower, different question: "is this role clearly NOT open to
+ * Africa at all", not "is this role Africa-friendly".
+ *
+ * Callers (normalizers) should treat a `true` result as a reason to drop
+ * the individual record via normalizeAll()'s existing dropped/logged path —
+ * never a silent, untracked skip.
+ *
+ * @param string|null $locationDetail Raw location_detail as parsed from the source
+ */
+function isLocationExcludedForAfrica(?string $locationDetail): bool
+{
+    if ($locationDetail === null || trim($locationDetail) === '') {
+        return false;
+    }
+
+    $normalized = \function_exists('mb_strtolower')
+        ? mb_strtolower(trim($locationDetail), 'UTF-8')
+        : strtolower(trim($locationDetail));
+
+    // Check the more-specific "-only" restrictions first so that a value like
+    // "Remote (US Only)" is caught as excluded before the broader worldwide
+    // check would short-circuit it as safe.
+    foreach (NON_AFRICA_ONLY_PHRASES as $phrase) {
+        if (str_contains($normalized, $phrase)) {
+            return true;
+        }
+    }
+
+    // A worldwide/generic-remote phrase means the role is open everywhere —
+    // not excluded. Checked after the "-only" loop so "Remote (US Only)"
+    // is never accidentally cleared by matching "remote" here.
+    $isWorldwide = array_filter(
+        WORLDWIDE_LOCATION_PHRASES,
+        static fn (string $phrase): bool => $normalized === $phrase || str_contains($normalized, $phrase),
+    ) !== [];
+
+    return !$isWorldwide && \in_array($normalized, NON_AFRICA_EXACT_LOCATIONS, true);
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
 // SALARY PARSING
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -575,6 +697,7 @@ function detectPeriod(string $raw): string
     // Explicit annual keywords
     if (stripos($raw, 'year')   !== false
      || stripos($raw, 'annual') !== false
+     || stripos($raw, 'annum')  !== false
      || stripos($raw, '/yr')    !== false
      || stripos($raw, 'p.a.')   !== false) {
         return 'annual';
@@ -1116,14 +1239,10 @@ function sendDiscord(string $message): array
         : [$discordMsg];
 
     foreach ($chunks as $i => $chunk) {
-        $result = sendDiscordChunk($chunk);
+        $result = sendDiscordChunk($chunk, $i, \count($chunks));
 
         if ($result[0] === false) {
             return $result;
-        }
-
-        if ($i < \count($chunks) - 1) {
-            usleep(500_000);
         }
     }
 
@@ -1133,17 +1252,20 @@ function sendDiscord(string $message): array
 /**
  * Send a single chunk to the Discord webhook.
  *
- * Extracted from sendDiscord() to keep per-chunk HTTP logic isolated
- * and reduce cognitive complexity in the parent function.
+ * Extracted from sendDiscord() to keep per-chunk cURL setup, execution,
+ * and error handling in one place and reduce cognitive complexity.
  *
- * @param string $chunk  Single message chunk (≤ 2000 chars)
+ * @param string $chunk  Message chunk text (already converted to Discord Markdown)
+ * @param int    $index  Zero-based chunk index
+ * @param int    $total  Total number of chunks
  * @return array{0: bool, 1: string|null}
  */
-function sendDiscordChunk(string $chunk): array
+function sendDiscordChunk(string $chunk, int $index, int $total): array
 {
+    // Delegate env-aware SSL decision to the same authority as CurlHttpClient::forEnvironment().
+    // Default is verified TLS; only an explicit opt-out flag relaxes it.
     $disableSsl = filter_var(getenv('DISABLE_SSL_VERIFY'), FILTER_VALIDATE_BOOLEAN)
-        || !\defined('APP_ENV')
-        || (APP_ENV !== 'production' && APP_ENV !== 'staging');
+        && !(\defined('APP_ENV') && \in_array(trim((string) APP_ENV), ['production', 'staging'], true));
 
     $payload = json_encode([
         'content'          => $chunk,
@@ -1169,11 +1291,18 @@ function sendDiscordChunk(string $chunk): array
         curl_close($ch);
     }
 
+    $error = null;
     if ($curlErr) {
-        return [false, "cURL: {$curlErr}"];
+        $error = "cURL: {$curlErr}";
+    } elseif ($httpCode !== 200 && $httpCode !== 204) {
+        $error = "HTTP {$httpCode}: " . substr($response, 0, 150);
     }
-    if ($httpCode !== 200 && $httpCode !== 204) {
-        return [false, "HTTP {$httpCode}: " . substr($response, 0, 150)];
+    if ($error !== null) {
+        return [false, $error];
+    }
+
+    if ($index < $total - 1) {
+        usleep(500_000); // 0.5s between chunks — avoid Discord rate limit
     }
 
     return [true, null];

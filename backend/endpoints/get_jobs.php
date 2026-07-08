@@ -1,217 +1,160 @@
 <?php
 
-/**
- * get_jobs.php
- * Returns a paginated, filtered list of active approved job listings.
- *
- * Called via: GET /?action=jobs
- *
- * Query parameters (all optional):
- *   q               string   Full-text search: title, company, description
- *   role_type       string   Comma-separated role types e.g. "DevOps Engineer,SRE"
- *   location_type   string   Comma-separated: africa_remote,africa_onsite,international_remote
- *   africa_friendly int      1 = Africa-friendly only
- *   source          string   Comma-separated: remotive,weworkremotely
- *   sort            string   newest (default) | closing_soon | salary_desc
- *   page            int      Page number (default: 1)
- *   per_page        int      Results per page (default: 20, max: 100)
- */
-
 declare(strict_types=1);
 
+/**
+ * endpoints/get_jobs.php — GET /?action=jobs
+ *
+ * Wired in via index.php's action router. This file handles HTTP concerns
+ * only: reading + validating query params, and shaping JobRepository's raw
+ * DB rows into the JSON contract the frontend's useJobs.ts expects. No SQL
+ * lives here — see JobRepository::findPaginated() for that.
+ *
+ * Every $_GET value is validated/cast before use; nothing is trusted as-is.
+ */
+
+require_once \dirname(__DIR__) . '/vendor/autoload.php';
 require_once \dirname(__DIR__) . '/db.php';
 require_once \dirname(__DIR__) . '/helpers.php';
 
+use App\Repository\JobRepository;
+
+if (!\function_exists('respond')) {
+    /**
+     * Send a JSON response and exit. Defined here (guarded with
+     * function_exists) rather than assumed to already exist from index.php,
+     * so this endpoint works correctly regardless of what the router itself
+     * does or doesn't define — index.php's own respond(), if it has one,
+     * still wins since this only defines it when missing.
+     */
+    function respond(int $status, array $data): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        echo json_encode($data, JSON_THROW_ON_ERROR);
+        exit;
+    }
+}
+
+const ALLOWED_SORTS = ['newest', 'closing_soon', 'salary_desc'];
+/** Reduced from 100 to 50 for performance — keep in sync with frontend useJobs.ts */
+const MAX_PER_PAGE = 50;
+
+/**
+ * Splits a comma-separated query param into a clean list of non-empty
+ * values. Returns [] for a missing/empty param rather than [""].
+ *
+ * @return string[]
+ */
+function parseCsvParam(?string $raw): array
+{
+    if ($raw === null || trim($raw) === '') {
+        return [];
+    }
+
+    return array_values(array_filter(
+        array_map('trim', explode(',', $raw)),
+        static fn (string $value): bool => $value !== '',
+    ));
+}
+
+/**
+ * Maps a JobRepository row (raw DB shape) to the frontend's Job interface —
+ * decodes the tags JSON column, coerces MySQL's 0/1 to real booleans,
+ * normalizes MySQL's 'Y-m-d H:i:s' to an ISO-ish 'Y-m-d\TH:i:s' string the
+ * frontend's Date.parse() can rely on consistently across browsers.
+ *
+ * @param array<string, mixed> $row
+ * @return array<string, mixed>
+ */
+function formatJobForApi(array $row): array
+{
+    return [
+        'id' => (int) $row['id'],
+        'title' => $row['title'],
+        'company' => $row['company'],
+        'company_logo_url' => $row['company_logo_url'],
+        'role_type' => $row['role_type'],
+        'location_type' => $row['location_type'],
+        'location_detail' => $row['location_detail'],
+        'africa_friendly' => (bool) $row['africa_friendly'],
+        'salary_min' => $row['salary_min'] !== null ? (int) $row['salary_min'] : null,
+        'salary_max' => $row['salary_max'] !== null ? (int) $row['salary_max'] : null,
+        'salary_currency' => $row['salary_currency'],
+        'salary_period' => $row['salary_period'],
+        'experience_level' => $row['experience_level'],
+        'tags' => $row['tags'] !== null ? (json_decode((string) $row['tags'], true) ?? []) : [],
+        'apply_url' => $row['apply_url'],
+        'affiliate_apply_url' => $row['affiliate_apply_url'],
+        'source' => $row['source'],
+        'posted_at' => formatIsoDate($row['posted_at'] ?? null),
+        'closes_at' => formatIsoDate($row['closes_at'] ?? null),
+        'days_remaining' => daysUntilClose($row['closes_at'] ?? null),
+        'is_featured' => (bool) $row['is_featured'],
+        'description' => $row['description'],
+    ];
+}
+
+function formatIsoDate(?string $mysqlDatetime): ?string
+{
+    if ($mysqlDatetime === null || $mysqlDatetime === '') {
+        return null;
+    }
+
+    return str_replace(' ', 'T', $mysqlDatetime);
+}
+
+
+
+// ── Parse + validate query params ───────────────────────────────────────────
+
+$sortParam = $_GET['sort'] ?? 'newest';
+$sort = \is_string($sortParam) && \in_array($sortParam, ALLOWED_SORTS, true) ? $sortParam : 'newest';
+
+$page = filter_var($_GET['page'] ?? 1, FILTER_VALIDATE_INT);
+$page = ($page !== false && $page > 0) ? $page : 1;
+
+$perPage = filter_var($_GET['per_page'] ?? 20, FILTER_VALIDATE_INT);
+$perPage = ($perPage !== false && $perPage > 0) ? min($perPage, MAX_PER_PAGE) : 20;
+
+$filters = [
+    'q' =>
+        isset($_GET['q']) && \is_string($_GET['q']) ? trim($_GET['q']) : '',
+    'role_type' =>
+        parseCsvParam(\is_string($_GET['role_type'] ?? null) ? $_GET['role_type'] : null),
+    'location_type' =>
+        parseCsvParam(\is_string($_GET['location_type'] ?? null) ? $_GET['location_type'] : null),
+    'africa_friendly' => (($_GET['africa_friendly'] ?? null) === '1'),
+    'experience_level' =>
+        parseCsvParam(\is_string($_GET['experience_level'] ?? null) ? $_GET['experience_level'] : null),
+    'sort'     => $sort,
+    'page'     => $page,
+    'per_page' => $perPage,
+];
+
+$salaryMin = filter_var($_GET['salary_min'] ?? null, FILTER_VALIDATE_INT);
+if ($salaryMin !== false && $salaryMin !== null) {
+    $filters['salary_min'] = $salaryMin;
+}
+
+$salaryMax = filter_var($_GET['salary_max'] ?? null, FILTER_VALIDATE_INT);
+if ($salaryMax !== false && $salaryMax !== null) {
+    $filters['salary_max'] = $salaryMax;
+}
+
+// ── Query + respond ──────────────────────────────────────────────────────────
+
 $db = getDB();
+$repository = new JobRepository($db);
+$result = $repository->findPaginated($filters);
 
-// ── Input sanitisation ────────────────────────────────────────────────────────
+$totalPages = $result['per_page'] > 0 ? (int) ceil($result['total'] / $result['per_page']) : 0;
 
-$q              = trim((string) ($_GET['q']              ?? ''));
-$roleTypeRaw    = trim((string) ($_GET['role_type']      ?? ''));
-$locationRaw    = trim((string) ($_GET['location_type']  ?? ''));
-$africaFriendly = isset($_GET['africa_friendly']) ? (int) $_GET['africa_friendly'] : null;
-$sourceRaw      = trim((string) ($_GET['source']         ?? ''));
-$sort           = trim((string) ($_GET['sort']           ?? 'newest'));
-$page           = max(1, (int) ($_GET['page']            ?? 1));
-$perPage        = min(100, max(1, (int) ($_GET['per_page'] ?? 20)));
-$offset         = ($page - 1) * $perPage;
-
-// Valid sort values — reject anything else and fall back to newest
-$validSorts = ['newest', 'closing_soon', 'salary_desc'];
-if (!\in_array($sort, $validSorts, true)) {
-    $sort = 'newest';
-}
-
-// Parse comma-separated filter values into arrays, strip empty entries
-$roleTypes     = $roleTypeRaw !== ''
-    ? array_filter(array_map('trim', explode(',', $roleTypeRaw)))
-    : [];
-$locationTypes = $locationRaw !== ''
-    ? array_filter(array_map('trim', explode(',', $locationRaw)))
-    : [];
-$sources       = $sourceRaw !== ''
-    ? array_filter(array_map('trim', explode(',', $sourceRaw)))
-    : [];
-
-// ── Build WHERE clause dynamically ───────────────────────────────────────────
-
-$conditions = ['is_active = 1', 'is_approved = 1'];
-$params     = [];
-
-// Full-text search — title, company, description
-if ($q !== '') {
-    $conditions[] = '(title LIKE ? OR company LIKE ? OR description LIKE ?)';
-    $like = '%' . $q . '%';
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-}
-
-// Role type filter (IN clause)
-if (!empty($roleTypes)) {
-    $placeholders = implode(',', array_fill(0, \count($roleTypes), '?'));
-    $conditions[] = "role_type IN ({$placeholders})";
-    foreach ($roleTypes as $rt) {
-        $params[] = $rt;
-    }
-}
-
-// Location type filter (IN clause)
-if (!empty($locationTypes)) {
-    $placeholders = implode(',', array_fill(0, \count($locationTypes), '?'));
-    $conditions[] = "location_type IN ({$placeholders})";
-    foreach ($locationTypes as $lt) {
-        $params[] = $lt;
-    }
-}
-
-// Africa-friendly toggle
-if ($africaFriendly === 1) {
-    $conditions[] = 'africa_friendly = 1';
-}
-
-// Source filter (IN clause)
-if (!empty($sources)) {
-    $placeholders = implode(',', array_fill(0, \count($sources), '?'));
-    $conditions[] = "source IN ({$placeholders})";
-    foreach ($sources as $src) {
-        $params[] = $src;
-    }
-}
-
-$whereClause = 'WHERE ' . implode(' AND ', $conditions);
-
-// ── Sort order ────────────────────────────────────────────────────────────────
-// Featured jobs always float to the top within any sort mode.
-
-$orderClause = match ($sort) {
-    'closing_soon' => "ORDER BY is_featured DESC, (CASE WHEN closes_at IS NULL THEN CAST('9999-12-31 23:59:59' AS DATETIME) ELSE closes_at END) ASC, posted_at DESC",
-    'salary_desc'  => 'ORDER BY is_featured DESC, salary_max DESC, salary_min DESC, posted_at DESC',
-    default        => 'ORDER BY is_featured DESC, posted_at DESC',
-};
-
-// ── Total count (for pagination) ──────────────────────────────────────────────
-
-try {
-    $countStmt = $db->prepare("SELECT COUNT(*) FROM jobs {$whereClause}");
-    $countStmt->execute($params);
-    $total = (int) $countStmt->fetchColumn();
-} catch (PDOException $e) {
-    respondJson(500, ['error' => 'Database query failed']);
-    exit;
-}
-
-// ── Fetch jobs ────────────────────────────────────────────────────────────────
-
-try {
-    $dataStmt = $db->prepare("
-        SELECT
-            id,
-            title,
-            company,
-            company_logo_url,
-            role_type,
-            location_type,
-            location_detail,
-            africa_friendly,
-            salary_min,
-            salary_max,
-            salary_currency,
-            salary_period,
-            experience_level,
-            tags,
-            apply_url,
-            affiliate_apply_url,
-            source,
-            posted_at,
-            closes_at,
-            is_featured,
-            description
-        FROM jobs
-        {$whereClause}
-        {$orderClause}
-        LIMIT ? OFFSET ?
-    ");
-
-    // Append pagination params (must come after WHERE params)
-    $dataStmt->execute([...$params, $perPage, $offset]);
-    $jobs = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    respondJson(500, ['error' => 'Database query failed']);
-    exit;
-}
-
-// ── Post-process each job ─────────────────────────────────────────────────────
-
-foreach ($jobs as &$job) {
-    // Compute days remaining (null if no closes_at)
-    $job['days_remaining'] = ($job['closes_at'] ?? null) !== null
-        ? daysUntilClose($job['closes_at'])
-        : null;
-
-    // Cast booleans for JSON output
-    $job['africa_friendly'] = (bool) $job['africa_friendly'];
-    $job['is_featured']     = (bool) $job['is_featured'];
-
-    // Decode tags JSON — return empty array if null or malformed
-    $job['tags'] = !empty($job['tags'])
-        ? (json_decode($job['tags'], true) ?? [])
-        : [];
-
-    // Cast salary fields to int or null
-    $job['salary_min'] = $job['salary_min'] !== null ? (int) $job['salary_min'] : null;
-    $job['salary_max'] = $job['salary_max'] !== null ? (int) $job['salary_max'] : null;
-}
-unset($job); // break reference
-
-// ── Last updated timestamp ────────────────────────────────────────────────────
-
-$lastUpdated = null;
-try {
-    $syncStmt  = $db->query('SELECT MAX(ran_at) FROM sync_log');
-    $lastUpdated = $syncStmt->fetchColumn() ?: null;
-} catch (PDOException $e) {
-    // Non-fatal — fall back to jobs table
-}
-
-if ($lastUpdated === null) {
-    try {
-        $fetchedStmt = $db->query(
-            'SELECT MAX(fetched_at) FROM jobs WHERE is_active = 1 AND is_approved = 1'
-        );
-        $lastUpdated = $fetchedStmt->fetchColumn() ?: null;
-    } catch (PDOException $e) {
-        // Ignore — null is acceptable
-    }
-}
-
-// ── Response ──────────────────────────────────────────────────────────────────
-
-respondJson(200, [
-    'total'        => $total,
-    'page'         => $page,
-    'per_page'     => $perPage,
-    'total_pages'  => $total > 0 ? (int) ceil($total / $perPage) : 0,
-    'last_updated' => $lastUpdated,
-    'jobs'         => $jobs,
+respond(200, [
+    'total' => $result['total'],
+    'page' => $result['page'],
+    'per_page' => $result['per_page'],
+    'total_pages' => $totalPages,
+    'last_updated' => $repository->getLastSyncedAt(),
+    'jobs' => array_map('formatJobForApi', $result['jobs']),
 ]);
