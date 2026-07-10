@@ -198,7 +198,7 @@ if (isset($indexColumns[$closingIndexName])) {
     if ($actualClosing === $expectedClosing) {
         pass("{$closingIndexName}: columns match expected " . implode(', ', $expectedClosing));
     } else {
-        warn("{$closingIndexName}: columns are (" . implode(', ', $actualClosing) . ") — expected (" . implode(', ', $expectedClosing) . "). Index may not optimally serve the closing-soon ORDER BY.");
+        warn("{$closingIndexName}: columns are (" . implode(', ', $actualClosing) . ') — expected (' . implode(', ', $expectedClosing) . '). Index may not optimally serve the closing-soon ORDER BY.');
     }
 } else {
     fail("{$closingIndexName} does not exist — closing-soon sort will full-scan or use a suboptimal index");
