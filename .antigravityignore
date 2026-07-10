@@ -1,0 +1,95 @@
+# .antigravityignore
+# Drop this file at the root of each project. It stops Antigravity's
+# background indexing / context-building from burning tokens on files
+# the model never needs to see.
+#
+# Note: unlike GEMINI.md, this file is NOT global by design — it must
+# live in each project's root. Keep this as your copy/paste template.
+
+## --- Version control ---
+.git/
+.svn/
+.hg/
+
+## --- Dependencies / package managers ---
+node_modules/
+vendor/
+.venv/
+venv/
+env/
+__pycache__/
+*.egg-info/
+.tox/
+target/            # Java/Maven, Rust
+.gradle/
+.m2/
+
+## --- Build output / compiled artifacts ---
+dist/
+build/
+out/
+bin/
+obj/
+*.class
+*.jar
+*.war
+*.pyc
+*.o
+*.so
+*.dll
+*.exe
+
+## --- Lockfiles (large, low signal for the model) ---
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+poetry.lock
+Pipfile.lock
+Gemfile.lock
+composer.lock
+
+## --- Logs / caches / temp files ---
+*.log
+logs/
+.cache/
+.next/
+.nuxt/
+.turbo/
+.parcel-cache/
+tmp/
+temp/
+
+## --- Test/coverage artifacts ---
+coverage/
+.nyc_output/
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+*.cover
+
+## --- Editor / OS noise ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+## --- Binary / media assets (rarely needed for code context) ---
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.pdf
+*.zip
+*.tar.gz
+*.mp4
+*.mov
+
+## --- Secrets (should never be indexed or sent as context) ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
