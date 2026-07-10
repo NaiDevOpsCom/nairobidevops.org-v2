@@ -246,8 +246,12 @@ final class JobRepository
         // Featured jobs always sort first, within whatever sort mode is active.
         // Each branch appends `id DESC` as a stable unique tie-breaker so
         // pagination is deterministic when two rows share the primary sort key.
+        // closing_soon uses the `closes_at_sort` generated column
+        // (IFNULL(closes_at, '2099-12-31 23:59:59')) so that idx_listing_closing
+        // (is_active, is_approved, is_featured, closes_at_sort) can satisfy the
+        // ORDER BY without a filesort. NULLs sort last naturally via the sentinel.
         $orderBy = 'is_featured DESC, ' . match ($filters['sort'] ?? 'newest') {
-            'closing_soon' => 'closes_at IS NULL, closes_at ASC, id DESC',
+            'closing_soon' => 'closes_at_sort ASC, id DESC',
             'salary_desc'  => 'salary_max IS NULL, salary_max DESC, id DESC',
             default        => 'posted_at DESC, id DESC',
         };

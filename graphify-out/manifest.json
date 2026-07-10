@@ -89,11 +89,6 @@
     "ast_hash": "ccd685a9c72293d8b18e7382ae1794e0",
     "semantic_hash": "ccd685a9c72293d8b18e7382ae1794e0"
   },
-  "backend/migrations/001_charset_and_index_fixes.sql": {
-    "mtime": 1783156979.7688434,
-    "ast_hash": "402e754c842d5e40c4b22ca505f9b300",
-    "semantic_hash": "402e754c842d5e40c4b22ca505f9b300"
-  },
   "backend/migrations/002_add_last_synced_at.sql": {
     "mtime": 1783156979.7688434,
     "ast_hash": "16bc9d014b664ef619df096f134496e8",
@@ -108,16 +103,6 @@
     "mtime": 1783156979.7748463,
     "ast_hash": "db8615968ae126bc691bd9f454fa37e5",
     "semantic_hash": "db8615968ae126bc691bd9f454fa37e5"
-  },
-  "backend/src/Contracts/JobNormalizerInterface.php": {
-    "mtime": 1783156979.7763643,
-    "ast_hash": "c39d15a2ee255604d34189b58cf96712",
-    "semantic_hash": "c39d15a2ee255604d34189b58cf96712"
-  },
-  "backend/src/Exception/InvalidJobRecordException.php": {
-    "mtime": 1783156979.7784305,
-    "ast_hash": "eea7972782e2cb5a53b0dd35f8288a2f",
-    "semantic_hash": "eea7972782e2cb5a53b0dd35f8288a2f"
   },
   "backend/src/Exception/MigrationException.php": {
     "mtime": 1783156979.7784305,
@@ -148,11 +133,6 @@
     "mtime": 1783156979.7864246,
     "ast_hash": "5ab64fc252c7868b6d67274e6f1a5f0b",
     "semantic_hash": "5ab64fc252c7868b6d67274e6f1a5f0b"
-  },
-  "backend/src/Model/NormalizedJob.php": {
-    "mtime": 1783156979.7874274,
-    "ast_hash": "a568ed4bde0f3ffb34d1740bdb8e755f",
-    "semantic_hash": "a568ed4bde0f3ffb34d1740bdb8e755f"
   },
   "backend/tests/Fetcher/RemotiveFetcherTest.php": {
     "mtime": 1783156979.7894309,
@@ -1560,37 +1540,37 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\package.json": {
-    "mtime": 1783289973.4568346,
+    "mtime": 1783497263.5145946,
     "ast_hash": "3e51f2db0c5e5a72818588353bcfc819",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\automation\\check-freshness.mjs": {
-    "mtime": 1783289973.1797476,
+    "mtime": 1783497263.1977234,
     "ast_hash": "b638bf7a496fd2f7b0e2e74b71430d5a",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\automation\\session-log.mjs": {
-    "mtime": 1783289973.1822777,
+    "mtime": 1783497263.2012336,
     "ast_hash": "0bd7ef801b0a96689e941d79e74d04bc",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\automation\\sync-rules.mjs": {
-    "mtime": 1783289973.1842916,
+    "mtime": 1783497263.2042758,
     "ast_hash": "8473f7277e40cda46b694fdfe729fc22",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\automation\\sync-skills.mjs": {
-    "mtime": 1783289973.186297,
+    "mtime": 1783497263.2072477,
     "ast_hash": "1e8cd968212293866417d821ade29af5",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\automation\\workspace-report.mjs": {
-    "mtime": 1783289973.1892948,
+    "mtime": 1783497263.2092762,
     "ast_hash": "dc5995eaf89faa1dcf5f6710f45e82d2",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\mcp\\manifest.json": {
-    "mtime": 1783289973.239367,
+    "mtime": 1783497263.258726,
     "ast_hash": "0c03280da45ddc9015dd7f1166ad3c45",
     "semantic_hash": ""
   },
@@ -1615,8 +1595,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\composer.json": {
-    "mtime": 1783289973.832917,
-    "ast_hash": "43a2731f930013766b9b978f7238fe0c",
+    "mtime": 1783497349.048091,
+    "ast_hash": "03bb11f2f330ceeb07888d0a636665f9",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\config.example.php": {
@@ -1625,8 +1605,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\config.local.php": {
-    "mtime": 1782589819.2580128,
-    "ast_hash": "fcc1ef134d431607276d1d1caa5c7996",
+    "mtime": 1783339057.027413,
+    "ast_hash": "eb8d68d064a4521dba3bf03cc81691b9",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\db.php": {
@@ -1635,8 +1615,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\helpers.php": {
-    "mtime": 1783268015.4116213,
-    "ast_hash": "4e47d47a25bf5f0a1076a4dd661023f5",
+    "mtime": 1783497401.4326906,
+    "ast_hash": "eac4b95ac41a33a990c463bf9861a43a",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\index.php": {
@@ -1650,13 +1630,13 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\bin\\smoke-test-wwr.php": {
-    "mtime": 1783194589.1857665,
-    "ast_hash": "a0911d8243e246b1a8434534e985d67d",
+    "mtime": 1783497263.398477,
+    "ast_hash": "314cf891b5ef2e46c6b773968233f453",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\cron\\migrate.php": {
-    "mtime": 1783184355.763151,
-    "ast_hash": "ac7bc5f9c430029c0b88d25dde515e0e",
+    "mtime": 1783622993.0162528,
+    "ast_hash": "faba0e24bc09eaf9e4c7fca0a0817082",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\cron\\notification\\notify_digest.php": {
@@ -1680,18 +1660,18 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\cron\\works\\sync_remotive.php": {
-    "mtime": 1783184355.8518426,
-    "ast_hash": "d97b5ae77449e40388427c3c09b9d4e1",
+    "mtime": 1783497349.0539594,
+    "ast_hash": "eea5503cfbef56aa92962a925c48c060",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\cron\\works\\sync_wwremote.php": {
-    "mtime": 1783184356.090825,
-    "ast_hash": "b568acb1e6adec47c36c598a64098c80",
+    "mtime": 1783497349.0575075,
+    "ast_hash": "52445cdfae21bdc96897d3f3aa56e93c",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\endpoints\\get_jobs.php": {
-    "mtime": 1782589820.9992492,
-    "ast_hash": "34dacb363c7f8bd205e7a0020884863b",
+    "mtime": 1783497349.061037,
+    "ast_hash": "02f1a18a8d72e7dab7cd90bbb115b8d7",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\endpoints\\submit_job.php": {
@@ -1702,11 +1682,6 @@
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\endpoints\\track_click.php": {
     "mtime": 1782589821.0777023,
     "ast_hash": "ccd685a9c72293d8b18e7382ae1794e0",
-    "semantic_hash": ""
-  },
-  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\migrations\\001_charset_and_index_fixes.sql": {
-    "mtime": 1783156979.7688434,
-    "ast_hash": "402e754c842d5e40c4b22ca505f9b300",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\migrations\\002_add_last_synced_at.sql": {
@@ -1724,16 +1699,6 @@
     "ast_hash": "c47205c0ba53c2c44bfde08ab1ede40c",
     "semantic_hash": ""
   },
-  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Contracts\\JobNormalizerInterface.php": {
-    "mtime": 1783184356.1109374,
-    "ast_hash": "60e35020d35a28ad0fe3b9f4f27bcd9c",
-    "semantic_hash": ""
-  },
-  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Exception\\InvalidJobRecordException.php": {
-    "mtime": 1783184356.1159713,
-    "ast_hash": "2432cdec3c1d6bbaf618f89d8c27b197",
-    "semantic_hash": ""
-  },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Exception\\MigrationException.php": {
     "mtime": 1783184356.1199718,
     "ast_hash": "41a993221aea5199562181b3c172a30d",
@@ -1745,58 +1710,53 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Fetcher\\RemotiveFetcher.php": {
-    "mtime": 1783184356.1795733,
-    "ast_hash": "7a24eeb6d6e248bbb8d3a71b8109059b",
+    "mtime": 1783497349.0700643,
+    "ast_hash": "5aeda93b004a936ef6d317e77a2079ad",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Fetcher\\WweRemoteFetcher.php": {
-    "mtime": 1783292267.0899446,
-    "ast_hash": "19266291d7b8e182c2bd15ba1cf29ce5",
+    "mtime": 1783497650.39,
+    "ast_hash": "40f4f4c9026efb1bf9f6cf8d866c808d",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Http\\CurlHttpClient.php": {
-    "mtime": 1783289973.8423867,
-    "ast_hash": "8fdf93d0a872454047bf0a8e30a1276b",
+    "mtime": 1783497457.4399645,
+    "ast_hash": "4fae2412aa4b42ea28b602c11ae77ed5",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Http\\HttpClientInterface.php": {
-    "mtime": 1783272588.297981,
-    "ast_hash": "c005c600069b2ae5ffe18b778350604c",
+    "mtime": 1783497349.079319,
+    "ast_hash": "746f7beefa06c6ac0234d746199d720c",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Migration\\MigrationRunner.php": {
-    "mtime": 1783184355.845827,
-    "ast_hash": "a77413286117aa36b1913eea0900eed5",
-    "semantic_hash": ""
-  },
-  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Model\\NormalizedJob.php": {
-    "mtime": 1783184355.8656366,
-    "ast_hash": "f8460952ee67d3375f369b225306c32f",
+    "mtime": 1783656833.083653,
+    "ast_hash": "59163431abaa2aa304ed69497493ae41",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Normalizer\\RemotiveNormalizer.php": {
-    "mtime": 1783292314.013244,
-    "ast_hash": "542ca5abd3c42283c2d368d76d9e63cd",
+    "mtime": 1783497483.2173595,
+    "ast_hash": "94d831bb85132c6fbf524eb10fc2b3b0",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Normalizer\\WweRemoteNormalizer.php": {
-    "mtime": 1783292331.4311793,
-    "ast_hash": "28ee985ce4b654df994195ec24d348c0",
+    "mtime": 1783497582.0193162,
+    "ast_hash": "df26ca9a86fad18a5b501922ec3de96b",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Fetcher\\RemotiveFetcherTest.php": {
-    "mtime": 1783184355.94029,
-    "ast_hash": "52eb805da632756abe513d16b6e73034",
+    "mtime": 1783497349.0930257,
+    "ast_hash": "03b3f5f2eded76b28f50a30b77032d59",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Fetcher\\WweRemoteFetcherTest.php": {
-    "mtime": 1783292287.3983324,
-    "ast_hash": "aacc950f921fddc2c6099adf445a5992",
+    "mtime": 1783497726.9179375,
+    "ast_hash": "d2f4b242fecb9e3300cd5dd786a2b59f",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Helpers\\HelpersTest.php": {
-    "mtime": 1783292374.536963,
-    "ast_hash": "195689d6a74b62ecd03b2b59870435b9",
+    "mtime": 1783497557.3197885,
+    "ast_hash": "d2d0f08e9ff71275ba21af20ccb61f5b",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Migration\\MigrationRunnerTest.php": {
@@ -1805,13 +1765,13 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Normalizer\\RemotiveNormalizerTest.php": {
-    "mtime": 1783287527.7344904,
-    "ast_hash": "61b07585fa54b4f54e9ccb9d03839caa",
+    "mtime": 1783497543.871569,
+    "ast_hash": "9b2fe05a9d1b2bf232c1c1d638de8364",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Normalizer\\WweRemoteNormalizerTest.php": {
-    "mtime": 1783292357.657737,
-    "ast_hash": "25a568b7ff1f717a7c124ff3d07fdb4b",
+    "mtime": 1783497518.305833,
+    "ast_hash": "c04b59f194cd706f287b0963a15f8784",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\frontend\\.mcp.json": {
@@ -2090,8 +2050,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\frontend\\client\\src\\components\\ui\\chart.tsx": {
-    "mtime": 1783186089.295165,
-    "ast_hash": "0b40068c8c2d95f6a2386b6ebeca6a2e",
+    "mtime": 1783497263.4503238,
+    "ast_hash": "4fe6a3b578f1be3b5c61556209b38afe",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\frontend\\client\\src\\components\\ui\\checkbox.tsx": {
@@ -2370,8 +2330,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\frontend\\client\\src\\hooks\\useJobs.ts": {
-    "mtime": 1782800644.464034,
-    "ast_hash": "a6067c55ecb7d8c5041e962c505defbe",
+    "mtime": 1783497349.112134,
+    "ast_hash": "70a7c15170e98014c94137678089652f",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\frontend\\client\\src\\hooks\\useLumaEvents.ts": {
@@ -2555,7 +2515,7 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\scripts\\setup-git-hooks.mjs": {
-    "mtime": 1783289973.4583488,
+    "mtime": 1783497263.5186014,
     "ast_hash": "b9b8aa5b23446218f1649bb29cf39495",
     "semantic_hash": ""
   },
@@ -2580,92 +2540,92 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\context.md": {
-    "mtime": 1783289973.219403,
+    "mtime": 1783497263.239479,
     "ast_hash": "3af810165ce06ddef1d6f68b60620eb6",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\readme.md": {
-    "mtime": 1783289973.2709353,
+    "mtime": 1783497263.2934487,
     "ast_hash": "89b65889909c12fcfd57a97b0a4a2f2b",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\checklists\\accessibility.md": {
-    "mtime": 1783289973.1950314,
+    "mtime": 1783497263.2158237,
     "ast_hash": "411669850cfde06175d449569a33bc81",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\checklists\\pr-review.md": {
-    "mtime": 1783289973.1970308,
+    "mtime": 1783497263.2188146,
     "ast_hash": "ec1a4f626cef0b352eb2d6de80c6994b",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\checklists\\pre-deploy.md": {
-    "mtime": 1783289973.200037,
+    "mtime": 1783497263.2213366,
     "ast_hash": "e5689de147181ea32051fdc918605b1a",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\checklists\\README.md": {
-    "mtime": 1783289973.193013,
+    "mtime": 1783497263.2128062,
     "ast_hash": "944922cb409281ecc278aabe5db17ceb",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\checklists\\security-review.md": {
-    "mtime": 1783289973.2020323,
+    "mtime": 1783497263.2242098,
     "ast_hash": "9bb20f8e575f0c06b9f8110711274355",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\docs\\api.md": {
-    "mtime": 1783289973.223407,
+    "mtime": 1783497263.2424803,
     "ast_hash": "ef796fff341ec4c0033ef57ae83f13b8",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\docs\\architecture.md": {
-    "mtime": 1783289973.225744,
+    "mtime": 1783497263.2446811,
     "ast_hash": "e361d000ff94ace24caf4ab32702112c",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\docs\\database.md": {
-    "mtime": 1783289973.227742,
+    "mtime": 1783497263.2466786,
     "ast_hash": "9d5a3fabaf54af4cfa00e26cf77080a2",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\knowledge\\business-rules.md": {
-    "mtime": 1783289973.230746,
+    "mtime": 1783497263.249679,
     "ast_hash": "57b82de2f5f06833237522e515d3b8b3",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\knowledge\\domain-model.md": {
-    "mtime": 1783289973.2338145,
+    "mtime": 1783497263.2530136,
     "ast_hash": "de2c31cf64d147dd5897b7c3b7ac1a4a",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\mcp\\README.md": {
-    "mtime": 1783289973.2373655,
+    "mtime": 1783497263.2554898,
     "ast_hash": "6180630721a1f6a577b2ab8b14c88138",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\mcp\\security.md": {
-    "mtime": 1783289973.2413676,
+    "mtime": 1783497263.2617824,
     "ast_hash": "58dd123dadcf519dd2bf683707d760a9",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\mcp\\servers\\filesystem.md": {
-    "mtime": 1783289973.244884,
+    "mtime": 1783497263.2643158,
     "ast_hash": "15107567c381d02d1506bcc9bea52b75",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\mcp\\servers\\jetro.md": {
-    "mtime": 1783289973.2479217,
+    "mtime": 1783497263.266333,
     "ast_hash": "dd6e7f98cb58c691ed3614b7042879c5",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\memory\\active-context.md": {
-    "mtime": 1783289973.2523181,
+    "mtime": 1783497263.2716866,
     "ast_hash": "c4d661d44ed6a962949f83b2072b6e0b",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\memory\\decisions.md": {
-    "mtime": 1783289973.2543242,
+    "mtime": 1783497263.2746885,
     "ast_hash": "37c8182409e95c459409c6bca57b072d",
     "semantic_hash": ""
   },
@@ -2680,192 +2640,192 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\memory\\session-log\\index.md": {
-    "mtime": 1783164088.574368,
-    "ast_hash": "8d3999e4db6e1a5db66881ac96d440f7",
+    "mtime": 1783656904.4182198,
+    "ast_hash": "64e9b27756953057ecbdcbebb3e8199c",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\prompts\\bug-analysis.prompt.md": {
-    "mtime": 1783289973.2596242,
+    "mtime": 1783497263.2804046,
     "ast_hash": "f10530310690ab6026962356ea0a92c6",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\prompts\\code-review.prompt.md": {
-    "mtime": 1783289973.2629087,
+    "mtime": 1783497263.2824059,
     "ast_hash": "6ac2f706aa4e8294ac17bdd65f920f4d",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\prompts\\deployment-check.prompt.md": {
-    "mtime": 1783289973.264901,
+    "mtime": 1783497263.2854056,
     "ast_hash": "8ce1adc94363539e76f552a7929a0186",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\prompts\\feature-planning.prompt.md": {
-    "mtime": 1783289973.2659032,
+    "mtime": 1783497263.2879343,
     "ast_hash": "057189540212369492b1ad384356fde2",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\prompts\\README.md": {
-    "mtime": 1783289973.2576241,
+    "mtime": 1783497263.2774086,
     "ast_hash": "5905f00ff0fe0b0eb6e2803fb424217d",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\prompts\\security-review.prompt.md": {
-    "mtime": 1783289973.2688913,
+    "mtime": 1783497263.290935,
     "ast_hash": "6cf369f3a5dc54bc36bc22bf750cb4ac",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\security\\README.md": {
-    "mtime": 1783289973.2736812,
+    "mtime": 1783497263.2970252,
     "ast_hash": "0bbd3e1666f7461d4502f6cc0bdb60ec",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\security\\threat-model.md": {
-    "mtime": 1783289973.276678,
+    "mtime": 1783497263.2990108,
     "ast_hash": "3454e604edcbd033c30123724d54f579",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\readme.md": {
-    "mtime": 1783289973.317683,
+    "mtime": 1783497263.340624,
     "ast_hash": "5beb79ccf07bcb343d1ddfdd93a2807a",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\api-design\\skill.md": {
-    "mtime": 1783289973.2822123,
+    "mtime": 1783497263.3030188,
     "ast_hash": "20b8f4fdfe11a413c1b4227258ce6e15",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\backend-development\\skill.md": {
-    "mtime": 1783289973.285213,
+    "mtime": 1783497263.3095758,
     "ast_hash": "87eee694497f8b0f2f08a7848783b4bc",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\bug-fixing\\skill.md": {
-    "mtime": 1783289973.288678,
+    "mtime": 1783497263.3125782,
     "ast_hash": "ec9e7108b643bedd5dad212bc6ef213a",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\code-review\\skill.md": {
-    "mtime": 1783289973.293681,
+    "mtime": 1783497263.316583,
     "ast_hash": "69968f1429c932c51b48b26d9bd83ed5",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\database\\skill.md": {
-    "mtime": 1783289973.2977307,
+    "mtime": 1783497263.3211277,
     "ast_hash": "93a45fbfea6c607255db53ee1ebf1576",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\deployment\\skill.md": {
-    "mtime": 1783289973.301767,
+    "mtime": 1783497263.3241146,
     "ast_hash": "24867c87a3b84cd09e1c9bcd6ce5b7bc",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\feature-implementation\\skill.md": {
-    "mtime": 1783289973.3057666,
+    "mtime": 1783497263.3261437,
     "ast_hash": "9cef1301f95af383c27e3d763b7202e8",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\frontend-development\\skill.md": {
-    "mtime": 1783289973.3087645,
+    "mtime": 1783497263.3300457,
     "ast_hash": "d544e31ff97c506574e102a4aba5ffb1",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\git-workflows\\skill.md": {
-    "mtime": 1783289973.3127105,
+    "mtime": 1783497263.3340547,
     "ast_hash": "13a886bb9ac4223a18aca1a6fb00656e",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\project-planning\\skill.md": {
-    "mtime": 1783289973.316682,
+    "mtime": 1783497263.3375728,
     "ast_hash": "1d4057693a49e8ec13071f963102f9d1",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\security\\skill.md": {
-    "mtime": 1783289973.321764,
+    "mtime": 1783497263.3436265,
     "ast_hash": "a9bf8e7152f2974cb35a1fe412e9c3ad",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\skills\\testing\\skill.md": {
-    "mtime": 1783289973.3257623,
+    "mtime": 1783497263.3476295,
     "ast_hash": "99d51e7a97d3792b2a9382f5673bcc89",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\standards\\css-standards.md": {
-    "mtime": 1783289973.32877,
+    "mtime": 1783497263.35117,
     "ast_hash": "c5bea568ff3a84ca4f157f6d589ebe4f",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\standards\\php-standards.md": {
-    "mtime": 1783289973.3319144,
+    "mtime": 1783497263.3537037,
     "ast_hash": "ccc626eaa7dcef3b8e3a275f0cb2e8b3",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\standards\\react-standards.md": {
-    "mtime": 1783289973.335456,
+    "mtime": 1783497263.3567061,
     "ast_hash": "88efbb200544f367669b900f7b01e15c",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\standards\\testing-standards.md": {
-    "mtime": 1783289973.3374722,
+    "mtime": 1783497263.3587136,
     "ast_hash": "6e311885e0cabcff52ccde8d089fc61c",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\standards\\typescript-standards.md": {
-    "mtime": 1783289973.3394718,
+    "mtime": 1783497263.3612459,
     "ast_hash": "74b319b76c77dfff30d0a7ed0966ae94",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\templates\\commit-message.md": {
-    "mtime": 1783289973.345034,
+    "mtime": 1783497263.3662498,
     "ast_hash": "8700bc3179666739170325ab12b171c2",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\templates\\php-endpoint.md": {
-    "mtime": 1783289973.3480344,
+    "mtime": 1783497263.3682485,
     "ast_hash": "18c46dff7a8b2fac814b642b0844b402",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\templates\\pr-description.md": {
-    "mtime": 1783289973.3500426,
+    "mtime": 1783497263.3707657,
     "ast_hash": "93f45276da1c68b0bc56cdcc6a63bb33",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\templates\\react-component.md": {
-    "mtime": 1783289973.3523855,
+    "mtime": 1783497263.3728037,
     "ast_hash": "1df86f3f10b4335ec319b6e2d80869da",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\templates\\README.md": {
-    "mtime": 1783289973.343034,
+    "mtime": 1783497263.3632715,
     "ast_hash": "3d182ee011249970aa298e8fbf0eda0a",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\templates\\sql-migration.md": {
-    "mtime": 1783289973.35438,
+    "mtime": 1783497263.3748026,
     "ast_hash": "f73737b23c590811208577a69b5c7ad8",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\workflows\\deploy.md": {
-    "mtime": 1783289973.359383,
+    "mtime": 1783497263.3803465,
     "ast_hash": "c56d0ff1dcbe00ce98da962410654879",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\workflows\\feature-branch.md": {
-    "mtime": 1783289973.3618908,
+    "mtime": 1783497263.3834653,
     "ast_hash": "e2843305b76c2903c5493e203b3dc051",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\workflows\\hotfix.md": {
-    "mtime": 1783289973.3639336,
+    "mtime": 1783497263.3864648,
     "ast_hash": "e647e53cb666aaf5df757cd973c78adb",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\workflows\\README.md": {
-    "mtime": 1783289973.358374,
+    "mtime": 1783497263.3783486,
     "ast_hash": "a429c6fe0f418b596dc7c884f19d1ab5",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\workflows\\release.md": {
-    "mtime": 1783289973.3659296,
+    "mtime": 1783497263.3900042,
     "ast_hash": "29e266d63627e8006a5a3cd481a16671",
     "semantic_hash": ""
   },
@@ -3060,22 +3020,22 @@
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\docs\\ai\\ARCHITECTURE.md": {
-    "mtime": 1783289973.3929894,
+    "mtime": 1783497263.4387593,
     "ast_hash": "aea09c95923d3849b3ba2d827137e3d4",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\docs\\ai\\MAINTENANCE.md": {
-    "mtime": 1783289973.3945062,
+    "mtime": 1783497263.4407835,
     "ast_hash": "3f53009ea0c5268fbc03778ca1b2c636",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\docs\\ai\\README.md": {
-    "mtime": 1783289973.396519,
+    "mtime": 1783497263.4427788,
     "ast_hash": "f5f5ce2e5a7c48c068beaed1126207e3",
     "semantic_hash": ""
   },
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\docs\\ai\\USAGE.md": {
-    "mtime": 1783289973.3985224,
+    "mtime": 1783497263.4463193,
     "ast_hash": "a2c53a9dd5625e7d3f00fc881bd223c2",
     "semantic_hash": ""
   },
@@ -3167,6 +3127,41 @@
   "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\frontend\\client\\src\\assets\\faq.png": {
     "mtime": 1781818814.9200206,
     "ast_hash": "bfa9453fff8b0d2c0cd1af8f962becab",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\migrations\\004_add_title_company_dedup_index.sql": {
+    "mtime": 1783497349.0670524,
+    "ast_hash": "6b4a08f7f22c46864dae14dea8fc949f",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\src\\Repository\\JobRepository.php": {
+    "mtime": 1783497349.0894694,
+    "ast_hash": "2e718473efa6471bbdd34e3810917ad9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Http\\CurlHttpClientTest.php": {
+    "mtime": 1783497349.1015868,
+    "ast_hash": "1c447064f37f71cd406760bd4479ebb5",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\tests\\Repository\\JobRepositoryTest.php": {
+    "mtime": 1783497349.1092758,
+    "ast_hash": "1a9f3d9c9e3536ed04558497bc50c35e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\migrations\\005_charset_and_index_fixes.sql": {
+    "mtime": 1783626292.0741737,
+    "ast_hash": "90d0a8aa7799b11473ada4e178d300dc",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\backend\\scripts\\check_db_health.php": {
+    "mtime": 1783578198.673109,
+    "ast_hash": "9e170d671028bf955f81e9d95a3d5117",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\jlc254\\Music\\ndc-redesign-website\\.ai\\memory\\session-log\\2026-07-10T04-15-03.md": {
+    "mtime": 1783656904.4167066,
+    "ast_hash": "7baa9809c1773b2c5c3cbdd3095b8fbe",
     "semantic_hash": ""
   }
 }

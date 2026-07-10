@@ -35,13 +35,13 @@ error_reporting(E_ALL);
 
 register_shutdown_function(static function (): void {
     $err = error_get_last();
-    if ($err !== null && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+    if ($err !== null && \in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
         fwrite(STDERR, "\n❌ FATAL: {$err['message']} in {$err['file']}:{$err['line']}\n");
     }
 });
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
-$backendRoot = dirname(__DIR__);
+$backendRoot = \dirname(__DIR__);
 echo "Looking for config in: {$backendRoot}\n";
 
 if (file_exists($backendRoot . '/config.php')) {
@@ -57,7 +57,7 @@ if (file_exists($backendRoot . '/config.php')) {
 }
 
 foreach (['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS'] as $const) {
-    if (!defined($const)) {
+    if (!\defined($const)) {
         fwrite(STDERR, "❌ {$const} is not defined — config file loaded but incomplete\n");
         exit(1);
     }
@@ -103,7 +103,7 @@ function hasIndexCoveringLeadingColumns(array $indexColumns, array $requiredLead
 
     foreach ($indexColumns as $keyName => $cols) {
         $cols = array_map('strtolower', $cols);
-        if (array_slice($cols, 0, count($requiredLeading)) === $requiredLeading) {
+        if (\array_slice($cols, 0, \count($requiredLeading)) === $requiredLeading) {
             return $keyName;
         }
     }
@@ -114,7 +114,9 @@ function hasIndexCoveringLeadingColumns(array $indexColumns, array $requiredLead
 // ── Connect ───────────────────────────────────────────────────────────────
 try {
     $pdo = new PDO(
-        'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+        'mysql:host=' . DB_HOST
+            . ';port=' . (\defined('DB_PORT') ? DB_PORT : '3306')
+            . ';dbname=' . DB_NAME . ';charset=utf8mb4',
         DB_USER,
         DB_PASS,
         [
@@ -127,9 +129,9 @@ try {
     exit(1);
 }
 
-$env = defined('APP_ENV') ? APP_ENV : 'unknown';
+$env = \defined('APP_ENV') ? APP_ENV : 'unknown';
 echo "Environment: {$env}\n";
-echo "Database:    " . DB_NAME . " @ " . DB_HOST . "\n";
+echo 'Database:    ' . DB_NAME . ' @ ' . DB_HOST . "\n";
 
 // ── 0. Does the jobs table even exist? ───────────────────────────────────────
 section('Table existence');
@@ -199,9 +201,9 @@ foreach ($requiredCoverage as $label => $requiredLeading) {
 section('Query plans — EXPLAIN on real filter shapes');
 
 $queries = [
-    'Active+approved listing (base filter every request uses)' =>
-        "EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
-         ORDER BY posted_at DESC LIMIT 20 OFFSET 0",
+    'Active+approved listing (newest — base filter every request uses)' =>
+        'EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
+         ORDER BY is_featured DESC, posted_at DESC, id DESC LIMIT 20 OFFSET 0',
 
     'Location type filter' =>
         "EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
@@ -211,17 +213,17 @@ $queries = [
         "EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
          AND role_type = 'DevOps Engineer' LIMIT 20",
 
-    'Closing soon sort' =>
-        "EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
-         ORDER BY closes_at ASC LIMIT 20",
+    'Closing soon sort (uses closes_at_sort generated column + idx_listing_closing)' =>
+        'EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
+         ORDER BY is_featured DESC, closes_at_sort ASC, id DESC LIMIT 20',
 
     'Cross-source dedup check (title+company)' =>
         "EXPLAIN SELECT id FROM jobs WHERE title = 'Senior DevOps Engineer'
          AND company = 'Andela'",
 
     'Notification digest query (is_notified)' =>
-        "EXPLAIN SELECT * FROM jobs WHERE is_notified = 0 AND is_active = 1
-         AND is_approved = 1 ORDER BY posted_at DESC LIMIT 8",
+        'EXPLAIN SELECT * FROM jobs WHERE is_notified = 0 AND is_active = 1
+         AND is_approved = 1 ORDER BY posted_at DESC LIMIT 8',
 ];
 
 foreach ($queries as $label => $sql) {
@@ -268,7 +270,7 @@ if (!is_dir($migrationsDir)) {
         $applied = array_column($stmt->fetchAll(), 'filename');
 
         foreach ($migrationFiles as $file) {
-            if (in_array($file, $applied, true)) {
+            if (\in_array($file, $applied, true)) {
                 pass("Applied: {$file}");
             } else {
                 fail("NOT applied: {$file} — run 'php migrate.php', or if the schema change is already present in the table (check section above), reconcile schema_migrations manually rather than re-running blindly");
@@ -280,11 +282,11 @@ if (!is_dir($migrationsDir)) {
 // ── 4. PHP OPcache ────────────────────────────────────────────────────────────
 section('PHP OPcache (CLI)');
 
-if (!function_exists('opcache_get_status')) {
+if (!\function_exists('opcache_get_status')) {
     fail('OPcache extension not loaded at all for this PHP CLI binary. On cPanel: check Select PHP Version → Extensions (or MultiPHP INI Editor) — this is a server config change, not something fixable from within the app.');
 } else {
-    $enabled = ini_get('opcache.enable');
-    $enabledCli = ini_get('opcache.enable_cli');
+    $enabled = \ini_get('opcache.enable');
+    $enabledCli = \ini_get('opcache.enable_cli');
 
     if ($enabled === '1' || $enabled === 'On') {
         pass('opcache.enable is On');
@@ -305,7 +307,7 @@ if (!function_exists('opcache_get_status')) {
         $misses = $stats['misses'] ?? 0;
         $hitRate = $stats['opcache_hit_rate'] ?? null;
         echo '     Hits: ' . $hits . ', Misses: ' . $misses
-            . ($hitRate !== null ? sprintf(', Hit rate: %.1f%%', $hitRate) : '')
+            . ($hitRate !== null ? \sprintf(', Hit rate: %.1f%%', $hitRate) : '')
             . "\n";
     }
 }

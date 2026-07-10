@@ -1,16 +1,16 @@
-# Graph Report - ndc-redesign-website  (2026-07-06)
+# Graph Report - ndc-redesign-website  (2026-07-10)
 
 ## Corpus Check
-- 301 files · ~162,294 words
+- 303 files · ~165,327 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2861 nodes · 3681 edges · 227 communities (206 shown, 21 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 26 edges (avg confidence: 0.8)
+- 2986 nodes · 3912 edges · 234 communities (209 shown, 25 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 70 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0e064dd4`
+- Built from commit: `07bcdba4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -73,6 +73,7 @@
 - [[_COMMUNITY_Community 56|Community 56]]
 - [[_COMMUNITY_Community 60|Community 60]]
 - [[_COMMUNITY_Community 62|Community 62]]
+- [[_COMMUNITY_Community 75|Community 75]]
 - [[_COMMUNITY_Community 78|Community 78]]
 - [[_COMMUNITY_Community 79|Community 79]]
 - [[_COMMUNITY_Community 80|Community 80]]
@@ -213,18 +214,23 @@
 - [[_COMMUNITY_Community 224|Community 224]]
 - [[_COMMUNITY_Community 225|Community 225]]
 - [[_COMMUNITY_Community 226|Community 226]]
+- [[_COMMUNITY_Community 227|Community 227]]
+- [[_COMMUNITY_Community 228|Community 228]]
+- [[_COMMUNITY_Community 229|Community 229]]
+- [[_COMMUNITY_Community 230|Community 230]]
+- [[_COMMUNITY_Community 231|Community 231]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `cn()` - 80 edges
-2. `CommunityPage()` - 42 edges
-3. `scripts` - 38 edges
-4. `PartnershipPage()` - 37 edges
-5. `Button` - 32 edges
-6. `mapRoleType()` - 28 edges
-7. `scripts` - 27 edges
-8. `HelpersTest` - 26 edges
-9. `HelpersTest` - 26 edges
-10. `Eventspage()` - 25 edges
+2. `mapRoleType()` - 47 edges
+3. `CommunityPage()` - 42 edges
+4. `scripts` - 38 edges
+5. `WweRemoteNormalizerTest` - 37 edges
+6. `PartnershipPage()` - 37 edges
+7. `HelpersTest` - 33 edges
+8. `Button` - 32 edges
+9. `scripts` - 27 edges
+10. `HelpersTest` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `proxyRunMiddleware()` --calls--> `getProxyCacheDir()`  [INFERRED]
@@ -238,39 +244,39 @@
 - `InteractiveImageBentoGallery()` --calls--> `cn()`  [EXTRACTED]
   frontend/client/src/components/ui/bento-gallery.tsx → frontend/client/src/lib/utils.ts
 
-## Communities (227 total, 21 thin omitted)
+## Communities (234 total, 25 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.11
-Nodes (23): SocialIconLink(), SocialIconLinkProps, ANIMATION_VARIANTS, communityGallery, teamGallery, Statistic, teamData, TeamMember (+15 more)
+Cohesion: 0.10
+Nodes (27): SocialIconLink(), SocialIconLinkProps, ANIMATION_VARIANTS, communityGallery, teamGallery, Statistic, statisticsData, teamData (+19 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.05
-Nodes (25): cleanDescription(), detectCurrency(), detectPeriod(), extractResponseKey(), extractSalaryNumbers(), fetchJSON(), isBackendRole(), isCloudArchitectRole() (+17 more)
+Cohesion: 0.10
+Nodes (22): detectCurrency(), detectPeriod(), extractResponseKey(), extractSalaryNumbers(), fetchJSON(), isBackendRole(), isCloudArchitectRole(), isDevOpsRole() (+14 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.08
 Nodes (21): checkParams(), checkPlatform(), displayHelp(), ErrorHandler, getHomeDir(), getIniMessage(), getOptValue(), getPlatformIssues() (+13 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.07
-Nodes (28): useIsMobile(), Separator, Sidebar, SidebarContent, SidebarContext, SidebarContextProps, SidebarFooter, SidebarGroup (+20 more)
+Cohesion: 0.06
+Nodes (29): useIsMobile(), Separator, Sidebar, SidebarContent, SidebarContext, SidebarContextProps, SidebarFooter, SidebarGroup (+21 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.16
-Nodes (14): useJobs(), countActiveFilters(), CURRENCY_SYMBOLS, currencySymbol(), DEFAULT_FILTERS, FilterPanel(), formatPostedAt(), formatSalary() (+6 more)
+Cohesion: 0.10
+Nodes (23): Job, JobFilters, JobsApiResponse, JobSource, LocationType, RoleType, SortOption, useJobs() (+15 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.13
 Nodes (23): HeroSlideData, heroSlidesData, containerVariants, Direction, HeroCarousel(), bgVariant, contentVariant, HeroSlide() (+15 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.15
+Cohesion: 0.14
 Nodes (24): CommunityEvent, CommunityProject, events, projects, RecordedSession, recordedSessions, allData, CampusTourSection() (+16 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.18
-Nodes (20): EventCard(), EventCardProps, LumaEventsList(), useLumaEvents(), fetchLumaEvents(), ICALTime, LumaEvent, Carousel (+12 more)
+Cohesion: 0.16
+Nodes (23): EventCard(), EventCardProps, LumaEventsList(), useLumaEvents(), fetchLumaEvents(), ICALTime, LumaEvent, Badge() (+15 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.13
@@ -309,36 +315,36 @@ Cohesion: 0.18
 Nodes (13): buildApacheConfigRules(), buildHeaderRules(), buildProxyRules(), __dirname, escapeHeaderValue(), __filename, generateCSPString(), generateHtaccess() (+5 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.16
-Nodes (18): FeaturedEvent, featuredEvents, UpcomingEvent, upcomingEvents, AdsLogo(), EventsTypeSection(), EventType, eventTypes (+10 more)
+Cohesion: 0.22
+Nodes (15): FeaturedEvent, featuredEvents, UpcomingEvent, upcomingEvents, AdsLogo(), EventsTypeSection(), EventType, eventTypes (+7 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.03
 Nodes (59): dependencies, class-variance-authority, @cloudinary/react, @cloudinary/url-gen, clsx, cmdk, date-fns, embla-carousel (+51 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.16
-Nodes (9): Navbar(), Theme, ThemeContext, ThemeContextType, ThemeProvider(), ThemeProviderProps, useTheme(), pathToComponent (+1 more)
+Cohesion: 0.15
+Nodes (5): RouteDefinition, routePaths, routes, pathToComponent, RoutePath
 
 ### Community 22 - "Community 22"
-Cohesion: 0.12
-Nodes (13): ChartConfig, ChartContainer, ChartContext, ChartContextProps, ChartLegendContent, ChartStyle, ChartTooltipContent, LegendContentProps (+5 more)
+Cohesion: 0.13
+Nodes (12): ChartConfig, ChartContainer, ChartContext, ChartContextProps, ChartLegendContent, ChartStyle, ChartTooltipContent, LegendContentProps (+4 more)
 
 ### Community 23 - "Community 23"
 Cohesion: 0.25
 Nodes (10): Author, authorMercy, BlogData, BlogPost, blogPosts, AuthorMeta(), BlogPage(), CategoryBadge() (+2 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.13
-Nodes (28): Action, ActionType, addToRemoveQueue(), dispatch(), genId(), listeners, memoryState, reducer() (+20 more)
+Cohesion: 0.17
+Nodes (23): Action, ActionType, addToRemoveQueue(), dispatch(), genId(), listeners, memoryState, reducer() (+15 more)
 
 ### Community 25 - "Community 25"
 Cohesion: 0.19
 Nodes (6): ErrorBoundary, ErrorBoundaryProps, ErrorBoundaryState, isDevelopment(), styles, rootElement
 
 ### Community 26 - "Community 26"
-Cohesion: 0.14
-Nodes (13): buildSitemapXml(), __dirname, DIST_DIR, __filename, generateSitemap(), getBlogSlugs(), ROOT_DIR, SitemapEntry (+5 more)
+Cohesion: 0.18
+Nodes (10): buildSitemapXml(), __dirname, DIST_DIR, __filename, generateSitemap(), getBlogSlugs(), ROOT_DIR, SitemapEntry (+2 more)
 
 ### Community 27 - "Community 27"
 Cohesion: 0.22
@@ -349,8 +355,8 @@ Cohesion: 0.30
 Nodes (13): __dirname, DIST_DIR, fail(), __filename, isValidIsoDate(), pass(), ROOT_DIR, validateLastmod() (+5 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.22
-Nodes (8): SheetContent, SheetContentProps, SheetDescription, SheetFooter(), SheetHeader(), SheetOverlay, SheetTitle, sheetVariants
+Cohesion: 0.18
+Nodes (15): Navbar(), Theme, ThemeContext, ThemeContextType, ThemeProvider(), ThemeProviderProps, useTheme(), SheetContent (+7 more)
 
 ### Community 30 - "Community 30"
 Cohesion: 0.03
@@ -375,10 +381,6 @@ Nodes (7): ignoredDirs, ignoredFiles, label, phpBin, phpFiles, phpVersion, resul
 ### Community 35 - "Community 35"
 Cohesion: 0.20
 Nodes (9): ContextMenuCheckboxItem, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuShortcut(), ContextMenuSubContent (+1 more)
-
-### Community 36 - "Community 36"
-Cohesion: 0.22
-Nodes (8): AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter(), AlertDialogHeader(), AlertDialogOverlay, AlertDialogTitle
 
 ### Community 37 - "Community 37"
 Cohesion: 0.20
@@ -428,10 +430,6 @@ Nodes (48): 404 Errors on cPanel, API Implementation, Backup Strategy, Build Fai
 Cohesion: 0.50
 Nodes (3): TabsContent, TabsList, TabsTrigger
 
-### Community 51 - "Community 51"
-Cohesion: 0.19
-Nodes (12): faqDataByCategory, statisticsData, AfricaDevOpsSummitSection(), AboutSection(), iconMap, FAQSection(), JoinCommunity(), CATEGORY_BACKGROUNDS (+4 more)
-
 ### Community 52 - "Community 52"
 Cohesion: 0.36
 Nodes (7): NavigationMenu, NavigationMenuContent, NavigationMenuIndicator, NavigationMenuList, NavigationMenuTrigger, navigationMenuTriggerStyle, NavigationMenuViewport
@@ -439,6 +437,10 @@ Nodes (7): NavigationMenu, NavigationMenuContent, NavigationMenuIndicator, Navig
 ### Community 54 - "Community 54"
 Cohesion: 0.83
 Nodes (3): CloudinaryImage(), CloudinaryImageProps, getCloudinaryClient()
+
+### Community 75 - "Community 75"
+Cohesion: 0.40
+Nodes (3): daysUntilClose(), formatIsoDate(), formatJobForApi()
 
 ### Community 90 - "Community 90"
 Cohesion: 0.05
@@ -469,8 +471,8 @@ Cohesion: 0.07
 Nodes (28): autoload, autoload-dev, psr-4, files, psr-4, config, optimize-autoloader, platform (+20 more)
 
 ### Community 97 - "Community 97"
-Cohesion: 0.16
-Nodes (13): SEOProps, FAQCategory, FAQData, faqDataFlat, FAQItem, getFAQsByCategory(), GalleryImage, EVENTS_FAQ_SCHEMA (+5 more)
+Cohesion: 0.12
+Nodes (21): SEOProps, FAQCategory, FAQData, faqDataByCategory, faqDataFlat, FAQItem, getFAQsByCategory(), GalleryImage (+13 more)
 
 ### Community 98 - "Community 98"
 Cohesion: 0.07
@@ -661,8 +663,8 @@ Cohesion: 0.17
 Nodes (12): code:powershell (& (Get-Content graphify-out\.graphify_python) -c "), code:powershell (@'), code:powershell (@'), code:powershell (@'), code:powershell (@'), code:powershell (@'), code:block8 ([Agent tool call 1: files 1-15]), code:block9 (You are a graphify extraction subagent. Read the files liste) (+4 more)
 
 ### Community 145 - "Community 145"
-Cohesion: 0.27
-Nodes (10): ACTIVE_CTX, capture(), __dirname, LOG_DIR, main(), ROOT, rotate(), run() (+2 more)
+Cohesion: 0.26
+Nodes (11): ACTIVE_CTX, capture(), __dirname, getLastTag(), LOG_DIR, main(), ROOT, rotate() (+3 more)
 
 ### Community 146 - "Community 146"
 Cohesion: 0.18
@@ -749,8 +751,8 @@ Cohesion: 0.22
 Nodes (8): 1. General Formatting, 2. Images & Media, 3. Unique Identifiers (IDs), 4. Social Media Handles, 5. FAQs, 6. Environment Variables, Content Contribution Guide, Data Guidelines
 
 ### Community 167 - "Community 167"
-Cohesion: 0.25
-Nodes (7): destDir, ROOT, skills, SOURCE, srcFile, targetDir, TARGETS
+Cohesion: 0.22
+Nodes (8): destDir, __dirname, ROOT, skills, SOURCE, srcFile, targetDir, TARGETS
 
 ### Community 168 - "Community 168"
 Cohesion: 0.36
@@ -807,10 +809,6 @@ Nodes (6): Common Risks & Attack Scenarios, Detailed Documentation, Security Ove
 ### Community 181 - "Community 181"
 Cohesion: 0.29
 Nodes (6): Audit History, Contact, Developer Quick Start, Documentation Index, Security Documentation, Security Mission Statement
-
-### Community 182 - "Community 182"
-Cohesion: 0.43
-Nodes (5): ToggleGroup, ToggleGroupContext, ToggleGroupItem, Toggle, toggleVariants
 
 ### Community 183 - "Community 183"
 Cohesion: 0.29
@@ -881,8 +879,8 @@ Cohesion: 0.40
 Nodes (4): Available Skills, Available Templates, Getting Started, Jetro Agent Context
 
 ### Community 200 - "Community 200"
-Cohesion: 0.40
-Nodes (4): Available Skills, Available Templates, Getting Started, Jetro Agent Context
+Cohesion: 0.15
+Nodes (12): 1. Core Principle, 2. Security Requirements (OWASP-aligned), 3. SonarQube Cleanliness Requirements, 4. Stack-Specific Notes, 5. Testing Expectations, 6. Output Behavior, 7. Self-Check Before Finalizing Code, Available Skills (+4 more)
 
 ### Community 201 - "Community 201"
 Cohesion: 0.50
@@ -936,9 +934,13 @@ Nodes (3): code:powershell (& (Get-Content graphify-out\.graphify_python) -m gra
 Cohesion: 0.67
 Nodes (3): code:powershell (@'), code:block26 (Graph complete. Outputs in PATH_TO_DIR/graphify-out/), Step 9 - Save manifest, update cost tracker, clean up, and report
 
-### Community 221 - "Community 221"
-Cohesion: 0.18
-Nodes (9): Job, JobFilters, JobsApiResponse, JobSource, LocationType, RoleType, SortOption, UseJobsResult (+1 more)
+### Community 223 - "Community 223"
+Cohesion: 0.22
+Nodes (3): buildAffiliateUrl(), sanitizeString(), RemotiveNormalizer
+
+### Community 224 - "Community 224"
+Cohesion: 0.23
+Nodes (3): isLocationExcludedForAfrica(), mb_substr(), WweRemoteNormalizer
 
 ### Community 225 - "Community 225"
 Cohesion: 0.29
@@ -948,25 +950,37 @@ Nodes (6): DialogContent, DialogDescription, DialogFooter(), DialogHeader(), Dia
 Cohesion: 0.50
 Nodes (3): AccordionContent, AccordionItem, AccordionTrigger
 
+### Community 228 - "Community 228"
+Cohesion: 0.22
+Nodes (8): AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter(), AlertDialogHeader(), AlertDialogOverlay, AlertDialogTitle
+
+### Community 229 - "Community 229"
+Cohesion: 0.67
+Nodes (5): apiRequest(), getQueryFn(), queryClient, throwIfResNotOk(), UnauthorizedBehavior
+
+### Community 231 - "Community 231"
+Cohesion: 0.43
+Nodes (5): ToggleGroup, ToggleGroupContext, ToggleGroupItem, Toggle, toggleVariants
+
 ## Knowledge Gaps
-- **1473 isolated node(s):** `__dirname`, `ROOT`, `AI_DIR`, `__dirname`, `ROOT` (+1468 more)
+- **1482 isolated node(s):** `type`, `command`, `args`, `JET_WORKSPACE`, `JET_API_URL` (+1477 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **25 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cn()` connect `Community 8` to `Community 3`, `Community 4`, `Community 7`, `Community 13`, `Community 14`, `Community 17`, `Community 19`, `Community 22`, `Community 24`, `Community 27`, `Community 29`, `Community 32`, `Community 33`, `Community 35`, `Community 36`, `Community 37`, `Community 38`, `Community 39`, `Community 40`, `Community 41`, `Community 48`, `Community 50`, `Community 51`, `Community 52`, `Community 182`, `Community 225`, `Community 226`, `Community 113`?**
-  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Why does `cn()` connect `Community 8` to `Community 3`, `Community 4`, `Community 7`, `Community 13`, `Community 14`, `Community 17`, `Community 19`, `Community 22`, `Community 24`, `Community 27`, `Community 29`, `Community 32`, `Community 33`, `Community 35`, `Community 37`, `Community 38`, `Community 39`, `Community 40`, `Community 41`, `Community 48`, `Community 50`, `Community 52`, `Community 97`, `Community 226`, `Community 225`, `Community 228`, `Community 231`, `Community 113`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **Why does `currencySymbol()` connect `Community 4` to `Community 1`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
-- **What connects `__dirname`, `ROOT`, `AI_DIR` to the rest of the system?**
-  _1473 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+- **Why does `Button` connect `Community 97` to `Community 0`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 10`, `Community 45`, `Community 17`, `Community 19`, `Community 29`?**
+  _High betweenness centrality (0.006) - this node is a cross-community bridge._
+- **Are the 37 inferred relationships involving `mapRoleType()` (e.g. with `.normalizeOne()` and `.normalizeOne()`) actually correct?**
+  _`mapRoleType()` has 37 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `type`, `command`, `args` to the rest of the system?**
+  _1482 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.1064102564102564 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09840425531914894 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.05499735589635114 - nodes in this community are weakly interconnected._
-- **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.07857142857142857 - nodes in this community are weakly interconnected._
-- **Should `Community 3` be split into smaller, more focused modules?**
-  _Cohesion score 0.06653225806451613 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09852216748768473 - nodes in this community are weakly interconnected._
