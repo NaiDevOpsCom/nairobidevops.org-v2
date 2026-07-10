@@ -152,7 +152,7 @@ jobs:
             const title = pr.title;
             const { owner, repo } = context.repo;
             const number = pr.number;
-            
+
             const body = [
               'Thanks for opening this PR! The title doesn\'t match our required format.',
               '',
@@ -175,15 +175,15 @@ jobs:
               '**Tip:** You can edit the title directly in this PR\'s title field above.',
               'No need to close and reopen — just edit and the check will re-run.'
             ].join('\n');
-            
+
             const { data: comments } = await github.rest.issues.listComments({
               owner, repo, issue_number: number
             });
-            
+
             const existing = comments.find(c =>
               c.user.type === 'Bot' && c.body.includes('Conventional Commits')
             );
-            
+
             if (!existing) {
               await github.rest.issues.createComment({
                 owner, repo, issue_number: number, body
