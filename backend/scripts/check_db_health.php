@@ -180,13 +180,29 @@ foreach ($indexColumns as $keyName => $cols) {
 echo "\n";
 
 $requiredCoverage = [
-    'is_active (base filter every listing query uses)'        => ['is_active'],
-    'location_type (location filter)'                          => ['location_type'],
-    'role_type (role filter)'                                   => ['role_type'],
-    'is_notified (digest cron query)'                            => ['is_notified'],
-    'closes_at (closing-soon sort / expiry cron)'               => ['closes_at'],
+    'is_active (base filter every listing query uses)'          => ['is_active'],
+    'location_type (location filter)'                           => ['location_type'],
+    'role_type (role filter)'                                    => ['role_type'],
+    'is_notified (digest cron query)'                           => ['is_notified'],
     'title + company, in that order (cross-source dedup check)' => ['title', 'company'],
+    // closes_at_sort is validated above via the idx_listing_closing sequence check;
+    // it is always accessed as part of that composite index, never as a leading column.
 ];
+
+
+// Verify idx_listing_closing specifically covers the closing-soon sort sequence.
+$closingIndexName = 'idx_listing_closing';
+if (isset($indexColumns[$closingIndexName])) {
+    $expectedClosing = ['is_active', 'is_approved', 'is_featured', 'closes_at_sort', 'id'];
+    $actualClosing   = array_map('strtolower', $indexColumns[$closingIndexName]);
+    if ($actualClosing === $expectedClosing) {
+        pass("{$closingIndexName}: columns match expected " . implode(', ', $expectedClosing));
+    } else {
+        warn("{$closingIndexName}: columns are (" . implode(', ', $actualClosing) . ") — expected (" . implode(', ', $expectedClosing) . "). Index may not optimally serve the closing-soon ORDER BY.");
+    }
+} else {
+    fail("{$closingIndexName} does not exist — closing-soon sort will full-scan or use a suboptimal index");
+}
 
 foreach ($requiredCoverage as $label => $requiredLeading) {
     $match = hasIndexCoveringLeadingColumns($indexColumns, $requiredLeading);
@@ -202,27 +218,27 @@ section('Query plans — EXPLAIN on real filter shapes');
 
 $queries = [
     'Active+approved listing (newest — base filter every request uses)' =>
-        'EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
+        'EXPLAIN FORMAT=TRADITIONAL SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
          ORDER BY is_featured DESC, posted_at DESC, id DESC LIMIT 20 OFFSET 0',
 
     'Location type filter' =>
-        "EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
+        "EXPLAIN FORMAT=TRADITIONAL SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
          AND location_type = 'africa_remote' LIMIT 20",
 
     'Role type filter' =>
-        "EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
+        "EXPLAIN FORMAT=TRADITIONAL SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
          AND role_type = 'DevOps Engineer' LIMIT 20",
 
     'Closing soon sort (uses closes_at_sort generated column + idx_listing_closing)' =>
-        'EXPLAIN SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
+        'EXPLAIN FORMAT=TRADITIONAL SELECT * FROM jobs WHERE is_active = 1 AND is_approved = 1
          ORDER BY is_featured DESC, closes_at_sort ASC, id DESC LIMIT 20',
 
     'Cross-source dedup check (title+company)' =>
-        "EXPLAIN SELECT id FROM jobs WHERE title = 'Senior DevOps Engineer'
+        "EXPLAIN FORMAT=TRADITIONAL SELECT id FROM jobs WHERE title = 'Senior DevOps Engineer'
          AND company = 'Andela'",
 
     'Notification digest query (is_notified)' =>
-        'EXPLAIN SELECT * FROM jobs WHERE is_notified = 0 AND is_active = 1
+        'EXPLAIN FORMAT=TRADITIONAL SELECT * FROM jobs WHERE is_notified = 0 AND is_active = 1
          AND is_approved = 1 ORDER BY posted_at DESC LIMIT 8',
 ];
 
@@ -231,19 +247,35 @@ foreach ($queries as $label => $sql) {
         $stmt = $pdo->query($sql);
         $plan = $stmt->fetch();
 
-        $key  = $plan['key']  ?? null;
-        $type = $plan['type'] ?? null;
-        $rows = $plan['rows'] ?? '?';
+        $key      = $plan['key']   ?? null;
+        $type     = $plan['type']  ?? null;
+        $rows     = $plan['rows']  ?? '?';
+        $extra    = $plan['Extra'] ?? '';
+        $filesort = str_contains($extra, 'Using filesort');
 
         if ($key !== null && $type !== 'ALL') {
-            pass("{$label}: using index '{$key}' (type={$type}, rows examined≈{$rows})");
+            $detail = "using index '{$key}' (type={$type}, rows examined≈{$rows}";
+            if ($filesort) {
+                $detail .= ", Extra={$extra}";
+            }
+            $detail .= ')';
+
+            if ($filesort) {
+                // Filesort despite index usage is expected on MySQL 5.7 for
+                // mixed-direction ORDER BY — record as a warning, not a failure.
+                warn("{$label}: {$detail} — filesort present; acceptable on MySQL 5.7 for mixed-direction ORDER BY, but resolve by upgrading to MySQL 8+ with DESC index support");
+            } else {
+                pass("{$label}: {$detail}");
+            }
         } elseif ($lowData) {
             warn("{$label}: no index used (type={$type}) — but table only has {$rowCount} rows, optimizer may be correctly choosing a scan. Re-check once real data volume exists.");
         } else {
             fail("{$label}: no index used despite {$rowCount} rows (type={$type}, rows examined≈{$rows}) — investigate");
         }
     } catch (PDOException $e) {
-        warn("{$label}: query failed — {$e->getMessage()}");
+        // EXPLAIN failure means the query cannot be planned at all (e.g. unknown
+        // column) — this is a definitive failure, not a warning.
+        fail("{$label}: EXPLAIN failed — {$e->getMessage()}");
     }
 }
 
@@ -266,14 +298,27 @@ if (!is_dir($migrationsDir)) {
     if (!$migrationsTableExists) {
         fail("schema_migrations table does not exist — migrate.php has never run here, or ran against a different DB than expected. The jobs table indexes you see above were applied some other way (direct SQL import?), so this environment's migration history can't be trusted.");
     } else {
-        $stmt = $pdo->query('SELECT filename FROM schema_migrations');
-        $applied = array_column($stmt->fetchAll(), 'filename');
+        // MigrationRunner tracks by numeric version (e.g. '005'), not filename.
+        // Fetch both columns so we can detect renames as well as genuine gaps.
+        $stmt = $pdo->query('SELECT version, filename FROM schema_migrations ORDER BY version');
+        /** @var array<string, string> $appliedByVersion  version => filename */
+        $appliedByVersion = array_column($stmt->fetchAll(), 'filename', 'version');
 
         foreach ($migrationFiles as $file) {
-            if (\in_array($file, $applied, true)) {
-                pass("Applied: {$file}");
+            // Extract the leading numeric version from the filename (e.g. '005').
+            if (!preg_match('/^(\d{3})_/', $file, $m)) {
+                warn("Skipping non-standard filename: {$file}");
+                continue;
+            }
+            $version = $m[1];
+
+            if (!\array_key_exists($version, $appliedByVersion)) {
+                fail("NOT applied: {$file} (version {$version}) — run 'php migrate.php', or reconcile schema_migrations manually if the schema change is already present");
+            } elseif ($appliedByVersion[$version] !== $file) {
+                // Version exists but under a different filename — likely a rename.
+                warn("Version {$version} applied as '{$appliedByVersion[$version]}', current filename is '{$file}' — file was renamed after being applied. Update schema_migrations.filename if the rename is intentional.");
             } else {
-                fail("NOT applied: {$file} — run 'php migrate.php', or if the schema change is already present in the table (check section above), reconcile schema_migrations manually rather than re-running blindly");
+                pass("Applied: {$file}");
             }
         }
     }

@@ -138,21 +138,27 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 --   ORDER BY is_featured DESC, posted_at DESC     (newest sort)
 --   ORDER BY is_featured DESC, closes_at_sort ASC (closing soon sort)
 --
--- is_featured must be in the index before posted_at/closes_at_sort so
--- MySQL can avoid a filesort on the ORDER BY clause.
+-- is_featured must be in the index before posted_at/closes_at_sort so the
+-- optimizer can narrow down rows efficiently.
+--
+-- MySQL 5.7 limitation: descending index columns are not supported, so the
+-- closing_soon ORDER BY (is_featured DESC, closes_at_sort ASC, id DESC) will
+-- still incur a filesort because the direction mix cannot be satisfied by a
+-- single ascending index. Upgrading to MySQL 8+ would allow a DESC index
+-- column on is_featured/id to eliminate the filesort entirely.
 -- ----------------------------------------------------------------------------
 
 SET @sql = (SELECT IF(
     NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
                 WHERE TABLE_SCHEMA = @schema AND TABLE_NAME = 'jobs' AND INDEX_NAME = 'idx_listing_newest'),
-    'ALTER TABLE jobs ADD INDEX idx_listing_newest (is_active, is_approved, is_featured, posted_at)',
+    'ALTER TABLE jobs ADD INDEX idx_listing_newest (is_active, is_approved, is_featured, posted_at, id)',
     'SELECT 1'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = (SELECT IF(
     NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS
                 WHERE TABLE_SCHEMA = @schema AND TABLE_NAME = 'jobs' AND INDEX_NAME = 'idx_listing_closing'),
-    'ALTER TABLE jobs ADD INDEX idx_listing_closing (is_active, is_approved, is_featured, closes_at_sort)',
+    'ALTER TABLE jobs ADD INDEX idx_listing_closing (is_active, is_approved, is_featured, closes_at_sort, id)',
     'SELECT 1'));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
