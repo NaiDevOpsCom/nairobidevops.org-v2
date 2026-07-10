@@ -103,6 +103,7 @@ CLAUDE.md
 .github/instructions/
 .windsurf/
 graphify-out/
+.graphifyignore
 
 
 
