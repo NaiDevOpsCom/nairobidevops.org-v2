@@ -45,7 +45,7 @@ try {
   </url>
 </urlset>`;
   fs.writeFileSync(sitemapPath, invalidContent);
-  
+
   try {
     execSync("npx tsx scripts/validate-sitemap.ts", { stdio: "inherit" });
     console.log("FAIL: Script should have failed on invalid date");
@@ -65,10 +65,13 @@ try {
   </url>
 </urlset>`;
   fs.writeFileSync(sitemapPath, validContent);
-  
+
   // Create temporary valid robots.txt so validate-sitemap passes
   if (fs.existsSync(robotsPath)) fs.copyFileSync(robotsPath, robotsBackupPath);
-  fs.writeFileSync(robotsPath, "User-agent: *\nAllow: /\nSitemap: https://nairobidevops.org/sitemap.xml");
+  fs.writeFileSync(
+    robotsPath,
+    "User-agent: *\nAllow: /\nSitemap: https://nairobidevops.org/sitemap.xml"
+  );
 
   try {
     execSync("npx tsx scripts/validate-sitemap.ts", { stdio: "inherit" });
@@ -84,7 +87,6 @@ try {
       fs.unlinkSync(robotsPath);
     }
   }
-
 } finally {
   // Restore
   if (sitemapExistsInitial) {
