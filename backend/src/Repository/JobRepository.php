@@ -246,8 +246,15 @@ final class JobRepository
         // Featured jobs always sort first, within whatever sort mode is active.
         // Each branch appends `id DESC` as a stable unique tie-breaker so
         // pagination is deterministic when two rows share the primary sort key.
+        // closing_soon uses the `closes_at_sort` generated column
+        // (IFNULL(closes_at, '2099-12-31 23:59:59')) so NULLs sort last
+        // naturally via the sentinel value, removing the need for an explicit
+        // IS NULL guard in the ORDER BY.
+        // NOTE: MySQL 5.7 does not support descending index columns, so the
+        // mixed-direction ORDER BY (is_featured DESC, closes_at_sort ASC,
+        // id DESC) will incur a filesort regardless of the index definition.
         $orderBy = 'is_featured DESC, ' . match ($filters['sort'] ?? 'newest') {
-            'closing_soon' => 'closes_at IS NULL, closes_at ASC, id DESC',
+            'closing_soon' => 'closes_at_sort ASC, id DESC',
             'salary_desc'  => 'salary_max IS NULL, salary_max DESC, id DESC',
             default        => 'posted_at DESC, id DESC',
         };

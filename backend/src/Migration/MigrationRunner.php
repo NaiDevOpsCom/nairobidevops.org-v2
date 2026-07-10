@@ -99,17 +99,19 @@ final class MigrationRunner
 
         $this->db->beginTransaction();
 
-        // NOTE: MySQL DDL (ALTER TABLE, CREATE TABLE) auto-commits and cannot
-        // be rolled back. The transaction here primarily protects the
-        // schema_migrations INSERT — migration SQL files use idempotent guards
-        // (IF NOT EXISTS, information_schema checks) to handle partial DDL.
         try {
             $this->db->exec($sql);
             $this->db->prepare(
                 'INSERT INTO schema_migrations (version, filename) VALUES (?, ?)'
             )->execute([$version, basename($filepath)]);
 
-            $this->db->commit();
+            // DDL may have already auto-committed and silently ended the
+            // transaction started above — only call commit() if one is
+            // actually still open, otherwise PDO throws "There is no active
+            // transaction" even though everything actually succeeded.
+            if ($this->db->inTransaction()) {
+                $this->db->commit();
+            }
         } catch (PDOException $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
