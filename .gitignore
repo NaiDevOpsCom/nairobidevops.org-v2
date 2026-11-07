@@ -112,6 +112,10 @@ backend/config.php
 backend/config.local.php
 backend/config.staging.php
 backend/vendor/
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+
 backend/composer.phar
 backend/.phpunit.cache/
 backend/.php-cs-fixer.cache
