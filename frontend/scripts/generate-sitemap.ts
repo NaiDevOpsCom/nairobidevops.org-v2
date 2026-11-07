@@ -64,13 +64,7 @@ const staticRoutes: SitemapEntry[] = routes
 
 async function getBlogSlugs(): Promise<string[]> {
   // Dynamic import so this script can run from project root
-  const blogDataPath = path.join(
-    ROOT_DIR,
-    "client",
-    "src",
-    "data",
-    "blogData.ts",
-  );
+  const blogDataPath = path.join(ROOT_DIR, "client", "src", "data", "blogData.ts");
 
   if (!fs.existsSync(blogDataPath)) {
     console.warn("⚠  blogData.ts not found — skipping dynamic blog routes");
@@ -78,9 +72,7 @@ async function getBlogSlugs(): Promise<string[]> {
   }
 
   try {
-    const { blogPosts } = (await import(
-      pathToFileURL(blogDataPath).href
-    )) as {
+    const { blogPosts } = (await import(pathToFileURL(blogDataPath).href)) as {
       blogPosts: Array<{ slug: string }>;
     };
     return blogPosts.map((p) => p.slug);
@@ -195,11 +187,11 @@ export async function generateSitemap(): Promise<void> {
   }
 
   console.log(`✅ sitemap.xml written to ${outputPath}`);
-  console.log(`   ${staticRoutes.length} static + ${blogEntries.length} dynamic → ${uniqueEntries.length} URLs`);
+  console.log(
+    `   ${staticRoutes.length} static + ${blogEntries.length} dynamic → ${uniqueEntries.length} URLs`
+  );
   if (allEntries.length > uniqueEntries.length) {
-    console.log(
-      `   (Removed ${allEntries.length - uniqueEntries.length} duplicate(s))`,
-    );
+    console.log(`   (Removed ${allEntries.length - uniqueEntries.length} duplicate(s))`);
   }
 }
 

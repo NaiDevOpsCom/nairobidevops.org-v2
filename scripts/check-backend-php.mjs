@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import { delimiter, join, relative } from "node:path";
 
 const backendDir = "backend";
@@ -15,7 +21,8 @@ function resolvePhpBinary() {
   if (process.env.PHP_PATH) return process.env.PHP_PATH;
 
   const pathDirs = (process.env.PATH || "").split(delimiter).filter(Boolean);
-  const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
+  const extensions =
+    process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
 
   for (const dir of pathDirs) {
     for (const ext of extensions) {
@@ -30,8 +37,12 @@ function resolvePhpBinary() {
 const phpBin = resolvePhpBinary();
 
 if (!phpBin) {
-  console.error("PHP is required for backend checks, but `php` was not found in PATH.");
-  console.error("Install PHP locally or set the PHP_PATH environment variable.");
+  console.error(
+    "PHP is required for backend checks, but `php` was not found in PATH.",
+  );
+  console.error(
+    "Install PHP locally or set the PHP_PATH environment variable.",
+  );
   process.exit(1);
 }
 
@@ -43,7 +54,9 @@ function collectPhpFiles(dir, visited = new Set()) {
   try {
     realDir = realpathSync(dir);
   } catch (err) {
-    console.warn(`Warning: could not resolve real path for "${dir}": ${err.message}`);
+    console.warn(
+      `Warning: could not resolve real path for "${dir}": ${err.message}`,
+    );
     return [];
   }
   if (visited.has(realDir)) return [];
@@ -70,7 +83,11 @@ function collectPhpFiles(dir, visited = new Set()) {
       if (targetStat.isDirectory()) {
         return ignoredDirs.has(entry) ? [] : collectPhpFiles(path, visited);
       }
-      if (!targetStat.isFile() || !entry.endsWith(".php") || ignoredFiles.has(entry)) {
+      if (
+        !targetStat.isFile() ||
+        !entry.endsWith(".php") ||
+        ignoredFiles.has(entry)
+      ) {
         return [];
       }
       return [path];
@@ -94,11 +111,17 @@ const phpVersion = spawnSync(phpBin, ["--version"], {
 });
 
 if (phpVersion.error?.code === "ETIMEDOUT") {
-  console.error("PHP is required for backend checks, but `php --version` timed out (10s).");
+  console.error(
+    "PHP is required for backend checks, but `php --version` timed out (10s).",
+  );
   process.exit(1);
 } else if (phpVersion.error || phpVersion.status !== 0) {
-  console.error("PHP is required for backend checks, but `php --version` failed.");
-  console.error("Install PHP locally or ensure the CI runner sets it up before `npm run check`.");
+  console.error(
+    "PHP is required for backend checks, but `php --version` failed.",
+  );
+  console.error(
+    "Install PHP locally or ensure the CI runner sets it up before `npm run check`.",
+  );
   process.exit(1);
 }
 
@@ -125,7 +148,11 @@ for (const file of phpFiles) {
     console.log(`OK ${label}`);
   } else {
     failed = true;
-    console.error(result.stdout.trim() || result.stderr.trim() || `PHP lint failed: ${label}`);
+    console.error(
+      result.stdout.trim() ||
+        result.stderr.trim() ||
+        `PHP lint failed: ${label}`,
+    );
   }
 }
 

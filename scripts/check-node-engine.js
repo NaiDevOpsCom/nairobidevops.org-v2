@@ -1,185 +1,220 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from 'node:fs/promises'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import semver from 'semver'
+import { readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import semver from "semver";
 
-const execFileAsync = promisify(execFile)
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const packageJsonPath = path.join(__dirname, '..', 'package.json')
-const lockFilePath = path.join(__dirname, '..', 'package-lock.json')
+const execFileAsync = promisify(execFile);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+let targetDir = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, "..");
+let packageJsonPath = path.join(targetDir, "package.json");
+let lockFilePath = path.join(targetDir, "package-lock.json");
 
 function maxVersion(versions) {
   return versions.reduce((highest, next) => {
-    if (!highest) return next
+    if (!highest) return next;
     try {
-      return semver.gt(next, highest) ? next : highest
+      return semver.gt(next, highest) ? next : highest;
     } catch {
-      return highest
+      return highest;
     }
-  }, null)
+  }, null);
 }
 
 function getMinVersionFromRange(range) {
-  if (!range) return null
+  if (!range) return null;
   try {
-    const min = semver.minVersion(range)
-    return min ? min.version : null
+    const min = semver.minVersion(range);
+    return min ? min.version : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 function getNodeEnginesRange(engines) {
-  if (!engines) return null
-  if (typeof engines === 'string') return engines
-  return engines.node ?? null
+  if (!engines) return null;
+  if (typeof engines === "string") return engines;
+  return engines.node ?? null;
 }
 
 async function npmViewEngines(packageName, versionSpec) {
-  const spec = `${packageName}@${versionSpec}`
+  const spec = `${packageName}@${versionSpec}`;
   try {
-    const { stdout } = await execFileAsync('npm', ['view', spec, 'engines', '--json'], {
-      timeout: 120000,
-      maxBuffer: 10 * 1024 * 1024,
-    })
-    const trimmed = stdout.trim()
-    if (!trimmed || trimmed === 'undefined') return null
+    const { stdout } = await execFileAsync(
+      "npm",
+      ["view", spec, "engines", "--json"],
+      {
+        timeout: 120000,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
+    const trimmed = stdout.trim();
+    if (!trimmed || trimmed === "undefined") return null;
     try {
-      return JSON.parse(trimmed)
+      return JSON.parse(trimmed);
     } catch {
-      return trimmed
+      return trimmed;
     }
   } catch (error) {
-    console.warn(`Warning: failed to query ${spec}. Skipping. ${error.message}`)
-    return null
+    console.warn(
+      `Warning: failed to query ${spec}. Skipping. ${error.message}`,
+    );
+    return null;
   }
 }
 
 async function semverSatisfies(version, range) {
-  if (!version || !range) return false
+  if (!version || !range) return false;
   try {
-    return semver.satisfies(version, range)
+    return semver.satisfies(version, range);
   } catch {
-    return false
+    return false;
   }
 }
 
 async function readJson(filePath) {
-  const resolvedPath = path.resolve(filePath)
-  const projectRoot = path.resolve(__dirname, '..')
+  const resolvedPath = path.resolve(filePath);
+  const projectRoot = path.resolve(__dirname, "..");
 
   if (!resolvedPath.startsWith(projectRoot)) {
-    throw new Error(`Unsafe file path detected: ${filePath}`)
+    throw new Error(`Unsafe file path detected: ${filePath}`);
   }
 
   // eslint-disable-next-line security/detect-non-literal-fs-filename
-  const content = await readFile(resolvedPath, 'utf8')
-  return JSON.parse(content)
+  const content = await readFile(resolvedPath, "utf8");
+  return JSON.parse(content);
 }
 
 function gatherDependencyList(packageJson) {
-  const dependencies = Object.keys(packageJson.dependencies ?? {})
-  const devDependencies = Object.keys(packageJson.devDependencies ?? {})
-  return [...new Set([...dependencies, ...devDependencies])].sort((left, right) => left.localeCompare(right))
+  const dependencies = Object.keys(packageJson.dependencies ?? {});
+  const devDependencies = Object.keys(packageJson.devDependencies ?? {});
+  return [...new Set([...dependencies, ...devDependencies])].sort(
+    (left, right) => left.localeCompare(right),
+  );
 }
 
 function findPackageVersion(packages, name) {
-  const rootDep = packages[`node_modules/${name}`]
-  if (rootDep?.version) return rootDep.version
+  const rootDep = packages[`node_modules/${name}`];
+  if (rootDep?.version) return rootDep.version;
 
   for (const [key, pkg] of Object.entries(packages)) {
-    if (!key.endsWith(`node_modules/${name}`) || !pkg?.version) continue
+    if (!key.endsWith(`node_modules/${name}`) || !pkg?.version) continue;
 
-    const parts = key.split('node_modules')
+    const parts = key.split("node_modules");
     if (parts.length <= 2) {
-      return pkg.version
+      return pkg.version;
     }
   }
 
-  return null
+  return null;
 }
 
 async function resolveDependencyVersion(name, packageJson, lockfile) {
   if (lockfile.packages) {
-    const packageVersion = findPackageVersion(lockfile.packages, name)
-    if (packageVersion) return packageVersion
+    const packageVersion = findPackageVersion(lockfile.packages, name);
+    if (packageVersion) return packageVersion;
   }
 
   // Fallback to v2 lockfile format (uses flat dependencies object)
-  const locked = lockfile.dependencies?.[name]?.version
-  if (locked) return locked
-  if (packageJson.dependencies?.[name]) return packageJson.dependencies[name]
-  if (packageJson.devDependencies?.[name]) return packageJson.devDependencies[name]
-  return null
+  const locked = lockfile.dependencies?.[name]?.version;
+  if (locked) return locked;
+  if (packageJson.dependencies?.[name]) return packageJson.dependencies[name];
+  if (packageJson.devDependencies?.[name])
+    return packageJson.devDependencies[name];
+  return null;
 }
 
 async function collectRequiredNodeVersions() {
-  const packageJson = await readJson(packageJsonPath)
-  const lockfile = await readJson(lockFilePath)
-  const dependencyNames = gatherDependencyList(packageJson)
-  const queue = [...dependencyNames]
+  const packageJson = await readJson(packageJsonPath);
+  const lockfile = await readJson(lockFilePath);
+  const dependencyNames = gatherDependencyList(packageJson);
+  const queue = [...dependencyNames];
 
-  const requiredVersions = []
-  const concurrency = 6
+  const requiredVersions = [];
+  const concurrency = 6;
   const workers = Array.from({ length: concurrency }, async () => {
     while (queue.length > 0) {
-      const name = queue.shift()
-      if (!name) continue
-      const versionSpec = await resolveDependencyVersion(name, packageJson, lockfile)
-      if (!versionSpec) continue
-      const engines = await npmViewEngines(name, versionSpec)
-      const range = getNodeEnginesRange(engines)
-      if (!range) continue
-      const minVer = getMinVersionFromRange(range)
-      if (!minVer || minVer === '0.0.0') continue
-      requiredVersions.push(minVer)
+      const name = queue.shift();
+      if (!name) continue;
+      const versionSpec = await resolveDependencyVersion(
+        name,
+        packageJson,
+        lockfile,
+      );
+      if (!versionSpec) continue;
+      const engines = await npmViewEngines(name, versionSpec);
+      const range = getNodeEnginesRange(engines);
+      if (!range) continue;
+      const minVer = getMinVersionFromRange(range);
+      if (!minVer || minVer === "0.0.0") continue;
+      requiredVersions.push(minVer);
     }
-  })
+  });
 
-  await Promise.all(workers)
-  return requiredVersions
+  await Promise.all(workers);
+  return requiredVersions;
 }
 
 async function run() {
-  const packageJson = await readJson(packageJsonPath)
-  const currentRange = getNodeEnginesRange(packageJson.engines)
-  const requiredVersions = await collectRequiredNodeVersions()
+  const packageJson = await readJson(packageJsonPath);
+  const currentRange = getNodeEnginesRange(packageJson.engines);
+  const requiredVersions = await collectRequiredNodeVersions();
 
   if (requiredVersions.length === 0) {
-    console.log('No dependency published Node engine requirement was detected. No update needed.')
-    return
+    console.log(
+      "No dependency published Node engine requirement was detected. No update needed.",
+    );
+    return;
   }
 
-  const requiredMinimum = maxVersion(requiredVersions)
+  const requiredMinimum = maxVersion(requiredVersions);
   if (!requiredMinimum) {
-    console.log('Unable to determine a required minimum Node.js version. No update made.')
-    return
+    console.log(
+      "Unable to determine a required minimum Node.js version. No update made.",
+    );
+    return;
   }
   // Note: maxVersion here is correct - we want the highest minimum requirement across all dependencies
 
-  if (currentRange && await semverSatisfies(requiredMinimum, currentRange)) {
-    console.log(`Current engines.node range (${currentRange}) already supports Node ${requiredMinimum}. No update needed.`)
-    return
+  if (currentRange && (await semverSatisfies(requiredMinimum, currentRange))) {
+    console.log(
+      `Current engines.node range (${currentRange}) already supports Node ${requiredMinimum}. No update needed.`,
+    );
+    return;
   }
 
-  const updatedRange = `>=${requiredMinimum}`
+  const updatedRange = `>=${requiredMinimum}`;
   packageJson.engines = {
     ...packageJson.engines,
     node: updatedRange,
-  }
+  };
 
-  await writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8')
-  console.log(`Updated package.json engines.node from ${currentRange ?? '<unset>'} to ${updatedRange}`)
+  await writeFile(
+    packageJsonPath,
+    JSON.stringify(packageJson, null, 2) + "\n",
+    "utf8",
+  );
+  console.log(
+    `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${updatedRange}`,
+  );
 }
 
-try {
-  await run()
-} catch (error) {
-  console.error('Node engine check failed:', error)
-  process.exit(1)
+export async function runForDir(dir) {
+  targetDir = path.resolve(dir);
+  packageJsonPath = path.join(targetDir, "package.json");
+  lockFilePath = path.join(targetDir, "package-lock.json");
+  await run();
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  try {
+    await run();
+  } catch (error) {
+    console.error("Node engine check failed:", error);
+    process.exit(1);
+  }
 }
