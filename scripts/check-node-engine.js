@@ -198,6 +198,21 @@ export function evaluateEngines(currentRange, dependencyRanges) {
   }
 
   const candidate = `>=${requiredMinimum}`;
+  // Never rewrite a curated multi-line OR range (e.g. `^22.12.0 || ^24.0.0 ||
+  // >=26.0.0`) with a flat floor: the OR lines are deliberate support policy
+  // (non-LTS Node lines excluded) and a floor would silently re-admit them.
+  // Simple single-comparator floors may be raised automatically.
+  let currentIsSimpleFloor = true;
+  if (currentRange) {
+    try {
+      currentIsSimpleFloor = new semver.Range(currentRange).set.length === 1;
+    } catch {
+      currentIsSimpleFloor = false;
+    }
+  }
+  if (!currentIsSimpleFloor) {
+    return { status: "manual", candidate, incompatible };
+  }
   for (const depRange of dependencyRanges) {
     let candidateIsSubset = false;
     try {

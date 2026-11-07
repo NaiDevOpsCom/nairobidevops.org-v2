@@ -21,6 +21,14 @@ test("manual when OR-ranges cannot be auto-reduced", () => {
   assert.ok(r.incompatible.length === 1);
 });
 
+test("manual when the >=floor candidate would widen the current range", () => {
+  // Node 23/25 are deliberately excluded by this curated OR range; a flat
+  // `>=` floor would re-admit them, so the automation must not write it.
+  // (Multi-line OR ranges are never auto-rewritten — only simple floors.)
+  const r = evaluateEngines("^22.12.0 || ^24.0.0 || >=26.0.0", [">=22.22.2"]);
+  assert.equal(r.status, "manual");
+});
+
 test("extracts node range from every npm view response shape", () => {
   assert.equal(enginesNodeFromNpmView(">=18"), ">=18");
   assert.equal(enginesNodeFromNpmView({ node: ">=20" }), ">=20");
