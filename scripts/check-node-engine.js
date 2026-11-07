@@ -35,9 +35,22 @@ function getMinVersionFromRange(range) {
   }
 }
 
-function getNodeEnginesRange(engines) {
+/**
+ * Extract the `node` engine range from an `npm view <pkg> engines --json`
+ * response, which may be a bare string, an object, or (npm >= 12) an array
+ * of objects. Returns null when no node range is present.
+ * @param {string|object|Array<{node?: string}>|undefined} engines
+ * @returns {string|null}
+ */
+export function enginesNodeFromNpmView(engines) {
   if (!engines) return null;
   if (typeof engines === "string") return engines;
+  if (Array.isArray(engines)) {
+    for (const entry of engines) {
+      if (entry && typeof entry === "object" && entry.node) return entry.node;
+    }
+    return null;
+  }
   return engines.node ?? null;
 }
 
@@ -64,15 +77,6 @@ async function npmViewEngines(packageName, versionSpec) {
       `Warning: failed to query ${spec}. Skipping. ${error.message}`,
     );
     return null;
-  }
-}
-
-async function semverSatisfies(version, range) {
-  if (!version || !range) return false;
-  try {
-    return semver.satisfies(version, range);
-  } catch {
-    return false;
   }
 }
 
@@ -134,7 +138,7 @@ async function collectRequiredNodeVersions() {
   const dependencyNames = gatherDependencyList(packageJson);
   const queue = [...dependencyNames];
 
-  const requiredVersions = [];
+  const requiredRanges = [];
   const concurrency = 6;
   const workers = Array.from({ length: concurrency }, async () => {
     while (queue.length > 0) {
@@ -147,60 +151,120 @@ async function collectRequiredNodeVersions() {
       );
       if (!versionSpec) continue;
       const engines = await npmViewEngines(name, versionSpec);
-      const range = getNodeEnginesRange(engines);
+      const range = enginesNodeFromNpmView(engines);
       if (!range) continue;
-      const minVer = getMinVersionFromRange(range);
-      if (!minVer || minVer === "0.0.0") continue;
-      requiredVersions.push(minVer);
+      requiredRanges.push(range);
     }
   });
 
   await Promise.all(workers);
-  return requiredVersions;
+  return requiredRanges;
+}
+
+/**
+ * Decide how the project's engines.node range relates to the Node ranges
+ * its dependencies require.
+ *
+ * The project range must be a *subset* of every dependency range: every
+ * Node version we allow must be one every dependency supports.
+ *
+ * @param {string|null} currentRange engines.node of the project
+ * @param {string[]} dependencyRanges engines.node of every direct dependency
+ * @returns {{status: "ok"|"bump"|"manual", candidate?: string, incompatible: string[]}}
+ */
+export function evaluateEngines(currentRange, dependencyRanges) {
+  const incompatible = [];
+  if (currentRange) {
+    for (const depRange of dependencyRanges) {
+      let isSubset = false;
+      try {
+        isSubset = semver.subset(currentRange, depRange);
+      } catch {
+        isSubset = false;
+      }
+      if (!isSubset) incompatible.push(depRange);
+    }
+    if (incompatible.length === 0) {
+      return { status: "ok", incompatible };
+    }
+  }
+
+  const minima = dependencyRanges
+    .map((range) => getMinVersionFromRange(range))
+    .filter((min) => min && min !== "0.0.0");
+  const requiredMinimum = maxVersion(minima);
+  if (!requiredMinimum) {
+    return { status: "manual", incompatible };
+  }
+
+  const candidate = `>=${requiredMinimum}`;
+  for (const depRange of dependencyRanges) {
+    let candidateIsSubset = false;
+    try {
+      candidateIsSubset = semver.subset(candidate, depRange);
+    } catch {
+      candidateIsSubset = false;
+    }
+    if (!candidateIsSubset) {
+      return { status: "manual", candidate, incompatible };
+    }
+  }
+  return { status: "bump", candidate, incompatible };
 }
 
 async function run() {
   const packageJson = await readJson(packageJsonPath);
-  const currentRange = getNodeEnginesRange(packageJson.engines);
-  const requiredVersions = await collectRequiredNodeVersions();
+  const currentRange = enginesNodeFromNpmView(packageJson.engines);
+  const requiredRanges = await collectRequiredNodeVersions();
 
-  if (requiredVersions.length === 0) {
+  if (requiredRanges.length === 0) {
     console.log(
       "No dependency published Node engine requirement was detected. No update needed.",
     );
     return;
   }
 
-  const requiredMinimum = maxVersion(requiredVersions);
-  if (!requiredMinimum) {
-    console.log(
-      "Unable to determine a required minimum Node.js version. No update made.",
-    );
-    return;
-  }
-  // Note: maxVersion here is correct - we want the highest minimum requirement across all dependencies
+  const outcome = evaluateEngines(currentRange, requiredRanges);
 
-  if (currentRange && (await semverSatisfies(requiredMinimum, currentRange))) {
+  if (outcome.status === "ok") {
     console.log(
-      `Current engines.node range (${currentRange}) already supports Node ${requiredMinimum}. No update needed.`,
+      `Current engines.node range (${currentRange}) is supported by every dependency. No update needed.`,
     );
     return;
   }
 
-  const updatedRange = `>=${requiredMinimum}`;
-  packageJson.engines = {
-    ...packageJson.engines,
-    node: updatedRange,
-  };
+  if (outcome.status === "bump") {
+    packageJson.engines = {
+      ...packageJson.engines,
+      node: outcome.candidate,
+    };
 
-  await writeFile(
-    packageJsonPath,
-    JSON.stringify(packageJson, null, 2) + "\n",
-    "utf8",
+    await writeFile(
+      packageJsonPath,
+      JSON.stringify(packageJson, null, 2) + "\n",
+      "utf8",
+    );
+    console.log(
+      `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${outcome.candidate}`,
+    );
+    return;
+  }
+
+  console.error(
+    [
+      "engines.node cannot be updated automatically: dependency Node ranges",
+      "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
+      "",
+      "Current engines.node:",
+      `  ${currentRange ?? "<unset>"}`,
+      "",
+      "Dependency ranges that constrain the project range:",
+      ...outcome.incompatible.map((range) => `  ${range}`),
+      "",
+      "Update engines.node in package.json to a range that is a subset of every range above.",
+    ].join("\n"),
   );
-  console.log(
-    `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${updatedRange}`,
-  );
+  process.exitCode = 1;
 }
 
 export async function runForDir(dir) {
