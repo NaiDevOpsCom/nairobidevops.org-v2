@@ -12,6 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { tsImport } from "tsx/esm/api";
+
 import { routes } from "../shared/routes";
 
 // ---------------------------------------------------------------------------
@@ -72,7 +74,11 @@ async function getBlogSlugs(): Promise<string[]> {
   }
 
   try {
-    const { blogPosts } = (await import(pathToFileURL(blogDataPath).href)) as {
+    // Use tsx's loader rather than a native `import()`. Native Node only
+    // handles `.ts` when built with experimental type stripping, so this
+    // keeps sitemap generation working both under `tsx` and when invoked
+    // from Vite's config bundle during `vite build`.
+    const { blogPosts } = (await tsImport(pathToFileURL(blogDataPath).href, import.meta.url)) as {
       blogPosts: Array<{ slug: string }>;
     };
     return blogPosts.map((p) => p.slug);
