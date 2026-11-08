@@ -10,7 +10,9 @@ const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let targetDir = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, "..");
+let targetDir = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.resolve(__dirname, "..");
 let packageJsonPath = path.join(targetDir, "package.json");
 let lockFilePath = path.join(targetDir, "package-lock.json");
 
@@ -35,9 +37,22 @@ function getMinVersionFromRange(range) {
   }
 }
 
-function getNodeEnginesRange(engines) {
+/**
+ * Extract the `node` engine range from an `npm view <pkg> engines --json`
+ * response, which may be a bare string, an object, or (npm >= 12) an array
+ * of objects. Returns null when no node range is present.
+ * @param {string|object|Array<{node?: string}>|undefined} engines
+ * @returns {string|null}
+ */
+export function enginesNodeFromNpmView(engines) {
   if (!engines) return null;
   if (typeof engines === "string") return engines;
+  if (Array.isArray(engines)) {
+    for (const entry of engines) {
+      if (entry && typeof entry === "object" && entry.node) return entry.node;
+    }
+    return null;
+  }
   return engines.node ?? null;
 }
 
@@ -64,15 +79,6 @@ async function npmViewEngines(packageName, versionSpec) {
       `Warning: failed to query ${spec}. Skipping. ${error.message}`,
     );
     return null;
-  }
-}
-
-async function semverSatisfies(version, range) {
-  if (!version || !range) return false;
-  try {
-    return semver.satisfies(version, range);
-  } catch {
-    return false;
   }
 }
 
@@ -134,7 +140,7 @@ async function collectRequiredNodeVersions() {
   const dependencyNames = gatherDependencyList(packageJson);
   const queue = [...dependencyNames];
 
-  const requiredVersions = [];
+  const requiredRanges = [];
   const concurrency = 6;
   const workers = Array.from({ length: concurrency }, async () => {
     while (queue.length > 0) {
@@ -147,60 +153,151 @@ async function collectRequiredNodeVersions() {
       );
       if (!versionSpec) continue;
       const engines = await npmViewEngines(name, versionSpec);
-      const range = getNodeEnginesRange(engines);
+      const range = enginesNodeFromNpmView(engines);
       if (!range) continue;
-      const minVer = getMinVersionFromRange(range);
-      if (!minVer || minVer === "0.0.0") continue;
-      requiredVersions.push(minVer);
+      requiredRanges.push(range);
     }
   });
 
   await Promise.all(workers);
-  return requiredVersions;
+  return requiredRanges;
+}
+
+function isSubsetSafe(candidateRange, constraintRange) {
+  try {
+    return semver.subset(candidateRange, constraintRange);
+  } catch {
+    return false;
+  }
+}
+
+function rangesNotCoveredBy(currentRange, dependencyRanges) {
+  if (!currentRange) return [...dependencyRanges];
+  return dependencyRanges.filter(
+    (depRange) => !isSubsetSafe(currentRange, depRange),
+  );
+}
+
+function computeFloorCandidate(dependencyRanges) {
+  const minima = dependencyRanges
+    .map((range) => getMinVersionFromRange(range))
+    .filter((min) => min && min !== "0.0.0");
+  const requiredMinimum = maxVersion(minima);
+  return requiredMinimum ? `>=${requiredMinimum}` : null;
+}
+
+// A curated multi-line OR range (e.g. `^22.12.0 || ^24.0.0 || >=26.0.0`) is
+// deliberate support policy (non-LTS Node lines excluded); a flat `>=` floor
+// would silently re-admit those lines. The same applies to an explicit bounded
+// range such as `>=20 <23`, which is one comparator set but still excludes
+// Node 23+. Only a single-token range such as `>=20` or `^16.0.0` is safe to
+// raise automatically.
+function isSimpleFloor(range) {
+  if (typeof range !== "string") return false;
+  const trimmed = range.trim();
+  // Whitespace marks a compound range (`>=20 <23`, `20 - 22`) and `||` marks
+  // an OR range; neither may be flattened to a single `>=` floor.
+  if (/\s/.test(trimmed) || trimmed.includes("||")) return false;
+  try {
+    return new semver.Range(trimmed).set.length === 1;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Decide how the project's engines.node range relates to the Node ranges
+ * its dependencies require.
+ *
+ * The project range must be a *subset* of every dependency range: every
+ * Node version we allow must be one every dependency supports.
+ *
+ * @param {string|null} currentRange engines.node of the project
+ * @param {string[]} dependencyRanges engines.node of every direct dependency
+ * @returns {{status: "ok"|"bump"|"manual", candidate?: string, incompatible: string[]}}
+ */
+export function evaluateEngines(currentRange, dependencyRanges) {
+  const incompatible = rangesNotCoveredBy(currentRange, dependencyRanges);
+  if (currentRange && incompatible.length === 0) {
+    return { status: "ok", incompatible };
+  }
+
+  const candidate = computeFloorCandidate(dependencyRanges);
+  if (!candidate) {
+    return { status: "manual", incompatible };
+  }
+
+  const candidateSupportedByDeps = dependencyRanges.every((depRange) =>
+    isSubsetSafe(candidate, depRange),
+  );
+  const currentIsSimpleFloor = currentRange
+    ? isSimpleFloor(currentRange)
+    : true;
+  if (!candidateSupportedByDeps || !currentIsSimpleFloor) {
+    return { status: "manual", candidate, incompatible };
+  }
+  return { status: "bump", candidate, incompatible };
 }
 
 async function run() {
   const packageJson = await readJson(packageJsonPath);
-  const currentRange = getNodeEnginesRange(packageJson.engines);
-  const requiredVersions = await collectRequiredNodeVersions();
+  const currentRange = enginesNodeFromNpmView(packageJson.engines);
+  const requiredRanges = await collectRequiredNodeVersions();
 
-  if (requiredVersions.length === 0) {
+  if (requiredRanges.length === 0) {
     console.log(
       "No dependency published Node engine requirement was detected. No update needed.",
     );
     return;
   }
 
-  const requiredMinimum = maxVersion(requiredVersions);
-  if (!requiredMinimum) {
+  const outcome = evaluateEngines(currentRange, requiredRanges);
+
+  if (outcome.status === "ok") {
+    // Printed values are semver range strings from package.json and the npm
+    // registry — not sensitive data, so Sonar's S8689 taint flag is a false
+    // positive here.
     console.log(
-      "Unable to determine a required minimum Node.js version. No update made.",
+      // NOSONAR (prints semver range strings, not sensitive data)
+      `Current engines.node range (${currentRange}) is supported by every dependency. No update needed.`,
     );
     return;
   }
-  // Note: maxVersion here is correct - we want the highest minimum requirement across all dependencies
 
-  if (currentRange && (await semverSatisfies(requiredMinimum, currentRange))) {
+  if (outcome.status === "bump") {
+    packageJson.engines = {
+      ...packageJson.engines,
+      node: outcome.candidate,
+    };
+
+    await writeFile(
+      packageJsonPath,
+      JSON.stringify(packageJson, null, 2) + "\n",
+      "utf8",
+    );
     console.log(
-      `Current engines.node range (${currentRange}) already supports Node ${requiredMinimum}. No update needed.`,
+      // NOSONAR (prints semver range strings, not sensitive data)
+      `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${outcome.candidate}`,
     );
     return;
   }
 
-  const updatedRange = `>=${requiredMinimum}`;
-  packageJson.engines = {
-    ...packageJson.engines,
-    node: updatedRange,
-  };
-
-  await writeFile(
-    packageJsonPath,
-    JSON.stringify(packageJson, null, 2) + "\n",
-    "utf8",
+  console.error(
+    // NOSONAR (prints semver range strings, not sensitive data)
+    [
+      "engines.node cannot be updated automatically: dependency Node ranges",
+      "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
+      "",
+      "Current engines.node:",
+      `  ${currentRange ?? "<unset>"}`,
+      "",
+      "Dependency ranges that constrain the project range:",
+      ...outcome.incompatible.map((range) => `  ${range}`),
+      "",
+      "Update engines.node in package.json to a range that is a subset of every range above.",
+    ].join("\n"),
   );
-  console.log(
-    `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${updatedRange}`,
-  );
+  process.exitCode = 1;
 }
 
 export async function runForDir(dir) {
@@ -210,7 +307,10 @@ export async function runForDir(dir) {
   await run();
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   try {
     await run();
   } catch (error) {
