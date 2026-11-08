@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateEngines, enginesNodeFromNpmView } from "./check-node-engine.js";
+import {
+  evaluateEngines,
+  enginesNodeFromNpmView,
+} from "./check-node-engine.js";
 
 test("ok when current range is a subset of every dep range", () => {
   const r = evaluateEngines(">=18", [">=16", ">=14"]);
@@ -11,6 +14,19 @@ test("bump when >=maxMin is a safe candidate", () => {
   const r = evaluateEngines("^16.0.0", [">=18.0.0", ">=16.0.0"]);
   assert.equal(r.status, "bump");
   assert.equal(r.candidate, ">=18.0.0");
+});
+
+test("manual when the current range is an explicit bounded AND range", () => {
+  // `>=20 <23` is one comparator set, but flattening it to `>=22` would
+  // re-admit the Node 23+ line the bound deliberately excludes.
+  const r = evaluateEngines(">=20 <23", [">=22"]);
+  assert.equal(r.status, "manual");
+  assert.equal(r.candidate, ">=22.0.0");
+});
+
+test("unset current range reports every dependency range as incompatible", () => {
+  const r = evaluateEngines(null, [">=18", ">=20"]);
+  assert.deepEqual(r.incompatible, [">=18", ">=20"]);
 });
 
 test("manual when OR-ranges cannot be auto-reduced", () => {

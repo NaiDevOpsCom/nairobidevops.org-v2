@@ -10,7 +10,9 @@ const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let targetDir = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, "..");
+let targetDir = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.resolve(__dirname, "..");
 let packageJsonPath = path.join(targetDir, "package.json");
 let lockFilePath = path.join(targetDir, "package-lock.json");
 
@@ -161,17 +163,6 @@ async function collectRequiredNodeVersions() {
   return requiredRanges;
 }
 
-/**
- * Decide how the project's engines.node range relates to the Node ranges
- * its dependencies require.
- *
- * The project range must be a *subset* of every dependency range: every
- * Node version we allow must be one every dependency supports.
- *
- * @param {string|null} currentRange engines.node of the project
- * @param {string[]} dependencyRanges engines.node of every direct dependency
- * @returns {{status: "ok"|"bump"|"manual", candidate?: string, incompatible: string[]}}
- */
 function isSubsetSafe(candidateRange, constraintRange) {
   try {
     return semver.subset(candidateRange, constraintRange);
@@ -181,7 +172,7 @@ function isSubsetSafe(candidateRange, constraintRange) {
 }
 
 function rangesNotCoveredBy(currentRange, dependencyRanges) {
-  if (!currentRange) return [];
+  if (!currentRange) return [...dependencyRanges];
   return dependencyRanges.filter(
     (depRange) => !isSubsetSafe(currentRange, depRange),
   );
@@ -197,11 +188,18 @@ function computeFloorCandidate(dependencyRanges) {
 
 // A curated multi-line OR range (e.g. `^22.12.0 || ^24.0.0 || >=26.0.0`) is
 // deliberate support policy (non-LTS Node lines excluded); a flat `>=` floor
-// would silently re-admit those lines. Only raise simple single-comparator
-// floors automatically.
+// would silently re-admit those lines. The same applies to an explicit bounded
+// range such as `>=20 <23`, which is one comparator set but still excludes
+// Node 23+. Only a single-token range such as `>=20` or `^16.0.0` is safe to
+// raise automatically.
 function isSimpleFloor(range) {
+  if (typeof range !== "string") return false;
+  const trimmed = range.trim();
+  // Whitespace marks a compound range (`>=20 <23`, `20 - 22`) and `||` marks
+  // an OR range; neither may be flattened to a single `>=` floor.
+  if (/\s/.test(trimmed) || trimmed.includes("||")) return false;
   try {
-    return new semver.Range(range).set.length === 1;
+    return new semver.Range(trimmed).set.length === 1;
   } catch {
     return false;
   }
@@ -232,7 +230,9 @@ export function evaluateEngines(currentRange, dependencyRanges) {
   const candidateSupportedByDeps = dependencyRanges.every((depRange) =>
     isSubsetSafe(candidate, depRange),
   );
-  const currentIsSimpleFloor = currentRange ? isSimpleFloor(currentRange) : true;
+  const currentIsSimpleFloor = currentRange
+    ? isSimpleFloor(currentRange)
+    : true;
   if (!candidateSupportedByDeps || !currentIsSimpleFloor) {
     return { status: "manual", candidate, incompatible };
   }
@@ -257,7 +257,8 @@ async function run() {
     // Printed values are semver range strings from package.json and the npm
     // registry — not sensitive data, so Sonar's S8689 taint flag is a false
     // positive here.
-    console.log( // NOSONAR (prints semver range strings, not sensitive data)
+    console.log(
+      // NOSONAR (prints semver range strings, not sensitive data)
       `Current engines.node range (${currentRange}) is supported by every dependency. No update needed.`,
     );
     return;
@@ -274,13 +275,15 @@ async function run() {
       JSON.stringify(packageJson, null, 2) + "\n",
       "utf8",
     );
-    console.log( // NOSONAR (prints semver range strings, not sensitive data)
+    console.log(
+      // NOSONAR (prints semver range strings, not sensitive data)
       `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${outcome.candidate}`,
     );
     return;
   }
 
-  console.error( // NOSONAR (prints semver range strings, not sensitive data)
+  console.error(
+    // NOSONAR (prints semver range strings, not sensitive data)
     [
       "engines.node cannot be updated automatically: dependency Node ranges",
       "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
@@ -304,7 +307,10 @@ export async function runForDir(dir) {
   await run();
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   try {
     await run();
   } catch (error) {
