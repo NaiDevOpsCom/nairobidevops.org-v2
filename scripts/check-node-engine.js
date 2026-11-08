@@ -172,57 +172,69 @@ async function collectRequiredNodeVersions() {
  * @param {string[]} dependencyRanges engines.node of every direct dependency
  * @returns {{status: "ok"|"bump"|"manual", candidate?: string, incompatible: string[]}}
  */
-export function evaluateEngines(currentRange, dependencyRanges) {
-  const incompatible = [];
-  if (currentRange) {
-    for (const depRange of dependencyRanges) {
-      let isSubset = false;
-      try {
-        isSubset = semver.subset(currentRange, depRange);
-      } catch {
-        isSubset = false;
-      }
-      if (!isSubset) incompatible.push(depRange);
-    }
-    if (incompatible.length === 0) {
-      return { status: "ok", incompatible };
-    }
+function isSubsetSafe(candidateRange, constraintRange) {
+  try {
+    return semver.subset(candidateRange, constraintRange);
+  } catch {
+    return false;
   }
+}
 
+function rangesNotCoveredBy(currentRange, dependencyRanges) {
+  if (!currentRange) return [];
+  return dependencyRanges.filter(
+    (depRange) => !isSubsetSafe(currentRange, depRange),
+  );
+}
+
+function computeFloorCandidate(dependencyRanges) {
   const minima = dependencyRanges
     .map((range) => getMinVersionFromRange(range))
     .filter((min) => min && min !== "0.0.0");
   const requiredMinimum = maxVersion(minima);
-  if (!requiredMinimum) {
+  return requiredMinimum ? `>=${requiredMinimum}` : null;
+}
+
+// A curated multi-line OR range (e.g. `^22.12.0 || ^24.0.0 || >=26.0.0`) is
+// deliberate support policy (non-LTS Node lines excluded); a flat `>=` floor
+// would silently re-admit those lines. Only raise simple single-comparator
+// floors automatically.
+function isSimpleFloor(range) {
+  try {
+    return new semver.Range(range).set.length === 1;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Decide how the project's engines.node range relates to the Node ranges
+ * its dependencies require.
+ *
+ * The project range must be a *subset* of every dependency range: every
+ * Node version we allow must be one every dependency supports.
+ *
+ * @param {string|null} currentRange engines.node of the project
+ * @param {string[]} dependencyRanges engines.node of every direct dependency
+ * @returns {{status: "ok"|"bump"|"manual", candidate?: string, incompatible: string[]}}
+ */
+export function evaluateEngines(currentRange, dependencyRanges) {
+  const incompatible = rangesNotCoveredBy(currentRange, dependencyRanges);
+  if (currentRange && incompatible.length === 0) {
+    return { status: "ok", incompatible };
+  }
+
+  const candidate = computeFloorCandidate(dependencyRanges);
+  if (!candidate) {
     return { status: "manual", incompatible };
   }
 
-  const candidate = `>=${requiredMinimum}`;
-  // Never rewrite a curated multi-line OR range (e.g. `^22.12.0 || ^24.0.0 ||
-  // >=26.0.0`) with a flat floor: the OR lines are deliberate support policy
-  // (non-LTS Node lines excluded) and a floor would silently re-admit them.
-  // Simple single-comparator floors may be raised automatically.
-  let currentIsSimpleFloor = true;
-  if (currentRange) {
-    try {
-      currentIsSimpleFloor = new semver.Range(currentRange).set.length === 1;
-    } catch {
-      currentIsSimpleFloor = false;
-    }
-  }
-  if (!currentIsSimpleFloor) {
+  const candidateSupportedByDeps = dependencyRanges.every((depRange) =>
+    isSubsetSafe(candidate, depRange),
+  );
+  const currentIsSimpleFloor = currentRange ? isSimpleFloor(currentRange) : true;
+  if (!candidateSupportedByDeps || !currentIsSimpleFloor) {
     return { status: "manual", candidate, incompatible };
-  }
-  for (const depRange of dependencyRanges) {
-    let candidateIsSubset = false;
-    try {
-      candidateIsSubset = semver.subset(candidate, depRange);
-    } catch {
-      candidateIsSubset = false;
-    }
-    if (!candidateIsSubset) {
-      return { status: "manual", candidate, incompatible };
-    }
   }
   return { status: "bump", candidate, incompatible };
 }
@@ -242,7 +254,10 @@ async function run() {
   const outcome = evaluateEngines(currentRange, requiredRanges);
 
   if (outcome.status === "ok") {
-    console.log(
+    // Printed values are semver range strings from package.json and the npm
+    // registry — not sensitive data, so Sonar's S8689 taint flag is a false
+    // positive here.
+    console.log( // NOSONAR (prints semver range strings, not sensitive data)
       `Current engines.node range (${currentRange}) is supported by every dependency. No update needed.`,
     );
     return;
@@ -259,13 +274,13 @@ async function run() {
       JSON.stringify(packageJson, null, 2) + "\n",
       "utf8",
     );
-    console.log(
+    console.log( // NOSONAR (prints semver range strings, not sensitive data)
       `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${outcome.candidate}`,
     );
     return;
   }
 
-  console.error(
+  console.error( // NOSONAR (prints semver range strings, not sensitive data)
     [
       "engines.node cannot be updated automatically: dependency Node ranges",
       "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
