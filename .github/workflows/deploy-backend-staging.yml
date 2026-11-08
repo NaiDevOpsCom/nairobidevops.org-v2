@@ -1,11 +1,12 @@
 name: Deploy Backend to Staging
 
 concurrency:
-  # MUST match the staging frontend deploy (staging-deploy.yml). That workflow
-  # re-links the jobs-api symlink and deletes old staging releases, so running
-  # it concurrently with this one could select or retain a release that this
-  # job is about to remove. Sharing the group serializes the pair.
-  group: deploy-staging
+  # Serializes backend deploys against each other. The staging frontend deploy
+  # deliberately uses a DIFFERENT group ("deploy-staging"): the two publish
+  # the same jobs-api target (see CURRENT_LINK below), so they do not need to
+  # be serialized, and sharing one group would let GitHub cancel a pending
+  # run of one workflow when the other is queued.
+  group: deploy-staging-backend
   cancel-in-progress: false
 
 on:
@@ -245,11 +246,18 @@ jobs:
             RELEASES_DIR="/home/$REMOTE_USER/backend-staging-releases"
             TMP_LINK="${TARGET_LINK}.tmp"
 
-            # Record the currently live release before switching so a failed
-            # health check can restore it. The marker is named after this
-            # release so a stale marker from an earlier run can never be
-            # mistaken for this run's rollback intent.
-            PREVIOUS_TARGET_FILE="$RELEASES_DIR/.previous-target-$RELEASE_TIMESTAMP"
+            # CURRENT_LINK is the stable "live backend" pointer. The frontend
+            # deploy (staging-deploy.yml) publishes the jobs-api symlink to
+            # THIS path instead of guessing a release directory, so the two
+            # workflows always agree on which backend release is live and can
+            # run concurrently without racing each other's cleanup.
+            CURRENT_LINK="$RELEASES_DIR/.current"
+
+            # PREVIOUS_LINK remembers the release that was live before this
+            # deploy, so a failed health check can restore it. It is refreshed
+            # by the same step that publishes CURRENT_LINK, so it can never be
+            # stale with respect to the current run.
+            PREVIOUS_LINK="$RELEASES_DIR/.previous"
 
             # Ensure the parent staging directory exists
             # (it may not exist yet if frontend hasn't deployed yet)
@@ -261,25 +269,27 @@ jobs:
               exit 1
             fi
 
-            if [ -L "$TARGET_LINK" ]; then
-              PREVIOUS_TARGET=$(readlink "$TARGET_LINK" 2>/dev/null || true)
-              if [ -n "$PREVIOUS_TARGET" ]; then
-                printf '%s\n' "$PREVIOUS_TARGET" > "$PREVIOUS_TARGET_FILE"
-                echo "🗂️  Previous target recorded: $PREVIOUS_TARGET"
-              else
-                printf '%s\n' "__NO_PREVIOUS_TARGET__" > "$PREVIOUS_TARGET_FILE"
-                echo "🗂️  Previous target could not be read — rollback will remove the link."
-              fi
+            # Remember the currently live release for the rollback step.
+            if [ -L "$CURRENT_LINK" ]; then
+              ln -sfn "$(readlink "$CURRENT_LINK")" "${PREVIOUS_LINK}.tmp"
+              mv -Tf "${PREVIOUS_LINK}.tmp" "$PREVIOUS_LINK"
+              echo "🗂️  Previous release recorded: $(readlink "$PREVIOUS_LINK")"
             else
-              printf '%s\n' "__NO_PREVIOUS_TARGET__" > "$PREVIOUS_TARGET_FILE"
-              echo "🗂️  No previous target (first deploy) — rollback will remove the link."
+              rm -f "$PREVIOUS_LINK"
+              echo "🗂️  No previous release (first deploy) — rollback will clear the pointer."
             fi
 
-            ln -sfn "$RELEASE_DIR" "$TMP_LINK"
+            # Publish the new release through the stable pointer.
+            ln -sfn "$RELEASE_DIR" "${CURRENT_LINK}.tmp"
+            mv -Tf "${CURRENT_LINK}.tmp" "$CURRENT_LINK"
+
+            # Point the public jobs-api path at the stable pointer.
+            ln -sfn "$CURRENT_LINK" "$TMP_LINK"
             mv -Tf "$TMP_LINK" "$TARGET_LINK"
 
             echo "✅ Symlink switched to release $RELEASE_TIMESTAMP."
-            echo "   $TARGET_LINK → $RELEASE_DIR"
+            echo "   $CURRENT_LINK → $RELEASE_DIR"
+            echo "   $TARGET_LINK → $CURRENT_LINK"
 
       - name: Health Check
         id: health_check
@@ -322,58 +332,51 @@ jobs:
             exit 1
           fi
 
-      # Roll back the jobs-api symlink when the health check fails.
+      # Roll back the live backend release when the health check fails.
       #
-      # WHY: the symlink is switched before the health check runs, so a failed
-      # check would otherwise leave jobs-api pointing at the broken release.
-      # Restoring the previously live release keeps the staging API serving.
-      # The failed release is deleted afterwards so a later frontend re-link
-      # can never select it.
-      - name: Roll Back Symlink on Health Check Failure
+      # WHY: the release is published before the health check runs, so a failed
+      # check would otherwise leave jobs-api serving the broken release. The
+      # jobs-api symlink points at the stable CURRENT_LINK pointer, so rolling
+      # back is a single pointer move — no symlink chain to rebuild.
+      - name: Roll Back to Previous Release on Health Check Failure
         if: ${{ failure() && steps.health_check.outcome == 'failure' }}
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET_LINK: ${{ secrets.BACKEND_STAGING_REMOTE_PATH }}
           RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
-          envs: REMOTE_USER,TARGET_LINK,RELEASE_TIMESTAMP
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
           script: |
             set -euo pipefail
 
             RELEASES_DIR="/home/$REMOTE_USER/backend-staging-releases"
             RELEASE_DIR="$RELEASES_DIR/$RELEASE_TIMESTAMP"
-            PREVIOUS_TARGET_FILE="$RELEASES_DIR/.previous-target-$RELEASE_TIMESTAMP"
+            CURRENT_LINK="$RELEASES_DIR/.current"
+            PREVIOUS_LINK="$RELEASES_DIR/.previous"
 
-            # 1. Restore the previously live release (if this run switched the
-            #    symlink). The marker is keyed by this release timestamp, so a
-            #    missing marker means the switch never happened and the live
-            #    symlink must be left untouched.
-            if [ -f "$PREVIOUS_TARGET_FILE" ]; then
-              PREVIOUS_TARGET=$(cat "$PREVIOUS_TARGET_FILE")
-              rm -f "$PREVIOUS_TARGET_FILE"
-
-              if [ "$PREVIOUS_TARGET" = "__NO_PREVIOUS_TARGET__" ]; then
-                echo "⚠️  No previous release to restore — removing $TARGET_LINK."
-                rm -f "$TARGET_LINK"
-              elif [ -d "$PREVIOUS_TARGET" ]; then
-                ln -sfn "$PREVIOUS_TARGET" "${TARGET_LINK}.tmp"
-                mv -Tf "${TARGET_LINK}.tmp" "$TARGET_LINK"
-                echo "✅ Rolled back $TARGET_LINK → $PREVIOUS_TARGET"
+            # 1. Move the stable pointer back to the previously live release.
+            #    PREVIOUS_LINK is written by the same step that published
+            #    CURRENT_LINK, so it always describes this run's predecessor.
+            if [ -L "$PREVIOUS_LINK" ]; then
+              PREVIOUS_TARGET=$(readlink "$PREVIOUS_LINK")
+              if [ -d "$PREVIOUS_TARGET" ]; then
+                ln -sfn "$PREVIOUS_TARGET" "${CURRENT_LINK}.tmp"
+                mv -Tf "${CURRENT_LINK}.tmp" "$CURRENT_LINK"
+                echo "✅ Rolled back $CURRENT_LINK → $PREVIOUS_TARGET"
               else
-                echo "⚠️  Previous release $PREVIOUS_TARGET no longer exists — removing $TARGET_LINK."
-                rm -f "$TARGET_LINK"
+                rm -f "$CURRENT_LINK"
+                echo "⚠️  Previous release $PREVIOUS_TARGET no longer exists — cleared $CURRENT_LINK."
               fi
             else
-              echo "ℹ️  Symlink was never switched by this run — leaving $TARGET_LINK untouched."
+              rm -f "$CURRENT_LINK"
+              echo "⚠️  No previous release to restore — cleared $CURRENT_LINK."
             fi
 
-            # 2. Delete the failed release so a later frontend re-link cannot
-            #    select it as the newest backend release.
+            # 2. Delete the failed release so it can never be published again.
             rm -rf "$RELEASE_DIR"
             echo "🧹 Removed failed release $RELEASE_DIR"
 
@@ -402,10 +405,11 @@ jobs:
               fi
             done
 
-            # Remove rollback markers left behind by earlier runs. The marker
-            # for this run was already consumed (or removed) by the rollback
-            # step, so anything still present is stale.
-            rm -f "$RELEASES_DIR"/.previous-target-* 2>/dev/null || true
+            # NOTE: the stable pointers (.current / .previous) are hidden files
+            # and are therefore not matched by the */ glob above. .current
+            # points at the release that was just published and must survive;
+            # .previous may now dangle, which is expected — it is refreshed on
+            # the next deploy.
 
             echo "✅ Staging backend deployment complete."
 

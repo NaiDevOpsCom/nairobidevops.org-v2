@@ -1,11 +1,12 @@
 name: Deploy Backend to Production
 
 concurrency:
-  # MUST match the production frontend deploy (deploy.yml) so the two cannot
-  # race: the frontend deploy switches the release tree that contains the
-  # jobs-api symlink and re-links it, while this workflow swaps the backend
-  # release that symlink points at. Sharing the group serializes the pair.
-  group: deploy-production
+  # Serializes backend deploys against each other. The production frontend
+  # deploy deliberately uses a DIFFERENT group ("deploy-production"): the two
+  # publish the same jobs-api target (see CURRENT_LINK below), so they do not
+  # need to be serialized, and sharing one group would let GitHub cancel a
+  # pending run of one workflow when the other is queued.
+  group: deploy-production-backend
   cancel-in-progress: false
 
 on:
@@ -235,21 +236,39 @@ jobs:
             set -euo pipefail
 
             RELEASE_DIR="/home/$REMOTE_USER/backend-releases/$RELEASE_TIMESTAMP"
+            RELEASES_DIR="/home/$REMOTE_USER/backend-releases"
             TMP_LINK="${TARGET_LINK}.tmp"
+
+            # CURRENT_LINK is the stable "live backend" pointer. The frontend
+            # deploy (deploy.yml) publishes the jobs-api symlink to THIS path
+            # instead of guessing a release directory, so the two workflows
+            # always agree on which backend release is live and can run
+            # concurrently without racing each other's cleanup.
+            CURRENT_LINK="$RELEASES_DIR/.current"
 
             if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
               echo "CRITICAL ERROR: $TARGET_LINK is not a symlink — aborting."
               exit 1
             fi
 
-            ln -sfn "$RELEASE_DIR" "$TMP_LINK"
+            # Publish the new release through the stable pointer first.
+            ln -sfn "$RELEASE_DIR" "${CURRENT_LINK}.tmp"
+            mv -Tf "${CURRENT_LINK}.tmp" "$CURRENT_LINK"
+
+            # Point the public jobs-api path at the stable pointer.
+            ln -sfn "$CURRENT_LINK" "$TMP_LINK"
             mv -Tf "$TMP_LINK" "$TARGET_LINK"
 
-            # Keep last 5 backend releases (matches frontend pattern)
-            cd "/home/$REMOTE_USER/backend-releases"
-            ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
+            # Keep last 5 backend releases (matches frontend pattern).
+            # Release names are %Y%m%d%H%M%S timestamps, so a reverse lexical
+            # sort is chronological — unlike mtime, it cannot be skewed by the
+            # timestamps restored from the release tarball.
+            cd "$RELEASES_DIR"
+            ls -1 | sort -r | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
 
             echo "Backend deployment successful."
+            echo "   $CURRENT_LINK → $RELEASE_DIR"
+            echo "   $TARGET_LINK → $CURRENT_LINK"
 
   notify:
     needs: [validate, deploy]

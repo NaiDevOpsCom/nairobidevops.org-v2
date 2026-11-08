@@ -352,8 +352,15 @@ jobs:
       #
       # WHY: The frontend deploy extracts files directly into staging.nairobidevops.org/
       # which overwrites everything including the jobs-api symlink on every deploy.
-      # This step recreates the symlink pointing to the latest backend release
-      # so the PHP API remains accessible after every frontend deploy.
+      # This step recreates the symlink pointing at the backend workflow's stable
+      # "live backend" pointer so the PHP API remains accessible after every
+      # frontend deploy.
+      #
+      # The pointer (backend-staging-releases/.current) is published atomically by
+      # deploy-backend-staging.yml and always resolves to the backend release
+      # that is actually live. Linking to it — rather than guessing a release
+      # directory — means this step cannot select a release that is still being
+      # uploaded or that a concurrent backend cleanup is about to remove.
       - name: Re-link Backend jobs-api After Frontend Deploy
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
@@ -369,47 +376,24 @@ jobs:
 
             STAGING_DIR="/home/$REMOTE_USER/staging.nairobidevops.org"
             BACKEND_RELEASES="/home/$REMOTE_USER/backend-staging-releases"
-
-            if [ ! -d "$BACKEND_RELEASES" ]; then
-              echo "⚠️  Backend releases directory $BACKEND_RELEASES does not exist — jobs-api not linked."
-              echo "   Deploy the backend first, then re-run this workflow."
-              exit 0
-            fi
+            CURRENT_LINK="$BACKEND_RELEASES/.current"
 
             if [ ! -d "$STAGING_DIR" ]; then
               echo "⚠️  Staging directory $STAGING_DIR does not exist — jobs-api not linked."
               exit 0
             fi
 
-            # Pick the newest COMPLETE backend release.
-            #
-            # Release names are %Y%m%d%H%M%S timestamps, so a reverse lexical
-            # sort is chronological. A release counts as complete only when its
-            # config.php symlink resolves to an existing file — that symlink is
-            # created last during extraction, so a release that was interrupted
-            # (or left behind by a failed backend deploy) is skipped instead of
-            # being linked.
-            LATEST=""
-            for candidate in $(ls -1 "$BACKEND_RELEASES" 2>/dev/null | sort -r || true); do
-              case "$candidate" in
-                .*) continue ;;
-              esac
-              [ -d "$BACKEND_RELEASES/$candidate" ] || continue
-              if [ -e "$BACKEND_RELEASES/$candidate/config.php" ]; then
-                LATEST="$candidate"
-                break
-              fi
-              echo "⚠️  Skipping incomplete backend release: $candidate"
-            done
-
-            if [ -z "$LATEST" ]; then
-              echo "⚠️  No complete backend release found in $BACKEND_RELEASES — jobs-api not linked."
+            # Guard the lookup BEFORE using it: with `set -euo pipefail` a
+            # missing pointer would otherwise abort the whole frontend deploy
+            # instead of reaching the intended warning branch.
+            if [ ! -e "$CURRENT_LINK" ]; then
+              echo "⚠️  No live backend release published at $CURRENT_LINK — jobs-api not linked."
               echo "   Deploy the backend first, then re-run this workflow."
               exit 0
             fi
 
-            ln -sfn "$BACKEND_RELEASES/$LATEST" "$STAGING_DIR/jobs-api"
-            echo "✅ Re-linked jobs-api → $LATEST"
+            ln -sfn "$CURRENT_LINK" "$STAGING_DIR/jobs-api"
+            echo "✅ Re-linked jobs-api → $CURRENT_LINK → $(readlink "$CURRENT_LINK")"
 
       # 10. Health check — verify the staging URL responds
       - name: Health Check
