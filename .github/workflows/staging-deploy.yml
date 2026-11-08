@@ -370,11 +370,40 @@ jobs:
             STAGING_DIR="/home/$REMOTE_USER/staging.nairobidevops.org"
             BACKEND_RELEASES="/home/$REMOTE_USER/backend-staging-releases"
 
-            # Find the most recent backend release folder
-            LATEST=$(ls -1t "$BACKEND_RELEASES" 2>/dev/null | grep -v '\.tmp$' | head -1)
+            if [ ! -d "$BACKEND_RELEASES" ]; then
+              echo "⚠️  Backend releases directory $BACKEND_RELEASES does not exist — jobs-api not linked."
+              echo "   Deploy the backend first, then re-run this workflow."
+              exit 0
+            fi
+
+            if [ ! -d "$STAGING_DIR" ]; then
+              echo "⚠️  Staging directory $STAGING_DIR does not exist — jobs-api not linked."
+              exit 0
+            fi
+
+            # Pick the newest COMPLETE backend release.
+            #
+            # Release names are %Y%m%d%H%M%S timestamps, so a reverse lexical
+            # sort is chronological. A release counts as complete only when its
+            # config.php symlink resolves to an existing file — that symlink is
+            # created last during extraction, so a release that was interrupted
+            # (or left behind by a failed backend deploy) is skipped instead of
+            # being linked.
+            LATEST=""
+            for candidate in $(ls -1 "$BACKEND_RELEASES" 2>/dev/null | sort -r || true); do
+              case "$candidate" in
+                .*) continue ;;
+              esac
+              [ -d "$BACKEND_RELEASES/$candidate" ] || continue
+              if [ -e "$BACKEND_RELEASES/$candidate/config.php" ]; then
+                LATEST="$candidate"
+                break
+              fi
+              echo "⚠️  Skipping incomplete backend release: $candidate"
+            done
 
             if [ -z "$LATEST" ]; then
-              echo "⚠️  No backend release found in $BACKEND_RELEASES — jobs-api not linked."
+              echo "⚠️  No complete backend release found in $BACKEND_RELEASES — jobs-api not linked."
               echo "   Deploy the backend first, then re-run this workflow."
               exit 0
             fi

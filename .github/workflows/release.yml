@@ -300,15 +300,21 @@ jobs:
 
             let raw = '';
             try {
-              // Cap at 500 commits to prevent unbounded output on first releases
-              // (range = 'HEAD' pulls full history when no prior tag exists).
+              // No commit-count cap: CHANGELOG.md must contain the complete
+              // history. (range = 'HEAD' pulls full history when no prior tag
+              // exists, and a `-n` cap silently dropped everything older than
+              // the newest 500 commits.)
               // %b (commit body) is not used by the parser below — drop it to
               // avoid inflating the string with multi-line commit descriptions.
+              // The 125,000 character GitHub release-body limit is applied to
+              // releaseNotes only, further down.
               raw = require('child_process')
-                .execSync(`git log ${range} --format="%s" -n 500`, {
-                  encoding: 'utf8', maxBuffer: 10 * 1024 * 1024
+                .execSync(`git log ${range} --format="%s"`, {
+                  encoding: 'utf8', maxBuffer: 50 * 1024 * 1024
                 }).trim();
-            } catch {}
+            } catch (error) {
+              core.warning(`Could not read git log for range "${range}": ${error.message}`);
+            }
 
             for (const line of raw.split('\n').filter(Boolean)) {
               const s = line;

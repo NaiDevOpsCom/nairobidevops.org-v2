@@ -8,7 +8,10 @@ name: Hardened Build Verification
 
 permissions:
   contents: read
-  pull-requests: read
+  # write is required by security-validation.yml so dependency-review-action
+  # can publish its failure summary comment on the pull request. The reusable
+  # workflow cannot elevate beyond what its caller grants.
+  pull-requests: write
 
 # Optimized concurrency - branch-based with global limit
 concurrency:

@@ -16,10 +16,9 @@ on:
     branches: [pre-staging]
 
 # Global environment variables for all jobs
-# Keep PHP_VERSION in sync with project-checks.yml and deploy workflows.
+# Backend gates (and their PHP_VERSION) live in project-checks.yml.
 env:
   NODE_VERSION: "22"
-  PHP_VERSION: "8.5"
   CACHE_VERSION: "v1"
   BUNDLE_SIZE_LIMIT_MB: "10"
   BUNDLE_SIZE_WARNING_MB: "8"
@@ -344,7 +343,10 @@ jobs:
 
   quality-summary:
     name: Quality Gates Summary
-    needs: [quality-checks, backend-checks]
+    # Backend gates live in project-checks.yml (backend-lint / backend-format /
+    # backend-test / backend-security-audit) and already run on pushes and PRs
+    # to pre-staging. Only the frontend gate is defined here.
+    needs: [quality-checks]
     runs-on: ubuntu-latest
     if: always()
 
@@ -366,48 +368,10 @@ jobs:
   # The health-check step there curls STAGING_URL after the cPanel deploy
   # completes, giving a reliable post-deploy signal rather than checking
   # a Vercel preview URL that may not exist.
+  #
+  # NOTE: Backend quality gates are NOT duplicated here. They are defined in
+  # project-checks.yml as backend-lint, backend-format, backend-test and
+  # backend-security-audit, and that workflow already runs on pushes and pull
+  # requests targeting pre-staging. Keeping a second copy here doubled runner
+  # time and CI maintenance for the same checks.
 
-  backend-checks:
-    name: Backend Quality Gates
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
-        with:
-          php-version: ${{ env.PHP_VERSION }}
-          coverage: none
-          tools: composer
-
-      - name: Cache Composer dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: backend/vendor
-          key: composer-${{ hashFiles('backend/composer.lock') }}
-          restore-keys: composer-
-
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Setup Node.js (for syntax lint helper)
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: PHP syntax lint
-        working-directory: .
-        run: node scripts/check-backend-php.mjs
-
-      - name: PHP formatting check (PHP-CS-Fixer)
-        run: composer run format:check
-
-      - name: PHP unit tests (PHPUnit)
-        run: composer run test

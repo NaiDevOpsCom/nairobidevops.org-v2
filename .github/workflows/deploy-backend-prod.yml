@@ -1,7 +1,11 @@
 name: Deploy Backend to Production
 
 concurrency:
-  group: ndc-redesign-backend-production
+  # MUST match the production frontend deploy (deploy.yml) so the two cannot
+  # race: the frontend deploy switches the release tree that contains the
+  # jobs-api symlink and re-links it, while this workflow swaps the backend
+  # release that symlink points at. Sharing the group serializes the pair.
+  group: deploy-production
   cancel-in-progress: false
 
 on:
@@ -199,11 +203,21 @@ jobs:
           script: |
             set -euo pipefail
             RELEASE_DIR="/home/$REMOTE_USER/backend-releases/$RELEASE_TIMESTAMP"
+            CONFIG_FILE="/home/$REMOTE_USER/config/backend-config.php"
             tar -xzf "$RELEASE_DIR/backend-release.tar.gz" -C "$RELEASE_DIR"
             rm "$RELEASE_DIR/backend-release.tar.gz"
 
-            ln -sf "/home/$REMOTE_USER/config/backend-config.php" \
-                   "$RELEASE_DIR/config.php"
+            # The shared production config is a deployment prerequisite.
+            # Without this check `ln -sf` would happily create a dangling
+            # config.php symlink and the release would go live with a config
+            # that cannot be loaded, breaking every database-backed endpoint.
+            if [ ! -f "$CONFIG_FILE" ]; then
+              echo "CRITICAL ERROR: shared production config $CONFIG_FILE is missing."
+              echo "Aborting before linking config.php so no broken release is published."
+              exit 1
+            fi
+
+            ln -sf "$CONFIG_FILE" "$RELEASE_DIR/config.php"
 
       - name: Atomically Switch Symlink & Clean Old Releases
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2

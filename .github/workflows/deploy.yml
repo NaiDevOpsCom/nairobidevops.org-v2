@@ -324,6 +324,73 @@ jobs:
 
             echo "✅ Deployment successful."
 
+      # 9. Re-link the backend jobs-api symlink
+      #
+      # WHY: the backend release is published inside the frontend release tree
+      # (<public_html>/jobs-api). Each frontend deploy extracts a brand new
+      # release directory and switches public_html to it, which leaves the
+      # freshly extracted tree without the jobs-api symlink and takes the jobs
+      # API offline even though the backend deployment itself succeeded.
+      # Re-linking after every frontend switch restores it.
+      - name: Re-link Backend jobs-api After Frontend Deploy
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          BACKEND_REMOTE_PATH: ${{ secrets.BACKEND_REMOTE_PATH }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,BACKEND_REMOTE_PATH
+          script: |
+            set -euo pipefail
+
+            BACKEND_RELEASES="/home/$REMOTE_USER/backend-releases"
+
+            if [ -z "$BACKEND_REMOTE_PATH" ]; then
+              echo "⚠️  BACKEND_REMOTE_PATH is not set — skipping jobs-api re-link."
+              exit 0
+            fi
+
+            if [ ! -d "$BACKEND_RELEASES" ]; then
+              echo "⚠️  Backend releases directory $BACKEND_RELEASES does not exist — jobs-api not linked."
+              echo "   Deploy the backend first, then re-run this workflow."
+              exit 0
+            fi
+
+            # Pick the newest COMPLETE backend release. Release names are
+            # %Y%m%d%H%M%S timestamps, so a reverse lexical sort is
+            # chronological. config.php is linked last during extraction, so a
+            # release whose config.php does not resolve was left incomplete by
+            # an interrupted or failed backend deploy and must be skipped.
+            LATEST=""
+            for candidate in $(ls -1 "$BACKEND_RELEASES" 2>/dev/null | sort -r || true); do
+              case "$candidate" in
+                .*) continue ;;
+              esac
+              [ -d "$BACKEND_RELEASES/$candidate" ] || continue
+              if [ -e "$BACKEND_RELEASES/$candidate/config.php" ]; then
+                LATEST="$candidate"
+                break
+              fi
+              echo "⚠️  Skipping incomplete backend release: $candidate"
+            done
+
+            if [ -z "$LATEST" ]; then
+              echo "⚠️  No complete backend release found in $BACKEND_RELEASES — jobs-api not linked."
+              echo "   Deploy the backend first, then re-run this workflow."
+              exit 0
+            fi
+
+            PARENT_DIR=$(dirname "$BACKEND_REMOTE_PATH")
+            if [ ! -d "$PARENT_DIR" ]; then
+              mkdir -p "$PARENT_DIR"
+            fi
+
+            ln -sfn "$BACKEND_RELEASES/$LATEST" "$BACKEND_REMOTE_PATH"
+            echo "✅ Re-linked $BACKEND_REMOTE_PATH → $LATEST"
+
   notify:
     needs: [build, deploy]
     if: always()
