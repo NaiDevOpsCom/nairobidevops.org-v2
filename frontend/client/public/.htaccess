@@ -106,6 +106,7 @@ Options -MultiViews
 
   # Bypass SPA routing for /jobs-api/ PHP backend
   RewriteRule ^/?jobs-api/ - [L]
+  RewriteRule ^/?job/ - [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
