@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [tailwindcss(), react(), sitemapPlugin(isHardened)],
+    envDir: path.resolve(import.meta.dirname, "client"), // Load environment variables from .env.staging
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -85,6 +86,11 @@ export default defineConfig(({ mode }) => {
         deny: ["**/.*"],
       },
       proxy: {
+        "/endpoints": {
+          target: "http://localhost:8000",
+          changeOrigin: false,
+          secure: false,
+        },
         "/api/luma": {
           target: "https://api.luma.com",
           changeOrigin: true,

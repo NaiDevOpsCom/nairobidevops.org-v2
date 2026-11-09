@@ -342,7 +342,7 @@ jobs:
       - name: Send Success Email
         if: ${{ needs.build.result == 'success' && needs.deploy.result == 'success' }}
         continue-on-error: true
-        uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c # v17
+        uses: dawidd6/action-send-mail@94de994a9f6fffee200243214e17002e2920bb59 # v18
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
@@ -377,7 +377,7 @@ jobs:
       - name: Send Failure Email
         if: ${{ needs.build.result != 'success' || needs.deploy.result != 'success' }}
         continue-on-error: true
-        uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c # v17
+        uses: dawidd6/action-send-mail@94de994a9f6fffee200243214e17002e2920bb59 # v18
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
