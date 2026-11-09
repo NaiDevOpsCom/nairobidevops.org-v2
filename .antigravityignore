@@ -59,6 +59,9 @@ logs/
 tmp/
 temp/
 
+## --- Local code-graph indexes ---
+.codegraph/
+
 ## --- Test/coverage artifacts ---
 coverage/
 .nyc_output/
