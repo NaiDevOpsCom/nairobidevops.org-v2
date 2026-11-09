@@ -1,3 +1,5 @@
+// nairobidevops.org-v2/frontend/client/src/hooks/
+
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
