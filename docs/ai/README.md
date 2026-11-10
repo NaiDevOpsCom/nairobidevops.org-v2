@@ -1,12 +1,12 @@
 # AI Workspace Documentation
 
-This directory documents the AI-powered development workspace integrated into this project.
+This directory documents the optional AI-powered development workspace for this project.
 
 ## Overview
 
-The NDC website has a full AI development workspace rooted at `.ai/` — a canonical, version-controlled directory that serves as the single source of truth for AI coding assistants across multiple tools (Claude Code, Cursor, Copilot, Windsurf, etc.).
+The NDC website can use an AI development workspace rooted at `.ai/` — an **optional, local-only** directory that serves as the single source of truth for the AI coding assistants you run on your machine (Claude Code, Cursor, Copilot, Windsurf, etc.). The `.ai/` directory is **not committed to this repository**; provision it locally before relying on any of the workflows below.
 
-The workspace was built in 7 phases:
+When present, the workspace is typically built in 7 phases:
 
 | Phase | What |
 |---|---|
@@ -20,11 +20,11 @@ The workspace was built in 7 phases:
 
 ## Key Concepts
 
-- **`.ai/` is canonical** — All tool-specific configs (`.cursor/`, `.claude/`, `.windsurf/`, etc.) are generated copies. Edit `.ai/` only.
+- **`.ai/` is canonical locally** — When you provision the workspace, all tool-specific configs (`.cursor/`, `.claude/`, `.windsurf/`, etc.) are generated copies. Edit `.ai/` only.
 - **Progressive disclosure** — Start with `.ai/CONTEXT.md` for a project TL;DR, drill into deeper files as needed.
-- **Sync scripts** — `npm run sync` regenerates all tool-specific copies from `.ai/`.
-- **Session logs** — `npm run session-log` captures git state; auto-runs on every commit via pre-commit hook.
-- **Workspace health** — `npm run check:workspace` validates cross-references and freshness; `npm run workspace:report` gives the full picture.
+- **Local-only automation** — The `sync`, `session-log`, `check:workspace`, and `workspace:report` npm scripts invoke helpers under `.ai/automation/`. Those helpers exist only after you create the workspace locally, so the scripts fail in a fresh clone that has no `.ai/` directory.
+- **Session logs** — `npm run session-log` captures git state; the pre-commit hook runs it when the local helper is present.
+- **Workspace health** — `npm run check:workspace` validates cross-references and freshness; `npm run workspace:report` gives the full picture. Both require the local `.ai/automation/` scripts.
 
 ## Pages
 

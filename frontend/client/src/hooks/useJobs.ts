@@ -26,7 +26,7 @@ export interface Job {
   company: string;
   company_logo_url: string | null;
   role_type: RoleType | (string & {});
-  location_type: LocationType;
+  location_type: LocationType | null;
   location_detail: string | null;
   africa_friendly: boolean;
   salary_min: number | null;
@@ -90,6 +90,8 @@ interface UseJobsResult {
   isError: boolean;
   /** Navigate to a specific page */
   setPage: (page: number) => void;
+  /** Re-run the current request without changing filters or page */
+  refetch: () => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -161,15 +163,15 @@ export function useJobs(filters: JobFilters): UseJobsResult {
   // Internal page state — owned by the hook so setPage can trigger a re-fetch
   const [currentPage, setCurrentPage] = useState<number>(filters.page);
 
-  // Sync internal page with external filters.page when they differ
+  // Sync internal page with the external filters.page only when that value
+  // changes. Depending on `currentPage` here would immediately undo setPage(),
+  // because the caller's filters.page stays on its old value.
   useEffect(() => {
-    // Detect a change from external filters.page
-    const pageChanged = filters.page !== currentPage;
-    if (pageChanged) {
-      // Update currentPage to match filters.page, which will trigger a fetch
-      setCurrentPage(filters.page);
-    }
-  }, [filters.page, currentPage]);
+    setCurrentPage(filters.page);
+  }, [filters.page]);
+
+  // Incremented by refetch() to force the fetch effect to re-run
+  const [refetchToken, setRefetchToken] = useState(0);
 
   // Debounced search term — updated after SEARCH_DEBOUNCE_MS of silence
   const [debouncedQ, setDebouncedQ] = useState(filters.q);
@@ -289,12 +291,18 @@ export function useJobs(filters: JobFilters): UseJobsResult {
     filters.sort,
     filters.per_page,
     currentPage,
+    refetchToken,
   ]);
 
   // ── Public page setter ──────────────────────────────────────────────────────
 
   const setPage = useCallback((page: number) => {
     setCurrentPage(page);
+  }, []);
+
+  // Re-run the current request (used by the error-state Retry button)
+  const refetch = useCallback(() => {
+    setRefetchToken((token) => token + 1);
   }, []);
 
   // ── Return ──────────────────────────────────────────────────────────────────
@@ -309,5 +317,6 @@ export function useJobs(filters: JobFilters): UseJobsResult {
     isLoading,
     isError,
     setPage,
+    refetch,
   };
 }

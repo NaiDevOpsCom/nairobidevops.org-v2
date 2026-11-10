@@ -16,12 +16,12 @@ test("bump when >=maxMin is a safe candidate", () => {
   assert.equal(r.candidate, ">=18.0.0");
 });
 
-test("manual when the current range is an explicit bounded AND range", () => {
-  // `>=20 <23` is one comparator set, but flattening it to `>=22` would
-  // re-admit the Node 23+ line the bound deliberately excludes.
+test("narrows an explicit bounded AND range without re-admitting the bound", () => {
+  // `>=20 <23` is one comparator set; the fix must keep the `<23` bound
+  // instead of flattening it to `>=22` and re-admitting the Node 23+ line.
   const r = evaluateEngines(">=20 <23", [">=22"]);
-  assert.equal(r.status, "manual");
-  assert.equal(r.candidate, ">=22.0.0");
+  assert.equal(r.status, "bump");
+  assert.equal(r.candidate, "^22.0.0");
 });
 
 test("unset current range reports every dependency range as incompatible", () => {
@@ -29,19 +29,38 @@ test("unset current range reports every dependency range as incompatible", () =>
   assert.deepEqual(r.incompatible, [">=18", ">=20"]);
 });
 
-test("manual when OR-ranges cannot be auto-reduced", () => {
+test("composes the intersection of OR ranges instead of bailing out", () => {
   const r = evaluateEngines("^20.19.0 || >=22.12.0", [
     "^22.22.2 || ^24.15.0 || >=26.0.0",
   ]);
-  assert.equal(r.status, "manual");
+  assert.equal(r.status, "bump");
+  assert.equal(r.candidate, "^22.22.2 || ^24.15.0 || >=26.0.0");
   assert.ok(r.incompatible.length === 1);
 });
 
-test("manual when the >=floor candidate would widen the current range", () => {
-  // Node 23/25 are deliberately excluded by this curated OR range; a flat
-  // `>=` floor would re-admit them, so the automation must not write it.
-  // (Multi-line OR ranges are never auto-rewritten — only simple floors.)
+test("keeps curated exclusions when narrowing an OR range", () => {
+  // Node 23/25 are deliberately excluded by this curated OR range; the
+  // composed candidate must keep excluding them (no widening to a floor).
   const r = evaluateEngines("^22.12.0 || ^24.0.0 || >=26.0.0", [">=22.22.2"]);
+  assert.equal(r.status, "bump");
+  assert.equal(r.candidate, "^22.22.2 || ^24.0.0 || >=26.0.0");
+});
+
+test("resolves the real frontend dependency intersection and is idempotent", () => {
+  const deps = [
+    "^20.19.0 || ^22.13.0 || >=24.0.0",
+    "^20.0.0 || ^22.0.0 || >=24.0.0",
+  ];
+  const r = evaluateEngines("^20.19.0 || >=22.12.0", deps);
+  assert.equal(r.status, "bump");
+  assert.equal(r.candidate, "^20.19.0 || ^22.13.0 || >=24.0.0");
+  assert.equal(evaluateEngines(r.candidate, deps).status, "ok");
+});
+
+test("manual when no Node version satisfies every constraint", () => {
+  // Disjoint current/dependency ranges leave nothing to intersect, and the
+  // current range is not a simple floor, so widening it needs a human.
+  const r = evaluateEngines("^18.0.0 || >=20 <21", [">=22"]);
   assert.equal(r.status, "manual");
 });
 

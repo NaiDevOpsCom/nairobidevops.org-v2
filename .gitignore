@@ -74,35 +74,26 @@ npm-debug.log*
 # Ignore local-only files
 *.localqodana.sarif.json
 
-# ===== AI Workspace — ephemeral data (canonical .ai/ is committed) =====
-.ai/memory/session-log/*
-.ai/memory/active-context.md.local
+# ===== AI Workspace — local-only (provisioned per developer, not committed) =====
+.ai/
 
 # Graphify knowledge graph — commit graphify-out/ but ignore local cache
 graphify-out/cost.json
 graphify-out/cache/
 
 # Ignore local AI / tool state and generated config
-.ai/
 .claude/
 .windsurf/
 .github/instructions/
 .agents/
-.claude/
 .cursor/
 .jetro/
 .kiro/
 .mcp.json
 .windsurfrules
-.windsurf/rules/
 AGENT.md
 CLAUDE.md
 .github/copilot-instructions.md
-.ai/
-.claude/
-.github/instructions/
-.windsurf/
-graphify-out/
 .graphifyignore
 
 

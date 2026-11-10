@@ -1,23 +1,26 @@
 name: Deploy Backend to Production
 
 concurrency:
-  group: ndc-redesign-backend-production
+  # Shared with the production frontend deploy (deploy.yml) so public-release
+  # switching and backend relinking cannot race.
+  group: deploy-production
   cancel-in-progress: false
 
 on:
+  # ⏸️ DEACTIVATED: the backend is being rewritten. The `push` trigger is
+  # intentionally removed so this workflow cannot run automatically. Restore
+  # it when the new backend is ready:
+  #
+  #   push:
+  #     branches:
+  #       - main
+  #     paths:
+  #       - "backend/**"
+  #       - ".github/workflows/deploy-backend-prod.yml"
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy-backend-prod.yml"
 
 env:
-  # Must stay aligned with backend/composer.json's config.platform.php
-  # override, and with .github/workflows/project-checks.yml's PHP_VERSION.
-  # If these ever drift apart, Composer's platform override can mask a real
-  # version mismatch instead of catching it (see PR notes).
+  # PHP version used when this workflow is re-enabled for the rewritten backend.
   PHP_VERSION: "8.5"
 
 jobs:
@@ -202,6 +205,10 @@ jobs:
             tar -xzf "$RELEASE_DIR/backend-release.tar.gz" -C "$RELEASE_DIR"
             rm "$RELEASE_DIR/backend-release.tar.gz"
 
+            if [ ! -f "/home/$REMOTE_USER/config/backend-config.php" ]; then
+              echo "Shared backend config is missing."
+              exit 1
+            fi
             ln -sf "/home/$REMOTE_USER/config/backend-config.php" \
                    "$RELEASE_DIR/config.php"
 

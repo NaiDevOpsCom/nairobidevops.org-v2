@@ -37,10 +37,10 @@ This is an internal project. Contributors are typically invited team members, bu
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js** (v20 or later recommended) and **npm**
-- **PHP** (v8.2 or later recommended)
-- **MySQL / MariaDB** (e.g., via WampServer, XAMPP, or standalone)
-- **Composer** (PHP dependency manager)
+- **Node.js** (`^22.22.2 || ^24.15.0 || >=26.0.0`) and **npm**
+
+A backend runtime is not required. The previous PHP API has been removed and is
+being rewritten in a different language — see [Backend](#backend).
 
 ### Frontend Setup
 
@@ -59,43 +59,9 @@ Before you begin, ensure you have the following installed:
 
     The application will be available at `http://localhost:5173`.
 
-### Backend Setup
-
-1.  **Install backend dependencies:**
-
-    ```bash
-    cd backend
-    composer install
-    ```
-
-2.  **Configure local environment:**
-
-    ```bash
-    cp config.example.php config.local.php
-    ```
-
-    Edit `config.local.php` to set your local MySQL credentials (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`).
-
-3.  **Create database and import schema:**
-
-    ```bash
-    mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS nairobidevops_jobs_local;"
-    mysql -u root -p nairobidevops_jobs_local < schema.sql
-    ```
-
-4.  **Verify connection:**
-
-    ```bash
-    php -r "require 'db.php'; echo getDB() ? 'Connected' : 'Failed';"
-    ```
-
-5.  **Start the backend server:**
-
-    ```bash
-    php -S localhost:8000
-    ```
-
-    Test it at `http://localhost:8000/?action=jobs`.
+    Jobs-related pages call the API at `VITE_API_URL` (set it in
+    `frontend/client/.env.local`). Until the rewritten backend is running, they
+    display their "temporarily unavailable" error state instead of data.
 
 ---
 
@@ -201,19 +167,14 @@ cd frontend && npm run check
 
 ### Backend
 
-- **PHP-CS-Fixer**: Used for PHP code style. Configured in `backend/.php-cs-fixer.php` with PSR-12 rules.
-
-Run from the `backend/` directory:
-
-```bash
-composer format:check   # Check style without modifying
-composer format         # Auto-fix style issues
-```
+The `backend/` directory is intentionally empty while the API is rewritten. Its
+code-quality and test commands will be documented here once the new stack lands.
+Until then, the frontend is the only part of the repository you need to build and
+test locally.
 
 ### Testing
 
 - **Frontend (Vitest)**: Run `npm run test` from `frontend/` for unit and integration tests.
-- **Backend (PHPUnit)**: Run `composer test` from `backend/` for PHP tests.
 
 ### Commit Message Convention
 
@@ -283,14 +244,3 @@ chore(deps): bump react-query version
 | `npm run format:check` | Check formatting without modifying         |
 | `npm run typecheck`    | TypeScript type checking                   |
 | `npm run check`        | Run all checks (lint + typecheck + format) |
-
-### Backend (`backend/`)
-
-| Command                  | Description                            |
-| ------------------------ | -------------------------------------- |
-| `composer install`       | Install PHP dependencies               |
-| `composer test`          | Run PHPUnit tests                      |
-| `composer test:coverage` | Run tests with coverage report         |
-| `composer format`        | Fix code style with PHP-CS-Fixer       |
-| `composer format:check`  | Check code style (dry run)             |
-| `composer audit`         | Audit dependencies for vulnerabilities |
