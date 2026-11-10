@@ -1,21 +1,26 @@
 name: Deploy Backend to Staging
 
 concurrency:
-  group: ndc-redesign-backend-staging
+  # Shared with the staging frontend deploy (staging-deploy.yml) so the
+  # jobs-api relink and release cleanup cannot race.
+  group: deploy-staging
   cancel-in-progress: false
 
 on:
+  # ⏸️ DEACTIVATED: the backend is being rewritten. The `push` trigger is
+  # intentionally removed so this workflow cannot run automatically. Restore
+  # it when the new backend is ready:
+  #
+  #   push:
+  #     branches:
+  #       - pre-staging
+  #     paths:
+  #       - "backend/**"
+  #       - ".github/workflows/deploy-backend-staging.yml"
   workflow_dispatch:
-  push:
-    branches:
-      - pre-staging
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy-backend-staging.yml"
 
 env:
-  # Must stay aligned with backend/composer.json's config.platform.php
-  # override, and with .github/workflows/project-checks.yml's PHP_VERSION.
+  # PHP version used when this workflow is re-enabled for the rewritten backend.
   PHP_VERSION: "8.5"
 
 jobs:
@@ -200,6 +205,10 @@ jobs:
             RELEASE_DIR="/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
             tar -xzf "$RELEASE_DIR/backend-release.tar.gz" -C "$RELEASE_DIR"
             rm "$RELEASE_DIR/backend-release.tar.gz"
+            if [ ! -f "/home/$REMOTE_USER/config/backend-config-staging.php" ]; then
+              echo "Shared staging backend config is missing."
+              exit 1
+            fi
             ln -sf "/home/$REMOTE_USER/config/backend-config-staging.php" \
                    "$RELEASE_DIR/config.php"
 
@@ -239,6 +248,14 @@ jobs:
               exit 1
             fi
 
+            # Record the pre-deploy target so a failed health check can roll back.
+            PREVIOUS_LINK_FILE="/home/$REMOTE_USER/.backend-staging-jobs-api.previous"
+            PREVIOUS_TARGET=""
+            if [ -L "$TARGET_LINK" ]; then
+              PREVIOUS_TARGET="$(readlink "$TARGET_LINK")"
+            fi
+            printf '%s' "$PREVIOUS_TARGET" > "$PREVIOUS_LINK_FILE"
+
             ln -sfn "$RELEASE_DIR" "$TMP_LINK"
             mv -Tf "$TMP_LINK" "$TARGET_LINK"
 
@@ -246,6 +263,7 @@ jobs:
             echo "   $TARGET_LINK → $RELEASE_DIR"
 
       - name: Health Check
+        id: health-check
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
         run: |
@@ -284,6 +302,40 @@ jobs:
             echo "Health check failed after $MAX_RETRIES attempts"
             exit 1
           fi
+
+      - name: Roll Back Failed Release
+        if: steps.health-check.outcome == 'failure'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          TARGET_LINK: ${{ secrets.BACKEND_STAGING_REMOTE_PATH }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,TARGET_LINK,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+
+            RELEASE_DIR="/home/$REMOTE_USER/backend-staging-releases/$RELEASE_TIMESTAMP"
+            PREVIOUS_LINK_FILE="/home/$REMOTE_USER/.backend-staging-jobs-api.previous"
+            PREVIOUS_TARGET="$(cat "$PREVIOUS_LINK_FILE" 2>/dev/null || true)"
+
+            if [ -n "$PREVIOUS_TARGET" ] && [ -e "$PREVIOUS_TARGET" ]; then
+              ln -sfn "$PREVIOUS_TARGET" "${TARGET_LINK}.tmp"
+              mv -Tf "${TARGET_LINK}.tmp" "$TARGET_LINK"
+              echo "↩️ Rolled jobs-api back to $PREVIOUS_TARGET"
+            else
+              echo "⚠️ No usable previous release — removing jobs-api link."
+              rm -f "$TARGET_LINK"
+            fi
+
+            rm -rf "$RELEASE_DIR"
+            rm -f "$PREVIOUS_LINK_FILE"
+            echo "❌ Health check failed; deployment rolled back."
+            exit 1
 
       - name: Clean Old Releases
         if: success()

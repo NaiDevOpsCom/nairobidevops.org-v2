@@ -32,11 +32,6 @@ allow-licenses:
   - CC0-1.0
   - 0BSD
   - MPL-2.0
-  # JSON (Crockford) — "shall be used for Good, not Evil" clause.
-  # Not OSI-approved; widely present in the D3/Victory ecosystem.
-  # Listed here for belt-and-suspenders coverage alongside the
-  # PURL exception below. Legal review: [Date] by [Team/Person].
-  - JSON
 
 # ─────────────────────────────────────────────────────────────
 # PACKAGE-LEVEL LICENSE EXCEPTIONS (PURL format)

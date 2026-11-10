@@ -241,16 +241,24 @@ function validateRobotsTxt(): void {
   if (sitemapLine) {
     const sitemapUrl = sitemapLine.slice(8).trim();
 
-    if (sitemapUrl.toLowerCase().endsWith("/sitemap.xml")) {
-      pass("robots.txt contains Sitemap directive");
-    } else {
-      fail("robots.txt missing valid 'Sitemap:' directive");
+    let parsedSitemapUrl: URL | null = null;
+    try {
+      parsedSitemapUrl = new URL(sitemapUrl);
+    } catch {
+      parsedSitemapUrl = null;
     }
 
-    if (sitemapUrl.startsWith("https://")) {
+    const hasValidSitemapUrl =
+      parsedSitemapUrl !== null &&
+      parsedSitemapUrl.protocol === "https:" &&
+      parsedSitemapUrl.hostname !== "" &&
+      parsedSitemapUrl.pathname.toLowerCase().endsWith("/sitemap.xml");
+
+    if (hasValidSitemapUrl) {
+      pass("robots.txt contains Sitemap directive");
       pass("Sitemap URL uses HTTPS");
     } else {
-      fail(`Sitemap URL in robots.txt is not HTTPS: ${sitemapUrl}`);
+      fail(`robots.txt missing valid 'Sitemap:' directive: ${sitemapUrl}`);
     }
   } else {
     fail("robots.txt missing valid 'Sitemap:' directive");

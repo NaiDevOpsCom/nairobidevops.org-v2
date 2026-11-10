@@ -84,9 +84,15 @@ async function npmViewEngines(packageName, versionSpec) {
 
 async function readJson(filePath) {
   const resolvedPath = path.resolve(filePath);
-  const projectRoot = path.resolve(__dirname, "..");
-
-  if (!resolvedPath.startsWith(projectRoot)) {
+  // Validate against the directory currently being checked (the repo root by
+  // default, or an explicit target passed to runForDir / process.argv[2]) so
+  // the target-directory support actually works and cannot escape that root.
+  const relativePath = path.relative(targetDir, resolvedPath);
+  if (
+    relativePath.startsWith(`..${path.sep}`) ||
+    relativePath === ".." ||
+    path.isAbsolute(relativePath)
+  ) {
     throw new Error(`Unsafe file path detected: ${filePath}`);
   }
 
@@ -186,6 +192,238 @@ function computeFloorCandidate(dependencyRanges) {
   return requiredMinimum ? `>=${requiredMinimum}` : null;
 }
 
+// A `*` engine range constrains nothing, so it must never be reported as an
+// incompatibility (and must never drag the composed candidate down to `*`).
+function isUniversalRange(range) {
+  try {
+    return new semver.Range(range).range === "*";
+  } catch {
+    return false;
+  }
+}
+
+function comparatorSetTexts(range) {
+  try {
+    return new semver.Range(range).set.map((comparators) =>
+      comparators.map((comparator) => comparator.value),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function joinComparators(comparators) {
+  return comparators.length === 0 ? "*" : comparators.join(" ");
+}
+
+/**
+ * Reduce a comparator set to its tightest lower and upper bound. Semver keeps
+ * every comparator it was given (`>=20 <23 >=22` stays three comparators), but
+ * only the tightest bound of each direction actually constrains the range.
+ * Returns null when the set cannot be reduced safely.
+ * @param {string[]} comparators
+ * @returns {string[]|null}
+ */
+function reduceComparators(comparators) {
+  let lower = null;
+  let upper = null;
+
+  const raiseLower = (version, inclusive) => {
+    if (!lower) {
+      lower = { version, inclusive };
+      return;
+    }
+    const comparison = semver.compare(version, lower.version);
+    if (comparison > 0) lower = { version, inclusive };
+    else if (comparison === 0 && !inclusive) lower.inclusive = false;
+  };
+
+  const lowerUpper = (version, inclusive) => {
+    if (!upper) {
+      upper = { version, inclusive };
+      return;
+    }
+    const comparison = semver.compare(version, upper.version);
+    if (comparison < 0) upper = { version, inclusive };
+    else if (comparison === 0 && !inclusive) upper.inclusive = false;
+  };
+
+  for (const value of comparators) {
+    const comparator = new semver.Comparator(value);
+    // An `ANY` comparator (`*`) carries no version and constrains nothing.
+    if (!comparator.value) continue;
+    switch (comparator.operator) {
+      case ">":
+        raiseLower(comparator.semver, false);
+        break;
+      case ">=":
+        raiseLower(comparator.semver, true);
+        break;
+      case "<":
+        lowerUpper(comparator.semver, false);
+        break;
+      case "<=":
+        lowerUpper(comparator.semver, true);
+        break;
+      case "":
+      case "=":
+      case "==":
+      case "===":
+        raiseLower(comparator.semver, true);
+        lowerUpper(comparator.semver, true);
+        break;
+      default:
+        return null;
+    }
+  }
+
+  const reduced = [];
+  if (lower) {
+    reduced.push(`${lower.inclusive ? ">=" : ">"}${lower.version.version}`);
+  }
+  if (upper) {
+    reduced.push(`${upper.inclusive ? "<=" : "<"}${upper.version.version}`);
+  }
+  if (reduced.length === 0) return null;
+
+  try {
+    new semver.Range(joinComparators(reduced));
+  } catch {
+    return null;
+  }
+  return reduced;
+}
+
+/**
+ * Rewrite the canonical comparator pair `>=X <Y` back into the compact caret
+ * or tilde form when it is exactly equivalent, so the range written into
+ * package.json stays human readable instead of turning into raw comparators.
+ * @param {string[]} comparators
+ * @returns {string}
+ */
+function formatComparatorSet(comparators) {
+  const text = joinComparators(comparators);
+  if (comparators.length !== 2) return text;
+
+  const [lowerComparator, upperComparator] = comparators;
+  if (
+    !lowerComparator.startsWith(">=") ||
+    upperComparator.startsWith("<=") ||
+    !upperComparator.startsWith("<")
+  ) {
+    return text;
+  }
+
+  const lower = semver.parse(lowerComparator.slice(2));
+  const upper = semver.parse(upperComparator.slice(1));
+  // `^`/`~` exclude prereleases of the next line via an `-0` upper bound; only
+  // that exact shape is equivalent to the caret/tilde shorthand.
+  if (
+    !lower ||
+    !upper ||
+    upper.prerelease.length !== 1 ||
+    upper.prerelease[0] !== 0
+  ) {
+    return text;
+  }
+
+  if (
+    upper.major === lower.major + 1 &&
+    upper.minor === 0 &&
+    upper.patch === 0
+  ) {
+    return `^${lower.version}`;
+  }
+  if (
+    upper.major === lower.major &&
+    upper.minor === lower.minor + 1 &&
+    upper.patch === 0
+  ) {
+    return `~${lower.version}`;
+  }
+  return text;
+}
+
+/**
+ * Compose the intersection of several semver ranges (the set of Node versions
+ * every range allows). Returns null when the ranges share no version, i.e.
+ * when no safe candidate can be derived from them.
+ *
+ * @param {string[]} ranges
+ * @returns {string|null}
+ */
+function composeIntersection(ranges) {
+  // Every element is a comparator set (a conjunction); the outer array is a
+  // union. Start from the universal range, then intersect with each range.
+  let accumulator = [[]];
+
+  for (const range of ranges) {
+    const sets = comparatorSetTexts(range);
+    if (!sets) return null;
+
+    const merged = [];
+    for (const current of accumulator) {
+      for (const next of sets) {
+        try {
+          if (
+            !semver.intersects(joinComparators(current), joinComparators(next))
+          )
+            continue;
+        } catch {
+          continue;
+        }
+        merged.push([...new Set([...current, ...next])]);
+      }
+    }
+    accumulator = merged;
+    if (accumulator.length === 0) return null;
+  }
+
+  // Canonicalise (sort + dedupe comparators) and drop duplicate branches.
+  const branches = new Map();
+  for (const comparators of accumulator) {
+    const canonical = new semver.Range(joinComparators(comparators));
+    if (canonical.set.length !== 1) continue;
+    const original = canonical.set[0].map((comparator) => comparator.value);
+    const originalText = joinComparators(original);
+    const reduced = reduceComparators(original);
+    // Only trust the reduction when it is provably equivalent; otherwise keep
+    // the verbose but correct canonical comparators.
+    const reducedText = reduced ? joinComparators(reduced) : null;
+    const equivalent =
+      reducedText !== null &&
+      isSubsetSafe(reducedText, originalText) &&
+      isSubsetSafe(originalText, reducedText);
+    const text = equivalent ? reducedText : originalText;
+    if (text === "*") continue;
+    branches.set(text, equivalent ? reduced : original);
+  }
+  if (branches.size === 0) return null;
+
+  // Keep only the widest branch when one branch contains another: the range is
+  // a union, so a narrower branch adds nothing.
+  const kept = [];
+  for (const [range, comparators] of branches) {
+    if (kept.some((entry) => isSubsetSafe(range, entry.range))) continue;
+    for (let index = kept.length - 1; index >= 0; index -= 1) {
+      if (isSubsetSafe(kept[index].range, range)) kept.splice(index, 1);
+    }
+    kept.push({ range, comparators });
+  }
+
+  kept.sort((left, right) => {
+    const leftMin = getMinVersionFromRange(left.range);
+    const rightMin = getMinVersionFromRange(right.range);
+    if (!leftMin || !rightMin) return 0;
+    return semver.compare(leftMin, rightMin);
+  });
+
+  const composed = kept
+    .map((entry) => formatComparatorSet(entry.comparators))
+    .join(" || ");
+  return composed === "*" ? null : composed;
+}
+
 // A curated multi-line OR range (e.g. `^22.12.0 || ^24.0.0 || >=26.0.0`) is
 // deliberate support policy (non-LTS Node lines excluded); a flat `>=` floor
 // would silently re-admit those lines. The same applies to an explicit bounded
@@ -212,22 +450,50 @@ function isSimpleFloor(range) {
  * The project range must be a *subset* of every dependency range: every
  * Node version we allow must be one every dependency supports.
  *
+ * The preferred answer is the exact intersection of the current range with
+ * every dependency range. That is the largest safe subset, so it can never
+ * widen the project's declared support (a curated `^22 || ^24 || >=26` range
+ * keeps excluding Node 23/25), and it handles multi-line OR ranges that a
+ * flat `>=` floor cannot express.
+ *
  * @param {string|null} currentRange engines.node of the project
  * @param {string[]} dependencyRanges engines.node of every direct dependency
  * @returns {{status: "ok"|"bump"|"manual", candidate?: string, incompatible: string[]}}
  */
 export function evaluateEngines(currentRange, dependencyRanges) {
-  const incompatible = rangesNotCoveredBy(currentRange, dependencyRanges);
+  const constraints = dependencyRanges.filter(
+    (range) => !isUniversalRange(range),
+  );
+  const incompatible = rangesNotCoveredBy(currentRange, constraints);
   if (currentRange && incompatible.length === 0) {
     return { status: "ok", incompatible };
   }
 
-  const candidate = computeFloorCandidate(dependencyRanges);
+  const constraintRanges = currentRange
+    ? [currentRange, ...constraints]
+    : [...constraints];
+  const intersection = composeIntersection(constraintRanges);
+  if (intersection) {
+    const supportedByDependencies = constraints.every((depRange) =>
+      isSubsetSafe(intersection, depRange),
+    );
+    const staysWithinCurrent = currentRange
+      ? isSubsetSafe(intersection, currentRange)
+      : true;
+    if (supportedByDependencies && staysWithinCurrent) {
+      return { status: "bump", candidate: intersection, incompatible };
+    }
+  }
+
+  // Fall back to a flat `>=` floor when no non-empty intersection exists,
+  // e.g. the project range is disjoint from what its dependencies support.
+  // That widens the project range, so it is only allowed for simple floors.
+  const candidate = computeFloorCandidate(constraints);
   if (!candidate) {
     return { status: "manual", incompatible };
   }
 
-  const candidateSupportedByDeps = dependencyRanges.every((depRange) =>
+  const candidateSupportedByDeps = constraints.every((depRange) =>
     isSubsetSafe(candidate, depRange),
   );
   const currentIsSimpleFloor = currentRange

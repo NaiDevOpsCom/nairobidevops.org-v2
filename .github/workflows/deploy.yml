@@ -11,7 +11,6 @@ on:
       - main
     paths:
       - "frontend/**"
-      - "backend/**"
       - ".github/workflows/deploy.yml"
       - ".github/actions/cache-vite-npm/action.yml"
 

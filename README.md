@@ -1,6 +1,8 @@
 # Nairobi DevOps Community
 
-A modern, responsive web application for the Nairobi DevOps Community. Built with React, TypeScript, Vite, and Tailwind CSS (frontend) and PHP (backend API).
+A modern, responsive web application for the Nairobi DevOps Community. Built with React, TypeScript, Vite, and Tailwind CSS.
+
+> **Backend status:** the previous PHP API (`backend/`) has been intentionally removed and is being rewritten in a different language. The frontend builds and runs independently; pages that consume the API (the jobs board) display a graceful "temporarily unavailable" state until the new backend is deployed.
 
 ---
 
@@ -8,7 +10,7 @@ A modern, responsive web application for the Nairobi DevOps Community. Built wit
 
 - [Project Overview](#project-overview)
 - [Frontend](#frontend)
-- [Backend](#backend)
+- [Backend Status](#backend-status)
 - [Documentation](#documentation)
 - [Development Setup](#development-setup)
 - [Available Commands](#available-commands)
@@ -24,10 +26,8 @@ A modern, responsive web application for the Nairobi DevOps Community. Built wit
 
 This platform empowers developers, automation experts, and tech enthusiasts to learn, network, and advance DevOps practices in Kenya's technology ecosystem. It features event management, community resources, job board, and collaborative tools.
 
-The project consists of two main parts:
-
 - **`frontend/`** — React + TypeScript SPA (Vite, Tailwind CSS, Radix UI, Wouter)
-- **`backend/`** — PHP API with job aggregation from Remotive & We Work Remotely
+- **`backend/`** — reserved for the rewritten jobs API (currently empty)
 
 ---
 
@@ -58,22 +58,15 @@ Key directories:
 
 ---
 
-## Backend
+## Backend Status
 
-- **Runtime**: PHP >= 8.2
-- **Database**: MySQL / MariaDB
-- **Purpose**: Job board API — aggregates listings from Remotive and We Work Remotely
-- **CLI Tools**: Composer for dependencies and scripts
+The `backend/` directory is intentionally empty while the API is rewritten.
 
-Key directories:
-
-| Directory                   | Purpose                                         |
-| --------------------------- | ----------------------------------------------- |
-| `backend/endpoints/`        | API endpoint handlers (get_jobs, submit, track) |
-| `backend/cron/works/`       | Job sync scripts (Remotive, WWR, expire, clean) |
-| `backend/cron/notification` | Notification dispatchers (digest, weekly)       |
-| `backend/tests/`            | PHPUnit tests                                   |
-| `backend/vendor/`           | Composer dependencies                           |
+- **Jobs board**: reads from `VITE_API_URL`. When the API is unreachable, `useJobs` sets an error state and the jobs page renders a "Job listings temporarily unavailable" alert with a **Retry** button.
+- **Production / staging**: `.env.production` and `.env.staging` point `VITE_API_URL` at the deployed jobs API.
+- **Local development**: without `VITE_API_URL`, the frontend falls back to `http://localhost:8000`. Set the variable in `frontend/client/.env.local` once the new backend is running.
+- **Cloudinary and Luma**: these use the PHP proxies in `frontend/client/public/api/`, which are part of the frontend deploy and are **not** affected by the `backend/` removal.
+- **CI/CD**: the backend deploy workflows are kept for reference but have been deactivated (no automatic `push` trigger). Re-enable them when the rewritten backend is ready.
 
 ---
 
@@ -103,10 +96,9 @@ Most project documentation is located in the root-level [`docs/`](./docs/) direc
 
 ### Prerequisites
 
-- Node.js (v20+ recommended) and npm
-- PHP (v8.2+ recommended)
-- MySQL / MariaDB (e.g., via WampServer, XAMPP, or standalone)
-- Composer (PHP dependency manager)
+- Node.js (`^22.22.2 || ^24.15.0 || >=26.0.0`) and npm
+
+A backend runtime is not required to work on the frontend. Jobs-related pages will show their error state until the new API is available.
 
 ### Frontend Setup
 
@@ -118,47 +110,14 @@ npm run dev
 
 The frontend dev server runs at `http://localhost:5173`.
 
-### Backend Setup
+### Jobs API (optional, local)
 
-1. **Install dependencies:**
+Once the rewritten backend is running locally, point the frontend at it:
 
-   ```bash
-   cd backend
-   composer install
-   ```
-
-2. **Configure environment:**
-
-   ```bash
-   cp config.example.php config.local.php
-   ```
-
-   Edit `config.local.php` and update `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` for your local MySQL setup.
-
-3. **Create database and import schema:**
-
-   ```bash
-   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS nairobidevops_jobs_local;"
-   mysql -u root -p nairobidevops_jobs_local < schema.sql
-   ```
-
-4. **Verify database connection:**
-
-   ```bash
-   php backend/check_db.php
-   ```
-
-5. **Start the development server:**
-
-   ```bash
-   php -S localhost:8000
-   ```
-
-6. **Test the API:**
-
-   ```
-   http://localhost:8000/?action=jobs
-   ```
+```bash
+# frontend/client/.env.local
+VITE_API_URL=http://localhost:8000
+```
 
 ---
 
@@ -186,25 +145,9 @@ The frontend dev server runs at `http://localhost:5173`.
 | `npm run sitemap:validate`  | Validate sitemap and robots.txt                      |
 | `npm run security:generate` | Generate `.htaccess` from policy                     |
 
-### Backend (`backend/`)
-
-| Command                    | Description                                     |
-| -------------------------- | ----------------------------------------------- |
-| `composer install`         | Install PHP dependencies                        |
-| `composer update`          | Update PHP dependencies                         |
-| `composer test`            | Run PHPUnit tests                               |
-| `composer test:coverage`   | Run tests with HTML coverage report             |
-| `composer format`          | Fix code style with PHP-CS-Fixer                |
-| `composer format:check`    | Check code style (dry run, no changes)          |
-| `composer audit`           | Audit Composer dependencies for vulnerabilities |
-| `php -S localhost:8000`    | Start PHP built-in server                       |
-| `php backend/check_db.php` | Verify database connection                      |
-
 ---
 
 ## Testing
-
-### Frontend Tests
 
 Tests use **Vitest**. Run from the `frontend/` directory:
 
@@ -215,22 +158,9 @@ npm run test:coverage   # With coverage report
 npm run test:ui         # Vitest UI dashboard
 ```
 
-### Backend Tests
-
-Tests use **PHPUnit**. Run from the `backend/` directory:
-
-```bash
-composer test                     # Run all tests
-composer test:coverage            # With HTML coverage (generated in coverage/)
-```
-
-The test suite uses a dedicated database (`nairobidevops_jobs_test` — configured in `phpunit.xml`) and sets `APP_ENV=test` to isolate test execution.
-
 ---
 
 ## Code Quality
-
-### Frontend Code Quality
 
 - **ESLint** — configured in `frontend/eslint.config.js`
 - **Prettier** — configured in `frontend/.prettierrc`
@@ -240,16 +170,6 @@ Run all checks together:
 
 ```bash
 cd frontend && npm run check
-```
-
-### Backend Code Quality
-
-- **PHP-CS-Fixer** — PSR-12 rules with additional conventions (configured in `backend/.php-cs-fixer.php`)
-
-```bash
-cd backend
-composer format:check   # Check style without modifying
-composer format         # Auto-fix style issues
 ```
 
 ---
@@ -269,6 +189,8 @@ The project uses GitHub Actions for deployment. See the [Deployment Guide](./doc
 - Shared secret store outside web root (`~/config/secrets.env.php`)
 - IP-based rate limiting and origin validation
 - Auto-generated security headers from `security-policy.json`
+
+> Backend deploy workflows (`deploy-backend-prod.yml`, `deploy-backend-staging.yml`) are retained but deactivated until the rewritten backend lands.
 
 ---
 

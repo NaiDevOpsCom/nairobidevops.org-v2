@@ -192,7 +192,7 @@ function UrgencyIndicator({ job }: { readonly job: Job }) {
 
   if (days <= 7) {
     return (
-      <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-500">
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
         <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
         🔴 Closes in {days}d — act fast
       </span>
@@ -201,7 +201,7 @@ function UrgencyIndicator({ job }: { readonly job: Job }) {
 
   if (days <= 14) {
     return (
-      <span className="flex items-center gap-1.5 text-xs text-amber-500">
+      <span className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
         <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />⚠ Closes in {days}d
       </span>
     );
@@ -261,14 +261,16 @@ function JobCard({ job }: { readonly job: Job }) {
           {/* Badges row */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {/* Location type */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-blue-500/10 border border-blue-500/20 text-blue-500 font-medium">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 font-medium">
               <MapPin className="h-3 w-3" />
-              {job.location_detail ?? job.location_type.replaceAll("_", " ")}
+              {job.location_detail ??
+                job.location_type?.replaceAll("_", " ") ??
+                "Location not specified"}
             </span>
 
             {/* Africa-friendly */}
             {job.africa_friendly && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-semibold">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold">
                 <Globe className="h-3 w-3" />
                 Africa-friendly ✓
               </span>
@@ -558,7 +560,8 @@ export default function Jobs() {
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  const { jobs, total, page, totalPages, lastSync, isLoading, isError, setPage } = useJobs(filters);
+  const { jobs, total, page, totalPages, lastSync, isLoading, isError, setPage, refetch } =
+    useJobs(filters);
 
   // Merge a partial filter patch and always reset to page 1 unless page is
   // the only thing changing (setPage handles that separately).
@@ -586,12 +589,25 @@ export default function Jobs() {
     const fetchAllJobs = async () => {
       try {
         const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-        const url = `${apiBase}/?action=jobs&page=1&per_page=1000`;
-        const response = await fetch(url, { signal: controller.signal });
-        if (response.ok) {
-          const data = await response.json();
-          setAllJobsForCounting(data.jobs || []);
-        }
+        // The API caps per_page at 50, so walk every page to get the true
+        // count of roles closing this week.
+        const perPage = 50;
+        const collected: Job[] = [];
+        let currentPageNumber = 1;
+        let totalPages = 1;
+
+        do {
+          const url = `${apiBase}/?action=jobs&page=${currentPageNumber}&per_page=${perPage}`;
+          const response = await fetch(url, { signal: controller.signal });
+          if (!response.ok) break;
+
+          const data: { jobs?: Job[]; total_pages?: number } = await response.json();
+          collected.push(...(data.jobs ?? []));
+          totalPages = data.total_pages ?? 1;
+          currentPageNumber += 1;
+        } while (currentPageNumber <= totalPages);
+
+        setAllJobsForCounting(collected);
       } catch (err) {
         if (err instanceof Error && err.name !== "AbortError") {
           console.error("Failed to fetch job count:", err);
@@ -779,7 +795,7 @@ export default function Jobs() {
           <section className="flex-1 space-y-4" aria-label="Job listings">
             {/* Top bar: count + sort */}
             <div className="flex items-center justify-between pb-4 border-b border-border">
-              <p className="text-sm text-muted-foreground">
+              <p role="status" className="text-sm text-muted-foreground">
                 {isLoading ? (
                   "Loading…"
                 ) : (
@@ -826,21 +842,16 @@ export default function Jobs() {
 
             {/* Error state */}
             {!isLoading && isError && (
-              <div className="flex flex-col items-center gap-3 py-16 text-center bg-card border border-border rounded-xl">
+              <div
+                role="alert"
+                className="flex flex-col items-center gap-3 py-16 text-center bg-card border border-border rounded-xl"
+              >
                 <AlertCircle className="h-10 w-10 text-destructive/60" />
                 <p className="font-medium text-foreground">Job listings temporarily unavailable</p>
                 <p className="text-sm text-muted-foreground">
                   Check your connection or try again in a moment.
                 </p>
-                <Button
-                  variant="outline"
-                  className="mt-1 gap-2"
-                  onClick={() => {
-                    patchFilters({ page: 1 });
-                    // Force a fetch by updating filters without setting page
-                    setFilters((prev) => ({ ...prev, page: 1 }));
-                  }}
-                >
+                <Button variant="outline" className="mt-1 gap-2" onClick={refetch}>
                   <RefreshCw className="h-4 w-4" />
                   Retry
                 </Button>
@@ -849,7 +860,10 @@ export default function Jobs() {
 
             {/* Empty state */}
             {!isLoading && !isError && jobs.length === 0 && (
-              <div className="flex flex-col items-center gap-3 py-16 text-center bg-card border border-border rounded-xl">
+              <div
+                role="status"
+                className="flex flex-col items-center gap-3 py-16 text-center bg-card border border-border rounded-xl"
+              >
                 <Search className="h-10 w-10 text-muted-foreground/40" />
                 <p className="font-medium text-foreground">No roles match your filters</p>
                 <p className="text-sm text-muted-foreground">
@@ -905,14 +919,20 @@ export default function Jobs() {
                 Post a role and reach engineers actively building Africa&apos;s infrastructure.
               </p>
               <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-2">
-                <Button className="flex items-center text-lg px-8 py-4 hover:bg-white hover:text-primary transition-colors duration-200 overflow-hidden">
-                  Post a Job →
+                <Button
+                  asChild
+                  className="flex items-center text-lg px-8 py-4 hover:bg-white hover:text-primary transition-colors duration-200 overflow-hidden"
+                >
+                  <a href="mailto:info@nairobidevops.org?subject=Job%20posting">Post a Job →</a>
                 </Button>
                 <Button
+                  asChild
                   variant="outline"
                   className="flex items-center text-lg px-8 py-4 bg-white/10 border-white/20 text-white hover:bg-white hover:text-black overflow-hidden"
                 >
-                  Learn about featuring
+                  <a href="mailto:info@nairobidevops.org?subject=Job%20featuring">
+                    Learn about featuring
+                  </a>
                 </Button>
               </div>
             </div>

@@ -22,9 +22,9 @@ on:
 
 permissions:
   contents: read
-  # write required for dependency-review-action to post
-  # the failure summary comment (comment-summary-in-pr: on-failure)
-  pull-requests: write
+  # Read-only: the reusable workflow runs only from hardened-build-check.yml,
+  # whose caller grants pull-requests: read and cannot be elevated here.
+  pull-requests: read
 
 jobs:
   security-validation:
@@ -126,9 +126,12 @@ jobs:
           # The inline allow-licenses string format does not reliably handle
           # compound expressions — use the external YAML list format instead.
           config-file: .github/dependency-review-config.yml
-          # Show review summary on PR when checks fail so developers
-          # understand why the scan blocked their PR.
-          comment-summary-in-pr: on-failure
+          # Pass the caller's fail-level through explicitly so the action input
+          # and the config file agree.
+          fail-on-severity: ${{ inputs.fail-level }}
+          # Summary comments stay disabled: the caller
+          # (hardened-build-check.yml) grants only pull-requests: read.
+          comment-summary-in-pr: never
 
       - name: Upload Audit Results
         if: always()
