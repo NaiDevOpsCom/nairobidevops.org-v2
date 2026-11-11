@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * setup-git-hooks.js
+ * setup-git-hooks.mjs
  *
  * Installs a Git pre-commit hook that enforces code quality checks for
  * the frontend before every commit.
  *
  * Usage:
- *   node scripts/setup-git-hooks.js
+ *   node scripts/setup-git-hooks.mjs
  *
  * Run this once after cloning the repository.
  * The hook calls `npm run check` from the workspace root, which validates:
@@ -19,6 +19,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -81,7 +82,41 @@ try {
 
 const hookFile = join(hooksDir, "pre-commit");
 const chainedHookName = "pre-commit.pre-setup";
-const hookMarker = "installed by scripts/setup-git-hooks.mjs";
+// Match both the legacy `.js` banner and the current `.mjs` banner so hooks
+// installed by older versions are recognised as ours instead of being
+// preserved and chained a second time.
+const hookMarker = "installed by scripts/setup-git-hooks";
+const generatedHashPrefix = "# generated-sha256: ";
+const generatedHashPlaceholder = "__GENERATED_SHA256__";
+
+// SHA-256 of every hook body this installer has shipped previously. A hook
+// matching one of these is untouched and safe to replace; anything else that
+// still carries the marker was edited by the developer and must be preserved.
+const legacyHookHashes = new Set([
+  "7651331830b693ceb197d5a89c1efcb1ba0d9dff257464910c6c6b80fd2298e4",
+  "bc23646b688750a1b1eebe04cf9a4c0fb13d24b51c66e3381a69d7fbe6eb830b",
+  "efb432aacf82b27bfd01ab573b26cbf2ab71fca4ad42637756d940304f3a50e2",
+  "ff6b9a047eb3fa2de849de829ebe11626be213cca2de4cf231ad8a612b1989cd",
+]);
+
+function sha256(text) {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+/**
+ * Return true when an existing hook is an unmodified build of this installer:
+ * either the current format (whose embedded hash still matches its body) or a
+ * known legacy body. Marker-bearing hooks that fail this check were edited and
+ * must not be overwritten.
+ */
+function isPristineGeneratedHook(content) {
+  const hashLine = content.match(/^# generated-sha256: ([0-9a-f]{64})$/m);
+  if (!hashLine) return legacyHookHashes.has(sha256(content));
+  const placeholderLine = `${generatedHashPrefix}${generatedHashPlaceholder}`;
+  return (
+    sha256(content.replace(hashLine[0], placeholderLine)) === hashLine[1]
+  );
+}
 
 // Ensure the hooks directory exists.
 if (!existsSync(hooksDir)) {
@@ -89,9 +124,10 @@ if (!existsSync(hooksDir)) {
 }
 
 // Write the pre-commit hook script.
-const hookContent = `#!/usr/bin/env sh
+const hookBody = `#!/usr/bin/env sh
 # ---------------------------------------------------------------
 # Pre-commit quality gate — installed by scripts/setup-git-hooks.mjs
+# generated-sha256: ${generatedHashPlaceholder}
 # Runs quality checks and captures a session log before every commit.
 # ---------------------------------------------------------------
 
@@ -108,17 +144,31 @@ REPO_ROOT="$(git rev-parse --show-toplevel)" || exit 1
 cd "$REPO_ROOT" || exit 1
 HOOK_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
-# Chain any custom pre-commit hook that was preserved during installation.
-CHAINED_HOOK="$HOOK_DIR/${chainedHookName}"
-if [ -x "$CHAINED_HOOK" ]; then
-  "$CHAINED_HOOK" "$@"
-  CHAINED_STATUS=$?
-  if [ "$CHAINED_STATUS" -ne 0 ]; then
-    echo ""
-    echo "❌ Preserved pre-commit hook failed: $CHAINED_HOOK"
-    echo "   Fix the above before committing."
-    exit "$CHAINED_STATUS"
-  fi
+# Chain every custom hook preserved during installation: the original
+# pre-commit.pre-setup first, then timestamped backups in creation order.
+# Skip this script itself and avoid running the same backup twice: a preserved
+# hook may still contain an older copy of this loop and would otherwise
+# re-enter it.
+if [ "\${NDC_PRECOMMIT_CHAINING:-0}" != "1" ]; then
+  export NDC_PRECOMMIT_CHAINING=1
+  SELF="$HOOK_DIR/$(basename -- "$0")"
+  SEEN=":"
+  for CHAINED_HOOK in "$HOOK_DIR/${chainedHookName}" "$HOOK_DIR"/${chainedHookName}.*; do
+    [ -x "$CHAINED_HOOK" ] || continue
+    [ "$CHAINED_HOOK" = "$SELF" ] && continue
+    case "$SEEN" in
+      *":$CHAINED_HOOK:"*) continue ;;
+    esac
+    SEEN="$SEEN$CHAINED_HOOK:"
+    "$CHAINED_HOOK" "$@"
+    CHAINED_STATUS=$?
+    if [ "$CHAINED_STATUS" -ne 0 ]; then
+      echo ""
+      echo "❌ Preserved pre-commit hook failed: $CHAINED_HOOK"
+      echo "   Fix the above before committing."
+      exit "$CHAINED_STATUS"
+    fi
+  done
 fi
 
 echo ""
@@ -152,6 +202,13 @@ echo ""
 exit 0
 `;
 
+// Embed a hash of the body so a later run can tell an untouched generated
+// hook (safe to upgrade) from one the developer edited (must be preserved).
+const hookContent = hookBody.replace(
+  generatedHashPlaceholder,
+  sha256(hookBody),
+);
+
 // Detect whether a hook already exists and avoid destroying custom hooks.
 if (existsSync(hookFile)) {
   const existing = readFileSync(hookFile, "utf8");
@@ -160,8 +217,26 @@ if (existsSync(hookFile)) {
     process.exit(0);
   }
 
-  if (existing.includes(hookMarker)) {
+  if (existing.includes(hookMarker) && isPristineGeneratedHook(existing)) {
     console.log("♻️  Updating the existing quality-gate pre-commit hook...");
+  } else if (existing.includes(hookMarker)) {
+    // The developer edited a generated hook. Keep a copy of their changes, but
+    // do not chain it: a generated hook contains its own chaining loop, so
+    // running it from the new hook would re-enter the chain and recurse.
+    const backupFile = join(
+      hooksDir,
+      `pre-commit.edited.${Date.now()}.bak`,
+    );
+    writeFileSync(backupFile, existing, "utf8");
+
+    console.warn(`⚠️  Preserved your edited pre-commit hook at ${backupFile}`);
+    console.warn(
+      "   It is not chained automatically because it contains the generated" +
+        " chaining logic, which would recurse if re-run.",
+    );
+    console.warn(
+      "   Re-apply any customisations to the new hook if you still need them.",
+    );
   } else {
     const preferredBackup = join(hooksDir, chainedHookName);
     const backupFile = existsSync(preferredBackup)
@@ -175,8 +250,12 @@ if (existsSync(hookFile)) {
       // Windows does not support chmod — the hook still runs under Git for Windows / WSL.
     }
 
-    console.warn(`⚠️  Preserved the existing pre-commit hook at ${backupFile}`);
-    console.warn("   The new hook chains to it before running quality checks.");
+    console.warn(
+      `⚠️  Preserved the existing pre-commit hook at ${backupFile}`,
+    );
+    console.warn(
+      "   The new hook chains to it before running quality checks.",
+    );
   }
 }
 

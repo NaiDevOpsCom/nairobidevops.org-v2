@@ -64,6 +64,23 @@ test("manual when no Node version satisfies every constraint", () => {
   assert.equal(r.status, "manual");
 });
 
+test("ignores universal dependency ranges when the current range is unset", () => {
+  // Semver normalises `*`, `>=0`, and `>=0.0.0` to the universal range; none
+  // of them should be listed as an incompatibility.
+  const r = evaluateEngines(null, ["*", ">=0", ">=18"]);
+  assert.deepEqual(r.incompatible, [">=18"]);
+  assert.equal(r.status, "bump");
+  assert.equal(r.candidate, ">=18.0.0");
+});
+
+test("does not format a major-zero upper bound as a caret range", () => {
+  // `^0.1.0` means `>=0.1.0 <0.2.0-0`, so rewriting this pair as a caret
+  // range would silently drop the `<1.0.0` bound and admit every 1.x release.
+  const r = evaluateEngines(">=0.1.0", [">=0.1.0 <1.0.0-0"]);
+  assert.equal(r.status, "bump");
+  assert.equal(r.candidate, ">=0.1.0 <1.0.0-0");
+});
+
 test("extracts node range from every npm view response shape", () => {
   assert.equal(enginesNodeFromNpmView(">=18"), ">=18");
   assert.equal(enginesNodeFromNpmView({ node: ">=20" }), ">=20");

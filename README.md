@@ -27,7 +27,7 @@ A modern, responsive web application for the Nairobi DevOps Community. Built wit
 This platform empowers developers, automation experts, and tech enthusiasts to learn, network, and advance DevOps practices in Kenya's technology ecosystem. It features event management, community resources, job board, and collaborative tools.
 
 - **`frontend/`** — React + TypeScript SPA (Vite, Tailwind CSS, Radix UI, Wouter)
-- **`backend/`** — reserved for the rewritten jobs API (currently empty)
+- **`backend/`** — reserved for the rewritten jobs API (not present yet)
 
 ---
 
@@ -60,7 +60,7 @@ Key directories:
 
 ## Backend Status
 
-The `backend/` directory is intentionally empty while the API is rewritten.
+The `backend/` directory has been removed and will be recreated when the rewritten API lands.
 
 - **Jobs board**: reads from `VITE_API_URL`. When the API is unreachable, `useJobs` sets an error state and the jobs page renders a "Job listings temporarily unavailable" alert with a **Retry** button.
 - **Production / staging**: `.env.production` and `.env.staging` point `VITE_API_URL` at the deployed jobs API.

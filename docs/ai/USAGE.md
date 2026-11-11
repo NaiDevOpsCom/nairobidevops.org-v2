@@ -40,7 +40,7 @@ Use the prompt templates for AI-assisted tasks:
 ### Before Committing
 
 The pre-commit hook automatically:
-1. Runs `npm run check` (lint, typecheck, format, backend checks, tests)
+1. Runs `npm run check` (frontend lint, typecheck, and format)
 2. Captures a session log (git state, uncommitted files, recent commits)
 
 To bypass in emergencies: `git commit --no-verify`
