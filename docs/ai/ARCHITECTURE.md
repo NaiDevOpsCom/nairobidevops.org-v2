@@ -54,7 +54,7 @@
 
 ## Git Strategy
 
-- `.ai/` is **committed** — it's the canonical source shared by the team
+- `.ai/` is **not committed** — it is an optional, local-only workspace. Restore the last tracked snapshot from Git history when you need it (see [README](README.md#provisioning-the-workspace)); each developer keeps their own copy.
 - `.ai/memory/session-log/*` is **gitignored** — session logs are local
 - Tool-specific dirs (`.claude/`, `.cursor/`, `.agents/`, `.windsurf/`, `.github/instructions/`, `.mcp.json`) are **gitignored** — regenerated via `npm run sync`
 - `graphify-out/` is **committed** (knowledge graph), but `cost.json` and `cache/` are ignored
