@@ -192,11 +192,13 @@ function computeFloorCandidate(dependencyRanges) {
   return requiredMinimum ? `>=${requiredMinimum}` : null;
 }
 
-// A `*` engine range constrains nothing, so it must never be reported as an
-// incompatibility (and must never drag the composed candidate down to `*`).
+// A universal engine range constrains nothing, so it must never be reported as
+// an incompatibility (and must never drag the composed candidate down to `*`).
+// Semver normalises `*`, `x`, `>=0`, and `>=0.0.0` to `range === ""`, so
+// comparing against the literal `"*"` misses almost every universal form.
 function isUniversalRange(range) {
   try {
-    return new semver.Range(range).range === "*";
+    return new semver.Range(range).range === "";
   } catch {
     return false;
   }
@@ -327,7 +329,11 @@ function formatComparatorSet(comparators) {
     return text;
   }
 
+  // The caret's upper bound only advances the major line for `^1.0.0` and up.
+  // For 0.x releases caret advances the minor (`^0.1.0` is `<0.2.0-0`), so a
+  // pair like `>=0.1.0 <1.0.0-0` must not be rewritten as `^0.1.0`.
   if (
+    lower.major > 0 &&
     upper.major === lower.major + 1 &&
     upper.minor === 0 &&
     upper.patch === 0
