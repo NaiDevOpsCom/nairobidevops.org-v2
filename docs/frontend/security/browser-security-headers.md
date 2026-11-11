@@ -30,10 +30,10 @@ We implement these headers at the infrastructure level using our deployment conf
 ## Code & Configuration Location
 
 Security headers are defined centrally in the security policy file:
-**[`security-policy.json`](../../security-policy.json)**
+**[`security-policy.json`](../../../frontend/security-policy.json)**
 
 During the build process, the generator script compiles this policy into an Apache configuration file:
-**`frontend/client/public/.htaccess`**
+**`frontend/client/public/.htaccess`** (source) / **`<dist>/.htaccess`** (deployed)
 
 ### Relevant Sections Explained
 

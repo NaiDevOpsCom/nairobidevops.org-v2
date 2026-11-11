@@ -342,7 +342,7 @@ jobs:
 
   quality-summary:
     name: Quality Gates Summary
-    needs: quality-checks
+    needs: [quality-checks]
     runs-on: ubuntu-latest
     if: always()
 
@@ -364,3 +364,4 @@ jobs:
   # The health-check step there curls STAGING_URL after the cPanel deploy
   # completes, giving a reliable post-deploy signal rather than checking
   # a Vercel preview URL that may not exist.
+
