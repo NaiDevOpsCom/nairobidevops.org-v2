@@ -298,17 +298,35 @@ jobs:
               'Other': []
             };
 
+            // Use the full commit history so CHANGELOG.md is complete; the
+            // GitHub release body is truncated separately below.
+            // %b (commit body) is not used by the parser below — drop it to
+            // avoid inflating the string with multi-line commit descriptions.
+            //
+            // Write git's output to a file instead of buffering stdout: a
+            // `HEAD` range can span the entire history and blow past
+            // execFileSync's maxBuffer. execFileSync (not execSync) also
+            // avoids shell interpolation of the range.
             let raw = '';
+            const fs = require('fs');
+            const os = require('os');
+            const path = require('path');
+            const { execFileSync } = require('child_process');
+            const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'changelog-'));
+            const outputFile = path.join(outputDir, 'commits.txt');
             try {
-              // Use the full commit history so CHANGELOG.md is complete; the
-              // GitHub release body is truncated separately below.
-              // %b (commit body) is not used by the parser below — drop it to
-              // avoid inflating the string with multi-line commit descriptions.
-              raw = require('child_process')
-                .execSync(`git log ${range} --format="%s"`, {
-                  encoding: 'utf8', maxBuffer: 10 * 1024 * 1024
-                }).trim();
-            } catch {}
+              execFileSync(
+                'git',
+                ['log', range, '--format=%s', `--output=${outputFile}`],
+                { encoding: 'utf8' }
+              );
+              raw = fs.readFileSync(outputFile, 'utf8').trim();
+            } catch (error) {
+              core.setFailed(`Failed to generate changelog from '${range}': ${error.message}`);
+              return;
+            } finally {
+              fs.rmSync(outputDir, { recursive: true, force: true });
+            }
 
             for (const line of raw.split('\n').filter(Boolean)) {
               const s = line;
@@ -354,7 +372,6 @@ jobs:
             if (!md.includes('- ')) md += '- No significant changes captured for this release.\n';
 
             // Write CHANGELOG.md (full content — no size limit applies here)
-            const fs = require('fs');
             const header = '# Changelog\n\n';
             let existing = '';
             try { existing = fs.readFileSync('CHANGELOG.md', 'utf8'); } catch {}

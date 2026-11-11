@@ -304,7 +304,10 @@ jobs:
           fi
 
       - name: Roll Back Failed Release
-        if: steps.health-check.outcome == 'failure'
+        # Include failure() explicitly: a bare `steps.*.outcome` condition is
+        # implicitly ANDed with success(), so this step was skipped exactly
+        # when it was needed.
+        if: failure() && steps.health-check.outcome == 'failure'
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         env:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
