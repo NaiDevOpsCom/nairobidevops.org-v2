@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { tsImport } from "tsx/esm/api";
 
-import { routes } from "../shared/routes";
+import { routes } from "../shared/routes.ts";
 
 // ---------------------------------------------------------------------------
 // Config
