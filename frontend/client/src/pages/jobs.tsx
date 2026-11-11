@@ -592,22 +592,30 @@ export default function Jobs() {
         // The API caps per_page at 50, so walk every page to get the true
         // count of roles closing this week.
         const perPage = 50;
-        const collected: Job[] = [];
-        let currentPageNumber = 1;
-        let totalPages = 1;
-
-        do {
-          const url = `${apiBase}/?action=jobs&page=${currentPageNumber}&per_page=${perPage}`;
+        const fetchPage = async (pageNumber: number) => {
+          const url = `${apiBase}/?action=jobs&page=${pageNumber}&per_page=${perPage}`;
           const response = await fetch(url, { signal: controller.signal });
-          if (!response.ok) break;
+          if (!response.ok) {
+            throw new Error(`Job count request failed with HTTP ${response.status}`);
+          }
+          return (await response.json()) as { jobs?: Job[]; total_pages?: number };
+        };
 
-          const data: { jobs?: Job[]; total_pages?: number } = await response.json();
-          collected.push(...(data.jobs ?? []));
-          totalPages = data.total_pages ?? 1;
-          currentPageNumber += 1;
-        } while (currentPageNumber <= totalPages);
+        const firstPage = await fetchPage(1);
+        const totalPages = firstPage.total_pages ?? 1;
+        const remainingPages =
+          totalPages > 1
+            ? await Promise.all(
+                Array.from({ length: totalPages - 1 }, (_, index) => fetchPage(index + 2))
+              )
+            : [];
 
-        setAllJobsForCounting(collected);
+        // Only publish the count once every page has loaded. Publishing a
+        // partial list would silently understate how many roles close soon.
+        setAllJobsForCounting([
+          ...(firstPage.jobs ?? []),
+          ...remainingPages.flatMap((pageData) => pageData.jobs ?? []),
+        ]);
       } catch (err) {
         if (err instanceof Error && err.name !== "AbortError") {
           console.error("Failed to fetch job count:", err);
