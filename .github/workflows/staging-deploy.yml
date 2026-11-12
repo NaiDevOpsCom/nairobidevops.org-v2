@@ -291,6 +291,54 @@ jobs:
               exit 1
             fi
 
+      # 7b. Link the persistent Django mount into the new release
+      #
+      # WHY: Every frontend deploy replaces the whole document root, which wipes
+      # anything hand-placed inside it, including the /job Passenger mount.
+      # The real mount lives OUTSIDE any release at ~/jobsboard-mounts/staging
+      # and is re-linked into each new release as `job`.
+      #
+      # This MUST run before the symlink switch (step 8) so /job is never
+      # missing on the live docroot, not even for a second.
+      - name: Restore Django Mount in Release
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          script: |
+            set -euo pipefail
+
+            MOUNT="/home/$REMOTE_USER/jobsboard-mounts/staging"
+            RELEASE_DIR="/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP"
+
+            if [ ! -d "$MOUNT" ]; then
+              echo "❌ Mount folder $MOUNT is missing — aborting before the symlink switch."
+              exit 1
+            fi
+
+            # A real folder named `job` would swallow the link (ln -sfn would
+            # create it INSIDE the folder), so remove it first.
+            # No trailing slash: this deletes the folder or link, never the mount.
+            if [ -e "$RELEASE_DIR/job" ] && [ ! -L "$RELEASE_DIR/job" ]; then
+              rm -rf "$RELEASE_DIR/job"
+            fi
+
+            ln -sfn "$MOUNT" "$RELEASE_DIR/job"
+
+            # Confirm the link resolves to the Passenger block
+            if [ ! -f "$RELEASE_DIR/job/.htaccess" ]; then
+              echo "❌ $RELEASE_DIR/job/.htaccess not found — mount link is broken."
+              exit 1
+            fi
+
+            echo "✅ Django mount linked into release $RELEASE_TIMESTAMP"
+
       # 8. Atomically switch symlink & clean ALL previous staging releases
       #
       # NOTE: Unlike production (which retains last 5 releases for rollback),
@@ -403,6 +451,35 @@ jobs:
             echo "::error::Staging health check failed after $MAX_RETRIES attempts (HTTP $HTTP_CODE)"
             exit 1
           fi
+
+      # 10. Django mount health check
+      #
+      # The check above only proves the React shell is served. This one fails the
+      # deploy if /job fell back to the SPA (HTTP 200 HTML) or Django is down:
+      # only the Django health JSON contains the "python" key.
+      - name: Django Mount Health Check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+        run: |
+          BASE="${STAGING_URL%/}"
+          MAX_RETRIES=5
+
+          for i in $(seq 1 "$MAX_RETRIES"); do
+            BODY="$(curl -fsS --connect-timeout 10 --max-time 30 "$BASE/job/health" || true)"
+
+            if printf '%s' "$BODY" | grep -q '"python"'; then
+              echo "✅ /job/health returned Django JSON"
+              exit 0
+            fi
+
+            echo "⏳ Attempt $i/$MAX_RETRIES: /job/health is not healthy"
+            if [ "$i" -lt "$MAX_RETRIES" ]; then
+              sleep "$((2 ** i))"
+            fi
+          done
+
+          echo "::error::/job/health did not return Django JSON after $MAX_RETRIES attempts. The mount may have been lost."
+          exit 1
 
   notify:
     name: Notify Staging Deployment
