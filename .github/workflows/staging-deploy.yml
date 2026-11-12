@@ -457,7 +457,15 @@ jobs:
       # The check above only proves the React shell is served. This one fails the
       # deploy if /job fell back to the SPA (HTTP 200 HTML) or Django is down:
       # only the Django health JSON contains the "python" key.
+      #
+      # Gated on the STAGING_DJANGO_ENABLED Actions variable because the Django app
+      # is not implemented yet. While the variable is unset this step is skipped
+      # silently instead of failing every deploy against a backend that does not
+      # exist; once backend/ is deployed, set it to "true"
+      # (Settings -> Secrets and variables -> Actions -> Variables) to turn this
+      # back into a hard gate. Nothing here needs to be edited to re-enable it.
       - name: Django Mount Health Check
+        if: vars.STAGING_DJANGO_ENABLED == 'true'
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
         run: |
@@ -465,20 +473,39 @@ jobs:
           MAX_RETRIES=5
 
           for i in $(seq 1 "$MAX_RETRIES"); do
-            BODY="$(curl -fsS --connect-timeout 10 --max-time 30 "$BASE/job/health" || true)"
+            # Capture the status code and body instead of discarding them: a bare
+            # "curl: (22) error: 500" gives no clue whether Django crashed, the
+            # mount vanished, or Passenger refused the app.
+            # `|| CODE=000` on the assignment (not `|| echo 000` inside it) so a
+            # transport failure replaces the code instead of appending to it.
+            CODE="$(curl -sS -o /tmp/job-health.body -w '%{http_code}' \
+              --connect-timeout 10 --max-time 30 "$BASE/job/health")" || CODE="000"
+            BODY="$(cat /tmp/job-health.body 2>/dev/null || true)"
+
+            echo "Attempt $i/$MAX_RETRIES: HTTP $CODE"
+            if [ "$CODE" != "200" ]; then
+              echo "  body: $(printf '%s' "$BODY" | head -c 300)"
+            fi
 
             if printf '%s' "$BODY" | grep -q '"python"'; then
               echo "✅ /job/health returned Django JSON"
               exit 0
             fi
 
-            echo "⏳ Attempt $i/$MAX_RETRIES: /job/health is not healthy"
+            # 403/404 mean the mount or its permissions are gone. Retrying cannot
+            # fix that, so fail fast instead of burning the backoff budget.
+            if [ "$CODE" = "403" ] || [ "$CODE" = "404" ]; then
+              echo "::error::/job/health returned HTTP $CODE - the /job mount is missing or blocked, not merely starting up."
+              exit 1
+            fi
+
+            echo "⏳ Attempt $i/$MAX_RETRIES: /job/health is not healthy yet"
             if [ "$i" -lt "$MAX_RETRIES" ]; then
               sleep "$((2 ** i))"
             fi
           done
 
-          echo "::error::/job/health did not return Django JSON after $MAX_RETRIES attempts. The mount may have been lost."
+          echo "::error::/job/health did not return Django JSON after $MAX_RETRIES attempts (last HTTP $CODE)."
           exit 1
 
   notify:
