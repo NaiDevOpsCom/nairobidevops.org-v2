@@ -456,7 +456,8 @@ jobs:
       #
       # The check above only proves the React shell is served. This one fails the
       # deploy if /job fell back to the SPA (HTTP 200 HTML) or Django is down:
-      # only the Django health JSON contains the "python" key.
+      # health is only accepted as HTTP 200 with the Django JSON body (the
+      # "python" key). A 200 HTML shell, a 500, and a 403/404 all fail the gate.
       #
       # Gated on the STAGING_DJANGO_ENABLED Actions variable because the Django app
       # is not implemented yet. While the variable is unset this step is skipped
@@ -473,6 +474,11 @@ jobs:
           MAX_RETRIES=5
 
           for i in $(seq 1 "$MAX_RETRIES"); do
+            # Truncate first: curl does not touch -o FILE when the connection
+            # fails (exit 7, code 000), so the previous attempt's body would
+            # otherwise be logged - and grepped - for the current attempt.
+            : > /tmp/job-health.body
+
             # Capture the status code and body instead of discarding them: a bare
             # "curl: (22) error: 500" gives no clue whether Django crashed, the
             # mount vanished, or Passenger refused the app.
@@ -487,16 +493,21 @@ jobs:
               echo "  body: $(printf '%s' "$BODY" | head -c 300)"
             fi
 
-            if printf '%s' "$BODY" | grep -q '"python"'; then
-              echo "✅ /job/health returned Django JSON"
-              exit 0
-            fi
-
             # 403/404 mean the mount or its permissions are gone. Retrying cannot
-            # fix that, so fail fast instead of burning the backoff budget.
+            # fix that, so fail fast instead of burning the backoff budget. This
+            # must precede the success branch: an error body can carry the marker.
             if [ "$CODE" = "403" ] || [ "$CODE" = "404" ]; then
               echo "::error::/job/health returned HTTP $CODE - the /job mount is missing or blocked, not merely starting up."
               exit 1
+            fi
+
+            # Success requires BOTH a 200 and the Django JSON marker. Without the
+            # status check, any non-200 body carrying '"python"' (Django debug
+            # traceback, Passenger error page, JSON error payload) would pass the
+            # gate and report a broken mount as healthy.
+            if [ "$CODE" = "200" ] && printf '%s' "$BODY" | grep -q '"python"'; then
+              echo "✅ /job/health returned Django JSON (HTTP 200)"
+              exit 0
             fi
 
             echo "⏳ Attempt $i/$MAX_RETRIES: /job/health is not healthy yet"
