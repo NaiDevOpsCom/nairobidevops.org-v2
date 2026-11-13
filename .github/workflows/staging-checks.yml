@@ -62,7 +62,7 @@ jobs:
           set -o pipefail
           echo "🏗️ Running quick build smoke test..."
           npm run security:generate
-          npm exec -- vite build --mode staging --logLevel error 2>&1 | tail -5
+          ./node_modules/.bin/vite build --mode staging --logLevel error 2>&1 | tail -5
           echo "✅ Build smoke test passed"
 
   quality-checks:
