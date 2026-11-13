@@ -404,14 +404,53 @@ function formatComparatorSet(comparators) {
 }
 
 /**
- * Compose the intersection of several semver ranges (the set of Node versions
- * every range allows). Returns null when the ranges share no version, i.e.
- * when no safe candidate can be derived from them.
+ * Intersect one comparator set from the accumulator with one from the next
+ * range. Returns the union of the two sets, or null when they cannot both
+ * hold at once (or when semver rejects either side).
+ *
+ * @param {string[]} current
+ * @param {string[]} next
+ * @returns {string[]|null}
+ */
+function mergeComparatorSet(current, next) {
+  try {
+    if (!semver.intersects(joinComparators(current), joinComparators(next))) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return [...new Set([...current, ...next])];
+}
+
+/**
+ * Cross every branch accumulated so far with every comparator set of the next
+ * range, keeping only the branches that remain satisfiable.
+ *
+ * @param {string[][]} accumulator
+ * @param {string[][]} sets
+ * @returns {string[][]}
+ */
+function intersectBranchSets(accumulator, sets) {
+  const merged = [];
+  for (const current of accumulator) {
+    for (const next of sets) {
+      const union = mergeComparatorSet(current, next);
+      if (union !== null) merged.push(union);
+    }
+  }
+  return merged;
+}
+
+/**
+ * Fold every range into the running intersection. Returns null as soon as a
+ * range cannot be parsed or no branch is left, so callers never see a partial
+ * intersection.
  *
  * @param {string[]} ranges
- * @returns {string|null}
+ * @returns {string[][]|null}
  */
-function composeIntersection(ranges) {
+function accumulateIntersection(ranges) {
   // Every element is a comparator set (a conjunction); the outer array is a
   // union. Start from the universal range, then intersect with each range.
   let accumulator = [[]];
@@ -419,26 +458,20 @@ function composeIntersection(ranges) {
   for (const range of ranges) {
     const sets = comparatorSetTexts(range);
     if (!sets) return null;
-
-    const merged = [];
-    for (const current of accumulator) {
-      for (const next of sets) {
-        try {
-          if (
-            !semver.intersects(joinComparators(current), joinComparators(next))
-          )
-            continue;
-        } catch {
-          continue;
-        }
-        merged.push([...new Set([...current, ...next])]);
-      }
-    }
-    accumulator = merged;
+    accumulator = intersectBranchSets(accumulator, sets);
     if (accumulator.length === 0) return null;
   }
+  return accumulator;
+}
 
-  // Canonicalise (sort + dedupe comparators) and drop duplicate branches.
+/**
+ * Canonicalise each surviving branch (sort + dedupe comparators) and key the
+ * result by its canonical text, so duplicate branches collapse.
+ *
+ * @param {string[][]} accumulator
+ * @returns {Map<string, string[]>}
+ */
+function canonicaliseBranches(accumulator) {
   const branches = new Map();
   for (const comparators of accumulator) {
     const canonical = new semver.Range(joinComparators(comparators));
@@ -457,10 +490,17 @@ function composeIntersection(ranges) {
     if (text === "*") continue;
     branches.set(text, equivalent ? reduced : original);
   }
-  if (branches.size === 0) return null;
+  return branches;
+}
 
-  // Keep only the widest branch when one branch contains another: the range is
-  // a union, so a narrower branch adds nothing.
+/**
+ * Keep only the widest branch when one branch contains another: the range is a
+ * union, so a narrower branch adds nothing.
+ *
+ * @param {Map<string, string[]>} branches
+ * @returns {Array<{range: string, comparators: string[]}>}
+ */
+function keepWidestBranches(branches) {
   const kept = [];
   for (const [range, comparators] of branches) {
     if (kept.some((entry) => isSubsetSafe(range, entry.range))) continue;
@@ -469,7 +509,25 @@ function composeIntersection(ranges) {
     kept.length = 0;
     kept.push(...survivors);
   }
+  return kept;
+}
 
+/**
+ * Compose the intersection of several semver ranges (the set of Node versions
+ * every range allows). Returns null when the ranges share no version, i.e.
+ * when no safe candidate can be derived from them.
+ *
+ * @param {string[]} ranges
+ * @returns {string|null}
+ */
+function composeIntersection(ranges) {
+  const accumulator = accumulateIntersection(ranges);
+  if (!accumulator) return null;
+
+  const branches = canonicaliseBranches(accumulator);
+  if (branches.size === 0) return null;
+
+  const kept = keepWidestBranches(branches);
   kept.sort((left, right) => {
     const leftMin = getMinVersionFromRange(left.range);
     const rightMin = getMinVersionFromRange(right.range);
