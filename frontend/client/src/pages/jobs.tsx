@@ -629,7 +629,10 @@ export default function Jobs() {
       }
     };
 
-    fetchAllJobs();
+    // The loader owns its own try/catch/finally and never rejects, so the
+    // promise is intentionally not awaited. `void` states that explicitly
+    // instead of leaving a dangling promise.
+    void fetchAllJobs();
     return () => controller.abort();
   }, [allJobsFetched]);
 
