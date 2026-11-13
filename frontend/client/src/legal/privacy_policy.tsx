@@ -72,16 +72,16 @@ export default function PrivacyPolicy() {
             </p>
             <ul className="list-disc list-inside space-y-2 text-muted-foreground leading-relaxed ml-4">
               <li>
-                <span className="font-semibold text-foreground">Identity Data: </span>
+                <span className="font-semibold text-foreground">Identity Data:</span>{" "}
                 Full name, email address, phone number, gender (optional), country, and
                 organization.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Professional Data: </span>
+                <span className="font-semibold text-foreground">Professional Data:</span>{" "}
                 Job title, industry, area of expertise, or education background.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Participation Data: </span>
+                <span className="font-semibold text-foreground">Participation Data:</span>{" "}
                 Event registrations, feedback, photos, and videos from events.
               </li>
               <li>
@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
                 address to deliver pages, but we do not store it in our analytics counters.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Job Board Data: </span>
+                <span className="font-semibold text-foreground">Job Board Data:</span>{" "}
                 If you submit a job listing, we collect the contact email you provide and the
                 listing details. The contact email is used only to confirm and review your
                 submission and is never shown publicly. We also count, per job and per day, how many
@@ -99,7 +99,7 @@ export default function PrivacyPolicy() {
                 no personal identifiers.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Communication Data: </span>
+                <span className="font-semibold text-foreground">Communication Data:</span>{" "}
                 Messages or queries you send us via email, forms, or social media.
               </li>
             </ul>

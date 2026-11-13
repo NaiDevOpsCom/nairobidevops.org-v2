@@ -1,10 +1,10 @@
-export { };
+export {};
 
 declare global {
-    interface Window {
-        ndcConsent?: {
-            open: () => void;
-            status: () => "granted" | "denied" | null;
-        };
-    }
+  interface Window {
+    ndcConsent?: {
+      open: () => void;
+      status: () => "granted" | "denied" | null;
+    };
+  }
 }

@@ -31,13 +31,31 @@ const LOG_VALUE_MAX_LENGTH = 256;
  */
 export function sanitizeForLog(value) {
   if (value === null || value === undefined) return "<unset>";
-  const text = String(value).replace(
+  const text = typeof value === "object" ? toLogString(value) : String(value);
+  const sanitized = text.replace(
     // eslint-disable-next-line no-control-regex -- stripping control chars is the point
     /[\u0000-\u001F\u007F-\u009F]/g,
     "",
   );
-  if (text.length <= LOG_VALUE_MAX_LENGTH) return text;
-  return `${text.slice(0, LOG_VALUE_MAX_LENGTH - 1)}…`;
+  if (sanitized.length <= LOG_VALUE_MAX_LENGTH) return sanitized;
+  return `${sanitized.slice(0, LOG_VALUE_MAX_LENGTH - 1)}…`;
+}
+
+/**
+ * Serialize an object to a log-safe string using `JSON.stringify`. Falls back
+ * to `String()` only when the object is circular or otherwise unserializable.
+ * Callers are responsible for ensuring `value` is an object before calling
+ * this function.
+ * @param {object} value
+ * @returns {string}
+ */
+function toLogString(value) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    // Circular or otherwise unserializable — String() is the last resort.
+    return String(value);
+  }
 }
 
 function maxVersion(versions) {
@@ -168,28 +186,26 @@ async function collectRequiredNodeVersions() {
   const packageJson = await readJson(packageJsonPath);
   const lockfile = await readJson(lockFilePath);
   const dependencyNames = gatherDependencyList(packageJson);
-  const queue = [...dependencyNames];
 
   const requiredRanges = [];
-  const concurrency = 6;
-  const workers = Array.from({ length: concurrency }, async () => {
-    while (queue.length > 0) {
-      const name = queue.shift();
-      if (!name) continue;
+
+  const resolved = await Promise.all(
+    dependencyNames.map(async (name) => {
       const versionSpec = await resolveDependencyVersion(
         name,
         packageJson,
         lockfile,
       );
-      if (!versionSpec) continue;
+      if (!versionSpec) return null;
       const engines = await npmViewEngines(name, versionSpec);
-      const range = enginesNodeFromNpmView(engines);
-      if (!range) continue;
-      requiredRanges.push(range);
-    }
+      return enginesNodeFromNpmView(engines);
+    }),
+  );
+
+  resolved.forEach((range) => {
+    if (range) requiredRanges.push(range);
   });
 
-  await Promise.all(workers);
   return requiredRanges;
 }
 
@@ -312,8 +328,11 @@ function reduceComparators(comparators) {
   }
   if (reduced.length === 0) return null;
 
+  // Validate that the reduced comparators form a parseable range; an invalid
+  // range causes semver.Range to throw and we return null instead.
   try {
-    new semver.Range(joinComparators(reduced));
+    const validatedRange = new semver.Range(joinComparators(reduced));
+    if (!validatedRange) return null;
   } catch {
     return null;
   }
@@ -346,9 +365,8 @@ function formatComparatorSet(comparators) {
   // that exact shape is equivalent to the caret/tilde shorthand.
   if (
     !lower ||
-    !upper ||
-    upper.prerelease.length !== 1 ||
-    upper.prerelease[0] !== 0
+    upper?.prerelease.length !== 1 ||
+    upper?.prerelease[0] !== 0
   ) {
     return text;
   }
@@ -435,10 +453,12 @@ function composeIntersection(ranges) {
   const kept = [];
   for (const [range, comparators] of branches) {
     if (kept.some((entry) => isSubsetSafe(range, entry.range))) continue;
-    for (let index = kept.length - 1; index >= 0; index -= 1) {
-      if (isSubsetSafe(kept[index].range, range)) kept.splice(index, 1);
-    }
-    kept.push({ range, comparators });
+    const survivors = kept.filter(
+      (entry) => !isSubsetSafe(entry.range, range),
+    );
+    survivors.push({ range, comparators });
+    kept.length = 0;
+    kept.push(...survivors);
   }
 
   kept.sort((left, right) => {
