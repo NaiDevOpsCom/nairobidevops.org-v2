@@ -374,7 +374,11 @@ function formatComparatorSet(comparators) {
   const upper = semver.parse(upperComparator.slice(1));
   // `^`/`~` exclude prereleases of the next line via an `-0` upper bound; only
   // that exact shape is equivalent to the caret/tilde shorthand.
-  if (!lower || upper?.prerelease.length !== 1 || upper?.prerelease[0] !== 0) {
+  if (
+    !lower ||
+    upper?.prerelease?.length !== 1 ||
+    upper?.prerelease?.[0] !== 0
+  ) {
     return text;
   }
 
