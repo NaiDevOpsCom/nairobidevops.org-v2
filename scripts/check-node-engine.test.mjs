@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   evaluateEngines,
   enginesNodeFromNpmView,
+  sanitizeForLog,
 } from "./check-node-engine.js";
 
 test("ok when current range is a subset of every dep range", () => {
@@ -79,6 +80,34 @@ test("does not format a major-zero upper bound as a caret range", () => {
   const r = evaluateEngines(">=0.1.0", [">=0.1.0 <1.0.0-0"]);
   assert.equal(r.status, "bump");
   assert.equal(r.candidate, ">=0.1.0 <1.0.0-0");
+});
+
+test("sanitizeForLog strips control characters so a tainted range cannot forge log lines", () => {
+  // External values (npm registry responses, third-party package.json files)
+  // reach these log lines. Without stripping, a value carrying \n or an ANSI
+  // escape sequence can forge log entries or hide the real outcome.
+  assert.equal(
+    sanitizeForLog("^22.0.0\nINJECTED LOG LINE"),
+    "^22.0.0INJECTED LOG LINE",
+  );
+  assert.equal(sanitizeForLog("^22.0.0\r\n\u001b[31mred"), "^22.0.0[31mred");
+  assert.equal(sanitizeForLog("tab\there"), "tabhere");
+  // Unicode line/paragraph separators and bidi controls can reorder or
+  // visually disguise the text without breaking it into a new log line.
+  assert.equal(sanitizeForLog("a\u2028b\u2029c"), "abc");
+  assert.equal(sanitizeForLog("a\u202eb\u2066c\u2069d"), "abcd");
+  assert.equal(sanitizeForLog("\u200eleft\u200fright"), "leftright");
+});
+
+test("sanitizeForLog reports unset values and truncates oversized input", () => {
+  assert.equal(sanitizeForLog(null), "<unset>");
+  assert.equal(sanitizeForLog(undefined), "<unset>");
+  assert.equal(sanitizeForLog("").length, 0);
+  assert.equal(sanitizeForLog("x".repeat(500)).length, 256);
+  assert.equal(sanitizeForLog("x".repeat(256)).length, 256);
+  // JSON.stringify returns undefined when toJSON yields undefined; the
+  // fallback must still produce a string for the control-char pass.
+  assert.equal(sanitizeForLog({ toJSON: () => undefined }), "[object Object]");
 });
 
 test("extracts node range from every npm view response shape", () => {

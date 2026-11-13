@@ -16,6 +16,56 @@ let targetDir = process.argv[2]
 let packageJsonPath = path.join(targetDir, "package.json");
 let lockFilePath = path.join(targetDir, "package-lock.json");
 
+const LOG_VALUE_MAX_LENGTH = 256;
+
+// `npm view` spawns a subprocess, so fanning out across every dependency at
+// once (94 for the root manifest) risks throttling or process exhaustion.
+// Those failures are swallowed as "missing engine data", which would produce an
+// incomplete check, so keep the fan-out bounded.
+const NPM_VIEW_CONCURRENCY = 6;
+
+/**
+ * Make an externally sourced value safe to interpolate into a log line.
+ *
+ * Ranges printed by this script come from `package.json` and from `npm view`
+ * responses, so they are untrusted input: a value carrying CR/LF or an ANSI
+ * escape sequence could forge log entries, hide the real outcome, or inject
+ * terminal escapes into the CI log.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function sanitizeForLog(value) {
+  if (value === null || value === undefined) return "<unset>";
+  const text = typeof value === "object" ? toLogString(value) : String(value);
+  const sanitized = text.replace(
+    // eslint-disable-next-line no-control-regex -- stripping control chars is the point
+    /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069]/g,
+    "",
+  );
+  if (sanitized.length <= LOG_VALUE_MAX_LENGTH) return sanitized;
+  return `${sanitized.slice(0, LOG_VALUE_MAX_LENGTH - 1)}…`;
+}
+
+/**
+ * Serialize an object to a log-safe string using `JSON.stringify`. Falls back
+ * to `String()` only when the object is circular or otherwise unserializable.
+ * Callers are responsible for ensuring `value` is an object before calling
+ * this function.
+ * @param {object} value
+ * @returns {string}
+ */
+function toLogString(value) {
+  try {
+    // JSON.stringify returns undefined (it does not throw) when a value's
+    // toJSON yields undefined, so coalesce before the caller calls replace().
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    // Circular or otherwise unserializable — String() is the last resort.
+    return String(value);
+  }
+}
+
 function maxVersion(versions) {
   return versions.reduce((highest, next) => {
     if (!highest) return next;
@@ -76,7 +126,7 @@ async function npmViewEngines(packageName, versionSpec) {
     }
   } catch (error) {
     console.warn(
-      `Warning: failed to query ${spec}. Skipping. ${error.message}`,
+      `Warning: failed to query ${sanitizeForLog(spec)}. Skipping. ${sanitizeForLog(error.message)}`,
     );
     return null;
   }
@@ -144,11 +194,12 @@ async function collectRequiredNodeVersions() {
   const packageJson = await readJson(packageJsonPath);
   const lockfile = await readJson(lockFilePath);
   const dependencyNames = gatherDependencyList(packageJson);
-  const queue = [...dependencyNames];
 
   const requiredRanges = [];
-  const concurrency = 6;
-  const workers = Array.from({ length: concurrency }, async () => {
+  const queue = [...dependencyNames];
+  const workerCount = Math.min(NPM_VIEW_CONCURRENCY, queue.length);
+
+  const workers = Array.from({ length: workerCount }, async () => {
     while (queue.length > 0) {
       const name = queue.shift();
       if (!name) continue;
@@ -288,8 +339,11 @@ function reduceComparators(comparators) {
   }
   if (reduced.length === 0) return null;
 
+  // Validate that the reduced comparators form a parseable range; an invalid
+  // range causes semver.Range to throw and we return null instead.
   try {
-    new semver.Range(joinComparators(reduced));
+    const validatedRange = new semver.Range(joinComparators(reduced));
+    if (!validatedRange) return null;
   } catch {
     return null;
   }
@@ -320,12 +374,7 @@ function formatComparatorSet(comparators) {
   const upper = semver.parse(upperComparator.slice(1));
   // `^`/`~` exclude prereleases of the next line via an `-0` upper bound; only
   // that exact shape is equivalent to the caret/tilde shorthand.
-  if (
-    !lower ||
-    !upper ||
-    upper.prerelease.length !== 1 ||
-    upper.prerelease[0] !== 0
-  ) {
+  if (!lower || upper?.prerelease.length !== 1 || upper?.prerelease[0] !== 0) {
     return text;
   }
 
@@ -411,10 +460,10 @@ function composeIntersection(ranges) {
   const kept = [];
   for (const [range, comparators] of branches) {
     if (kept.some((entry) => isSubsetSafe(range, entry.range))) continue;
-    for (let index = kept.length - 1; index >= 0; index -= 1) {
-      if (isSubsetSafe(kept[index].range, range)) kept.splice(index, 1);
-    }
-    kept.push({ range, comparators });
+    const survivors = kept.filter((entry) => !isSubsetSafe(entry.range, range));
+    survivors.push({ range, comparators });
+    kept.length = 0;
+    kept.push(...survivors);
   }
 
   kept.sort((left, right) => {
@@ -526,13 +575,10 @@ async function run() {
   const outcome = evaluateEngines(currentRange, requiredRanges);
 
   if (outcome.status === "ok") {
-    // Printed values are semver range strings from package.json and the npm
-    // registry — not sensitive data, so Sonar's S8689 taint flag is a false
-    // positive here.
-    console.log(
-      // NOSONAR (prints semver range strings, not sensitive data)
-      `Current engines.node range (${currentRange}) is supported by every dependency. No update needed.`,
-    );
+    // The logged value is a semver range from the repo's own package.json and
+    // npm metadata: not sensitive data, and sanitized against log injection.
+    const message = `Current engines.node range (${sanitizeForLog(currentRange)}) is supported by every dependency. No update needed.`;
+    console.log(message); // NOSONAR: semver range, not sensitive data
     return;
   }
 
@@ -547,28 +593,26 @@ async function run() {
       JSON.stringify(packageJson, null, 2) + "\n",
       "utf8",
     );
-    console.log(
-      // NOSONAR (prints semver range strings, not sensitive data)
-      `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${outcome.candidate}`,
-    );
+    // Same rationale as above: semver ranges, not sensitive data.
+    const message = `Updated package.json engines.node from ${sanitizeForLog(currentRange)} to ${sanitizeForLog(outcome.candidate)}`;
+    console.log(message); // NOSONAR: semver ranges, not sensitive data
     return;
   }
 
-  console.error(
-    // NOSONAR (prints semver range strings, not sensitive data)
-    [
-      "engines.node cannot be updated automatically: dependency Node ranges",
-      "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
-      "",
-      "Current engines.node:",
-      `  ${currentRange ?? "<unset>"}`,
-      "",
-      "Dependency ranges that constrain the project range:",
-      ...outcome.incompatible.map((range) => `  ${range}`),
-      "",
-      "Update engines.node in package.json to a range that is a subset of every range above.",
-    ].join("\n"),
-  );
+  // Same rationale: semver ranges, not sensitive data.
+  const message = [
+    "engines.node cannot be updated automatically: dependency Node ranges",
+    "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
+    "",
+    "Current engines.node:",
+    `  ${sanitizeForLog(currentRange)}`,
+    "",
+    "Dependency ranges that constrain the project range:",
+    ...outcome.incompatible.map((range) => `  ${sanitizeForLog(range)}`),
+    "",
+    "Update engines.node in package.json to a range that is a subset of every range above.",
+  ].join("\n");
+  console.error(message); // NOSONAR: semver ranges, not sensitive data
   process.exitCode = 1;
 }
 

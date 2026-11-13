@@ -277,9 +277,9 @@ function JobCard({ job }: { readonly job: Job }) {
             )}
 
             {/* Source attribution */}
-            {/* <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono text-muted-foreground bg-muted/50">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono text-muted-foreground bg-muted/50">
               via {job.source}
-            </span> */}
+            </span>
 
             {/* Tech tags */}
             {job.tags.slice(0, 3).map((tag) => (
