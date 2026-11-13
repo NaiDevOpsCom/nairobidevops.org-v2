@@ -575,10 +575,13 @@ async function run() {
   const outcome = evaluateEngines(currentRange, requiredRanges);
 
   if (outcome.status === "ok") {
-    // The logged value is a semver range from the repo's own package.json and
-    // npm metadata: not sensitive data, and sanitized against log injection.
-    const message = `Current engines.node range (${sanitizeForLog(currentRange)}) is supported by every dependency. No update needed.`;
-    console.log(message); // NOSONAR: semver range, not sensitive data
+    // Deliberately does not echo `currentRange`: it is read from package.json
+    // and therefore untrusted input, and there is nothing actionable to print
+    // when nothing needs changing. The range is reported by the branches below
+    // when the operator actually has to act on it.
+    console.log(
+      "Current engines.node range is supported by every dependency. No update needed.",
+    );
     return;
   }
 
@@ -593,13 +596,11 @@ async function run() {
       JSON.stringify(packageJson, null, 2) + "\n",
       "utf8",
     );
-    // Same rationale as above: semver ranges, not sensitive data.
     const message = `Updated package.json engines.node from ${sanitizeForLog(currentRange)} to ${sanitizeForLog(outcome.candidate)}`;
-    console.log(message); // NOSONAR: semver ranges, not sensitive data
+    console.log(message);
     return;
   }
 
-  // Same rationale: semver ranges, not sensitive data.
   const message = [
     "engines.node cannot be updated automatically: dependency Node ranges",
     "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
@@ -612,7 +613,7 @@ async function run() {
     "",
     "Update engines.node in package.json to a range that is a subset of every range above.",
   ].join("\n");
-  console.error(message); // NOSONAR: semver ranges, not sensitive data
+  console.error(message);
   process.exitCode = 1;
 }
 
