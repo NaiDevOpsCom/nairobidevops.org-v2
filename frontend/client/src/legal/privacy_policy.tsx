@@ -84,10 +84,10 @@ export default function PrivacyPolicy() {
                 registrations, feedback, photos, and videos from events.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Technical Data: </span>
-                Browser type, device type, and general location, collected by Google Analytics only
-                if you accept analytics cookies (see Section 7). Our servers also process your IP
-                address to deliver pages, but we do not store it in our analytics counters.
+                <span className="font-semibold text-foreground">Technical Data:</span> Browser type,
+                device type, and general location, collected by Google Analytics only if you accept
+                analytics cookies (see Section 7). Our servers also process your IP address to
+                deliver pages, but we do not store it in our analytics counters.
               </li>
               <li>
                 <span className="font-semibold text-foreground">Job Board Data:</span> If you submit

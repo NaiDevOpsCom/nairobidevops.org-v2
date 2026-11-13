@@ -18,6 +18,12 @@ let lockFilePath = path.join(targetDir, "package-lock.json");
 
 const LOG_VALUE_MAX_LENGTH = 256;
 
+// `npm view` spawns a subprocess, so fanning out across every dependency at
+// once (94 for the root manifest) risks throttling or process exhaustion.
+// Those failures are swallowed as "missing engine data", which would produce an
+// incomplete check, so keep the fan-out bounded.
+const NPM_VIEW_CONCURRENCY = 6;
+
 /**
  * Make an externally sourced value safe to interpolate into a log line.
  *
@@ -51,7 +57,9 @@ export function sanitizeForLog(value) {
  */
 function toLogString(value) {
   try {
-    return JSON.stringify(value);
+    // JSON.stringify returns undefined (it does not throw) when a value's
+    // toJSON yields undefined, so coalesce before the caller calls replace().
+    return JSON.stringify(value) ?? String(value);
   } catch {
     // Circular or otherwise unserializable — String() is the last resort.
     return String(value);
@@ -188,24 +196,27 @@ async function collectRequiredNodeVersions() {
   const dependencyNames = gatherDependencyList(packageJson);
 
   const requiredRanges = [];
+  const queue = [...dependencyNames];
+  const workerCount = Math.min(NPM_VIEW_CONCURRENCY, queue.length);
 
-  const resolved = await Promise.all(
-    dependencyNames.map(async (name) => {
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (queue.length > 0) {
+      const name = queue.shift();
+      if (!name) continue;
       const versionSpec = await resolveDependencyVersion(
         name,
         packageJson,
         lockfile,
       );
-      if (!versionSpec) return null;
+      if (!versionSpec) continue;
       const engines = await npmViewEngines(name, versionSpec);
-      return enginesNodeFromNpmView(engines);
-    }),
-  );
-
-  resolved.forEach((range) => {
-    if (range) requiredRanges.push(range);
+      const range = enginesNodeFromNpmView(engines);
+      if (!range) continue;
+      requiredRanges.push(range);
+    }
   });
 
+  await Promise.all(workers);
   return requiredRanges;
 }
 
@@ -363,11 +374,7 @@ function formatComparatorSet(comparators) {
   const upper = semver.parse(upperComparator.slice(1));
   // `^`/`~` exclude prereleases of the next line via an `-0` upper bound; only
   // that exact shape is equivalent to the caret/tilde shorthand.
-  if (
-    !lower ||
-    upper?.prerelease.length !== 1 ||
-    upper?.prerelease[0] !== 0
-  ) {
+  if (!lower || upper?.prerelease.length !== 1 || upper?.prerelease[0] !== 0) {
     return text;
   }
 
@@ -453,9 +460,7 @@ function composeIntersection(ranges) {
   const kept = [];
   for (const [range, comparators] of branches) {
     if (kept.some((entry) => isSubsetSafe(range, entry.range))) continue;
-    const survivors = kept.filter(
-      (entry) => !isSubsetSafe(entry.range, range),
-    );
+    const survivors = kept.filter((entry) => !isSubsetSafe(entry.range, range));
     survivors.push({ range, comparators });
     kept.length = 0;
     kept.push(...survivors);

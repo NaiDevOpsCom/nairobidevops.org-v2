@@ -105,6 +105,9 @@ test("sanitizeForLog reports unset values and truncates oversized input", () => 
   assert.equal(sanitizeForLog("").length, 0);
   assert.equal(sanitizeForLog("x".repeat(500)).length, 256);
   assert.equal(sanitizeForLog("x".repeat(256)).length, 256);
+  // JSON.stringify returns undefined when toJSON yields undefined; the
+  // fallback must still produce a string for the control-char pass.
+  assert.equal(sanitizeForLog({ toJSON: () => undefined }), "[object Object]");
 });
 
 test("extracts node range from every npm view response shape", () => {
