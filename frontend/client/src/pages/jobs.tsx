@@ -629,7 +629,10 @@ export default function Jobs() {
       }
     };
 
-    fetchAllJobs();
+    // The loader owns its own try/catch/finally and never rejects, so the
+    // promise is intentionally not awaited. `void` states that explicitly
+    // instead of leaving a dangling promise.
+    void fetchAllJobs();
     return () => controller.abort();
   }, [allJobsFetched]);
 
@@ -807,7 +810,7 @@ export default function Jobs() {
           <section className="flex-1 space-y-4" aria-label="Job listings">
             {/* Top bar: count + sort */}
             <div className="flex items-center justify-between pb-4 border-b border-border">
-              <p role="status" className="text-sm text-muted-foreground">
+              <output className="text-sm text-muted-foreground">
                 {isLoading ? (
                   "Loading…"
                 ) : (
@@ -816,7 +819,7 @@ export default function Jobs() {
                     {total === 1 ? "role" : "roles"} found
                   </>
                 )}
-              </p>
+              </output>
 
               {/* Sort (desktop) */}
               <div className="hidden md:flex items-center gap-2">
@@ -872,19 +875,16 @@ export default function Jobs() {
 
             {/* Empty state */}
             {!isLoading && !isError && jobs.length === 0 && (
-              <div
-                role="status"
-                className="flex flex-col items-center gap-3 py-16 text-center bg-card border border-border rounded-xl"
-              >
+              <output className="flex flex-col items-center gap-3 py-16 text-center bg-card border border-border rounded-xl">
                 <Search className="h-10 w-10 text-muted-foreground/40" />
-                <p className="font-medium text-foreground">No roles match your filters</p>
-                <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">No roles match your filters</span>
+                <span className="block text-sm text-muted-foreground">
                   Try adjusting your filters or check back tomorrow — we update listings daily.
-                </p>
+                </span>
                 <Button variant="outline" className="mt-1" onClick={clearFilters}>
                   Clear all filters
                 </Button>
-              </div>
+              </output>
             )}
 
             {/* Job cards */}

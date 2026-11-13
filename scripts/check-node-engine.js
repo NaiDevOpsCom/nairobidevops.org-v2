@@ -374,7 +374,11 @@ function formatComparatorSet(comparators) {
   const upper = semver.parse(upperComparator.slice(1));
   // `^`/`~` exclude prereleases of the next line via an `-0` upper bound; only
   // that exact shape is equivalent to the caret/tilde shorthand.
-  if (!lower || upper?.prerelease.length !== 1 || upper?.prerelease[0] !== 0) {
+  if (
+    !lower ||
+    upper?.prerelease?.length !== 1 ||
+    upper?.prerelease?.[0] !== 0
+  ) {
     return text;
   }
 
@@ -400,14 +404,53 @@ function formatComparatorSet(comparators) {
 }
 
 /**
- * Compose the intersection of several semver ranges (the set of Node versions
- * every range allows). Returns null when the ranges share no version, i.e.
- * when no safe candidate can be derived from them.
+ * Intersect one comparator set from the accumulator with one from the next
+ * range. Returns the union of the two sets, or null when they cannot both
+ * hold at once (or when semver rejects either side).
+ *
+ * @param {string[]} current
+ * @param {string[]} next
+ * @returns {string[]|null}
+ */
+function mergeComparatorSet(current, next) {
+  try {
+    if (!semver.intersects(joinComparators(current), joinComparators(next))) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return [...new Set([...current, ...next])];
+}
+
+/**
+ * Cross every branch accumulated so far with every comparator set of the next
+ * range, keeping only the branches that remain satisfiable.
+ *
+ * @param {string[][]} accumulator
+ * @param {string[][]} sets
+ * @returns {string[][]}
+ */
+function intersectBranchSets(accumulator, sets) {
+  const merged = [];
+  for (const current of accumulator) {
+    for (const next of sets) {
+      const union = mergeComparatorSet(current, next);
+      if (union !== null) merged.push(union);
+    }
+  }
+  return merged;
+}
+
+/**
+ * Fold every range into the running intersection. Returns null as soon as a
+ * range cannot be parsed or no branch is left, so callers never see a partial
+ * intersection.
  *
  * @param {string[]} ranges
- * @returns {string|null}
+ * @returns {string[][]|null}
  */
-function composeIntersection(ranges) {
+function accumulateIntersection(ranges) {
   // Every element is a comparator set (a conjunction); the outer array is a
   // union. Start from the universal range, then intersect with each range.
   let accumulator = [[]];
@@ -415,26 +458,20 @@ function composeIntersection(ranges) {
   for (const range of ranges) {
     const sets = comparatorSetTexts(range);
     if (!sets) return null;
-
-    const merged = [];
-    for (const current of accumulator) {
-      for (const next of sets) {
-        try {
-          if (
-            !semver.intersects(joinComparators(current), joinComparators(next))
-          )
-            continue;
-        } catch {
-          continue;
-        }
-        merged.push([...new Set([...current, ...next])]);
-      }
-    }
-    accumulator = merged;
+    accumulator = intersectBranchSets(accumulator, sets);
     if (accumulator.length === 0) return null;
   }
+  return accumulator;
+}
 
-  // Canonicalise (sort + dedupe comparators) and drop duplicate branches.
+/**
+ * Canonicalise each surviving branch (sort + dedupe comparators) and key the
+ * result by its canonical text, so duplicate branches collapse.
+ *
+ * @param {string[][]} accumulator
+ * @returns {Map<string, string[]>}
+ */
+function canonicaliseBranches(accumulator) {
   const branches = new Map();
   for (const comparators of accumulator) {
     const canonical = new semver.Range(joinComparators(comparators));
@@ -453,10 +490,17 @@ function composeIntersection(ranges) {
     if (text === "*") continue;
     branches.set(text, equivalent ? reduced : original);
   }
-  if (branches.size === 0) return null;
+  return branches;
+}
 
-  // Keep only the widest branch when one branch contains another: the range is
-  // a union, so a narrower branch adds nothing.
+/**
+ * Keep only the widest branch when one branch contains another: the range is a
+ * union, so a narrower branch adds nothing.
+ *
+ * @param {Map<string, string[]>} branches
+ * @returns {Array<{range: string, comparators: string[]}>}
+ */
+function keepWidestBranches(branches) {
   const kept = [];
   for (const [range, comparators] of branches) {
     if (kept.some((entry) => isSubsetSafe(range, entry.range))) continue;
@@ -465,7 +509,25 @@ function composeIntersection(ranges) {
     kept.length = 0;
     kept.push(...survivors);
   }
+  return kept;
+}
 
+/**
+ * Compose the intersection of several semver ranges (the set of Node versions
+ * every range allows). Returns null when the ranges share no version, i.e.
+ * when no safe candidate can be derived from them.
+ *
+ * @param {string[]} ranges
+ * @returns {string|null}
+ */
+function composeIntersection(ranges) {
+  const accumulator = accumulateIntersection(ranges);
+  if (!accumulator) return null;
+
+  const branches = canonicaliseBranches(accumulator);
+  if (branches.size === 0) return null;
+
+  const kept = keepWidestBranches(branches);
   kept.sort((left, right) => {
     const leftMin = getMinVersionFromRange(left.range);
     const rightMin = getMinVersionFromRange(right.range);
@@ -575,10 +637,11 @@ async function run() {
   const outcome = evaluateEngines(currentRange, requiredRanges);
 
   if (outcome.status === "ok") {
-    // The logged value is a semver range from the repo's own package.json and
-    // npm metadata: not sensitive data, and sanitized against log injection.
-    const message = `Current engines.node range (${sanitizeForLog(currentRange)}) is supported by every dependency. No update needed.`;
-    console.log(message); // NOSONAR: semver range, not sensitive data
+    // Nothing needs changing, so there is nothing to report beyond the verdict:
+    // the range itself is package.json content and must never be logged.
+    console.log(
+      "Current engines.node range is supported by every dependency. No update needed.",
+    );
     return;
   }
 
@@ -593,26 +656,28 @@ async function run() {
       JSON.stringify(packageJson, null, 2) + "\n",
       "utf8",
     );
-    // Same rationale as above: semver ranges, not sensitive data.
-    const message = `Updated package.json engines.node from ${sanitizeForLog(currentRange)} to ${sanitizeForLog(outcome.candidate)}`;
-    console.log(message); // NOSONAR: semver ranges, not sensitive data
+    // Neither the previous nor the new range is echoed: both are package.json
+    // content, which must never be written to the log. `git diff package.json`
+    // shows exactly what changed.
+    console.log(
+      "Updated package.json engines.node to a range every dependency supports (see `git diff package.json`).",
+    );
     return;
   }
 
-  // Same rationale: semver ranges, not sensitive data.
-  const message = [
-    "engines.node cannot be updated automatically: dependency Node ranges",
-    "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
-    "",
-    "Current engines.node:",
-    `  ${sanitizeForLog(currentRange)}`,
-    "",
-    "Dependency ranges that constrain the project range:",
-    ...outcome.incompatible.map((range) => `  ${sanitizeForLog(range)}`),
-    "",
-    "Update engines.node in package.json to a range that is a subset of every range above.",
-  ].join("\n");
-  console.error(message); // NOSONAR: semver ranges, not sensitive data
+  console.error(
+    [
+      "engines.node cannot be updated automatically: dependency Node ranges",
+      "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
+      "",
+      "The current range and the dependency ranges that constrain it are not",
+      "printed here: they are read from package.json, and file content must not",
+      "be written to logs.",
+      "",
+      "Inspect engines.node in package.json and in each direct dependency's",
+      "manifest, then set the project range to a subset of every one of them.",
+    ].join("\n"),
+  );
   process.exitCode = 1;
 }
 

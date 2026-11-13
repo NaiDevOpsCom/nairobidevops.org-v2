@@ -279,7 +279,9 @@ export function useJobs(filters: JobFilters): UseJobsResult {
       }
     };
 
-    fetchJobs();
+    // fetchJobs catches every outcome internally, so the promise cannot
+    // reject. `void` makes the deliberate non-await explicit.
+    void fetchJobs();
 
     // Cancel the in-flight request when the effect re-runs or the component unmounts
     return () => controller.abort();

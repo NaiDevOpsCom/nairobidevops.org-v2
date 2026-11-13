@@ -61,10 +61,10 @@ jobs:
       - name: Install and Validate Dependencies
         run: |
           echo "📦 Installing dependencies with lockfile validation..."
-          npm ci
+          npm ci --ignore-scripts
 
           echo "🔒 Validating lockfile integrity..."
-          npx lockfile-lint \
+          ./node_modules/.bin/lockfile-lint \
             --path package-lock.json \
             --type npm \
             --validate-https \
@@ -90,7 +90,7 @@ jobs:
       - name: Hardened Build Unit Test (CI enforcement)
         env:
           CI_ENFORCE_HARDENING: "true"
-        run: npx vitest run src/utils/__tests__/hardenedBuildCheck.test.ts
+        run: ./node_modules/.bin/vitest run src/utils/__tests__/hardenedBuildCheck.test.ts
 
       - name: Verify No Source Maps
         run: |

@@ -517,9 +517,9 @@ function FAQCarousel() {
         </div>
       )}
 
-      <p className="sr-only" role="status">
+      <output className="sr-only">
         Slide {slideIdx + 1} of {slides.length}
-      </p>
+      </output>
     </div>
   );
 }

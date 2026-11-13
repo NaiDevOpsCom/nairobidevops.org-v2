@@ -59,24 +59,14 @@ jobs:
       # Install dependencies (lockfile guaranteed to exist here)
       # ------------------------------------------------------------
       - name: Verify lockfile integrity (npm ci)
-        run: npm ci
-
-      # ------------------------------------------------------------
-      # Ensure lockfile-lint is installed
-      # ------------------------------------------------------------
-      - name: Ensure lockfile-lint is available
-        run: |
-          if ! npx --yes lockfile-lint --version >/dev/null 2>&1; then
-            echo "Installing lockfile-lint locally..."
-            npm install --no-save lockfile-lint
-          fi
+        run: npm ci --ignore-scripts
 
       # ------------------------------------------------------------
       # Lint lockfile
       # ------------------------------------------------------------
       - name: Lint lockfile
         run: |
-          npx lockfile-lint \
+          ./node_modules/.bin/lockfile-lint \
             --path package-lock.json \
             --type npm \
             --validate-https \

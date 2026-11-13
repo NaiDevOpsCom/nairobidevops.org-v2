@@ -181,6 +181,15 @@ jobs:
             major) echo "new_version=$((P[0]+1)).0.0" ;;
             minor) echo "new_version=${P[0]}.$((P[1]+1)).0" ;;
             patch) echo "new_version=${P[0]}.${P[1]}.$((P[2]+1))" ;;
+            # BUMP is either auto-detected or taken from the workflow_dispatch
+            # input, so it can hold an unsupported value such as "manual" with
+            # an empty version. Without this branch the step would emit no
+            # new_version at all and the release would continue with an empty
+            # version; fail instead.
+            *)
+              echo "::error::Unsupported bump type '${BUMP}' — cannot compute a new version" >&2
+              exit 1
+              ;;
           esac >> "$GITHUB_OUTPUT"
 
       - name: Guard — check for existing tag & release

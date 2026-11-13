@@ -31,11 +31,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint lockfile (registry/https)
         run: |
-          npx lockfile-lint \
+          ./node_modules/.bin/lockfile-lint \
             --path package-lock.json \
             --type npm \
             --validate-https \

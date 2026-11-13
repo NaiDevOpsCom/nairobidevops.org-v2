@@ -42,7 +42,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Dependencies
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --ignore-scripts
 
       - name: Check Type Compatibility
         run: |
@@ -62,7 +62,7 @@ jobs:
           set -o pipefail
           echo "🏗️ Running quick build smoke test..."
           npm run security:generate
-          npx vite build --mode staging --logLevel error 2>&1 | tail -5
+          ./node_modules/.bin/vite build --mode staging --logLevel error 2>&1 | tail -5
           echo "✅ Build smoke test passed"
 
   quality-checks:
@@ -91,7 +91,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Dependencies
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --ignore-scripts
 
       # FIXED: Separated lint checks - only run linting, not typecheck
       - name: Lint and Format Check

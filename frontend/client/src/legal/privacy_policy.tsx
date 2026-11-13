@@ -220,7 +220,7 @@ export default function PrivacyPolicy() {
               7. Cookies and Tracking Technologies
             </h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
-              <span className="font-semibold text-foreground">Analytics cookies (optional). </span>
+              <span className="font-semibold text-foreground">Analytics cookies (optional).</span>{" "}
               We use Google Analytics to understand which pages are useful. It is switched off until
               you choose Accept on the banner shown on your first visit. Until then, no request is
               sent to Google and no analytics cookies are set. If you choose Decline, nothing is
@@ -232,12 +232,12 @@ export default function PrivacyPolicy() {
             </p>
             <p className="text-muted-foreground mb-4 leading-relaxed">
               <span className="font-semibold text-foreground">
-                Your choice is stored in your browser{" "}
-              </span>
+                Your choice is stored in your browser
+              </span>{" "}
               (local storage) so we do not ask again on every visit. It is not sent to us.
             </p>
             <p className="text-muted-foreground mb-4 leading-relaxed">
-              <span className="font-semibold text-foreground">Job board counts (no cookies). </span>
+              <span className="font-semibold text-foreground">Job board counts (no cookies).</span>{" "}
               The job board counts page views and Apply clicks per job per day. This uses no
               cookies, stores no IP address or browser details, and works whether or not you accept
               analytics cookies.
