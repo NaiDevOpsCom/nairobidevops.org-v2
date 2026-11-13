@@ -575,9 +575,10 @@ async function run() {
   const outcome = evaluateEngines(currentRange, requiredRanges);
 
   if (outcome.status === "ok") {
-    console.log(
-      `Current engines.node range (${sanitizeForLog(currentRange)}) is supported by every dependency. No update needed.`,
-    );
+    // The logged value is a semver range from the repo's own package.json and
+    // npm metadata: not sensitive data, and sanitized against log injection.
+    const message = `Current engines.node range (${sanitizeForLog(currentRange)}) is supported by every dependency. No update needed.`;
+    console.log(message); // NOSONAR: semver range, not sensitive data
     return;
   }
 
@@ -592,26 +593,26 @@ async function run() {
       JSON.stringify(packageJson, null, 2) + "\n",
       "utf8",
     );
-    console.log(
-      `Updated package.json engines.node from ${sanitizeForLog(currentRange)} to ${sanitizeForLog(outcome.candidate)}`,
-    );
+    // Same rationale as above: semver ranges, not sensitive data.
+    const message = `Updated package.json engines.node from ${sanitizeForLog(currentRange)} to ${sanitizeForLog(outcome.candidate)}`;
+    console.log(message); // NOSONAR: semver ranges, not sensitive data
     return;
   }
 
-  console.error(
-    [
-      "engines.node cannot be updated automatically: dependency Node ranges",
-      "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
-      "",
-      "Current engines.node:",
-      `  ${sanitizeForLog(currentRange)}`,
-      "",
-      "Dependency ranges that constrain the project range:",
-      ...outcome.incompatible.map((range) => `  ${sanitizeForLog(range)}`),
-      "",
-      "Update engines.node in package.json to a range that is a subset of every range above.",
-    ].join("\n"),
-  );
+  // Same rationale: semver ranges, not sensitive data.
+  const message = [
+    "engines.node cannot be updated automatically: dependency Node ranges",
+    "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
+    "",
+    "Current engines.node:",
+    `  ${sanitizeForLog(currentRange)}`,
+    "",
+    "Dependency ranges that constrain the project range:",
+    ...outcome.incompatible.map((range) => `  ${sanitizeForLog(range)}`),
+    "",
+    "Update engines.node in package.json to a range that is a subset of every range above.",
+  ].join("\n");
+  console.error(message); // NOSONAR: semver ranges, not sensitive data
   process.exitCode = 1;
 }
 
