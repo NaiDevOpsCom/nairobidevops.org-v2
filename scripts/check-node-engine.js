@@ -16,6 +16,30 @@ let targetDir = process.argv[2]
 let packageJsonPath = path.join(targetDir, "package.json");
 let lockFilePath = path.join(targetDir, "package-lock.json");
 
+const LOG_VALUE_MAX_LENGTH = 256;
+
+/**
+ * Make an externally sourced value safe to interpolate into a log line.
+ *
+ * Ranges printed by this script come from `package.json` and from `npm view`
+ * responses, so they are untrusted input: a value carrying CR/LF or an ANSI
+ * escape sequence could forge log entries, hide the real outcome, or inject
+ * terminal escapes into the CI log.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function sanitizeForLog(value) {
+  if (value === null || value === undefined) return "<unset>";
+  const text = String(value).replace(
+    // eslint-disable-next-line no-control-regex -- stripping control chars is the point
+    /[\u0000-\u001F\u007F-\u009F]/g,
+    "",
+  );
+  if (text.length <= LOG_VALUE_MAX_LENGTH) return text;
+  return `${text.slice(0, LOG_VALUE_MAX_LENGTH - 1)}…`;
+}
+
 function maxVersion(versions) {
   return versions.reduce((highest, next) => {
     if (!highest) return next;
@@ -76,7 +100,7 @@ async function npmViewEngines(packageName, versionSpec) {
     }
   } catch (error) {
     console.warn(
-      `Warning: failed to query ${spec}. Skipping. ${error.message}`,
+      `Warning: failed to query ${sanitizeForLog(spec)}. Skipping. ${sanitizeForLog(error.message)}`,
     );
     return null;
   }
@@ -526,12 +550,8 @@ async function run() {
   const outcome = evaluateEngines(currentRange, requiredRanges);
 
   if (outcome.status === "ok") {
-    // Printed values are semver range strings from package.json and the npm
-    // registry — not sensitive data, so Sonar's S8689 taint flag is a false
-    // positive here.
     console.log(
-      // NOSONAR (prints semver range strings, not sensitive data)
-      `Current engines.node range (${currentRange}) is supported by every dependency. No update needed.`,
+      `Current engines.node range (${sanitizeForLog(currentRange)}) is supported by every dependency. No update needed.`,
     );
     return;
   }
@@ -548,23 +568,21 @@ async function run() {
       "utf8",
     );
     console.log(
-      // NOSONAR (prints semver range strings, not sensitive data)
-      `Updated package.json engines.node from ${currentRange ?? "<unset>"} to ${outcome.candidate}`,
+      `Updated package.json engines.node from ${sanitizeForLog(currentRange)} to ${sanitizeForLog(outcome.candidate)}`,
     );
     return;
   }
 
   console.error(
-    // NOSONAR (prints semver range strings, not sensitive data)
     [
       "engines.node cannot be updated automatically: dependency Node ranges",
       "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
       "",
       "Current engines.node:",
-      `  ${currentRange ?? "<unset>"}`,
+      `  ${sanitizeForLog(currentRange)}`,
       "",
       "Dependency ranges that constrain the project range:",
-      ...outcome.incompatible.map((range) => `  ${range}`),
+      ...outcome.incompatible.map((range) => `  ${sanitizeForLog(range)}`),
       "",
       "Update engines.node in package.json to a range that is a subset of every range above.",
     ].join("\n"),

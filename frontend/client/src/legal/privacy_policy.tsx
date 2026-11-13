@@ -3,7 +3,7 @@ import Navbar from "@/components/Navbar";
 
 export default function PrivacyPolicy() {
   // Static last updated date (set to project release date)
-  const formattedLastUpdated = "December 16, 2025";
+  const formattedLastUpdated = "November 12, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,8 +86,17 @@ export default function PrivacyPolicy() {
               </li>
               <li>
                 <span className="font-semibold text-foreground">Technical Data: </span>
-                IP address, browser type, device type, location (general), and cookies (see Section
-                7).
+                Browser type, device type, and general location, collected by Google Analytics only
+                if you accept analytics cookies (see Section 7). Our servers also process your IP
+                address to deliver pages, but we do not store it in our analytics counters.
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">Job Board Data: </span>
+                If you submit a job listing, we collect the contact email you provide and the
+                listing details. The contact email is used only to confirm and review your
+                submission and is never shown publicly. We also count, per job and per day, how many
+                times a job page is viewed and how many times Apply is clicked. These counts contain
+                no personal identifiers.
               </li>
               <li>
                 <span className="font-semibold text-foreground">Communication Data: </span>
@@ -116,6 +125,8 @@ export default function PrivacyPolicy() {
               <li>Respond to inquiries or community reports</li>
               <li>Share event content (e.g., photos, videos, presentations)</li>
               <li>Improve our programs and user experience</li>
+              <li>Run the job board: review employer submissions and publish listings</li>
+              <li>Post job summaries to our community Telegram group</li>
               <li>Comply with legal and regulatory obligations</li>
             </ul>
           </section>
@@ -147,7 +158,8 @@ export default function PrivacyPolicy() {
               </li>
             </ul>
             <p className="text-muted-foreground mt-4 leading-relaxed">
-              You may withdraw consent at any time by emailing:{" "}
+              You may withdraw consent for analytics cookies at any time from the cookie settings
+              link in Section 7, and for anything else by emailing:{" "}
               <a href="mailto:info@nairobidevops.org" className="text-primary hover:underline">
                 info@nairobidevops.org
               </a>
@@ -167,6 +179,10 @@ export default function PrivacyPolicy() {
               <li>
                 Vendors or service providers helping us run events or manage our systems (e.g.,
                 Eventbrite, Google Forms, Zoom)
+              </li>
+              <li>
+                Google, which provides Google Analytics if you accept analytics cookies (see Section
+                7)
               </li>
               <li>Government authorities when required by law</li>
             </ul>
@@ -188,6 +204,12 @@ export default function PrivacyPolicy() {
               <li>2 years for event participation records</li>
               <li>5 years for legal and reporting obligations</li>
               <li>Until you unsubscribe for newsletters or community communications</li>
+              <li>
+                90 days after we approve or reject a job submission, for the employer contact email
+              </li>
+              <li>
+                Job board view and click counts are kept as totals without personal identifiers
+              </li>
             </ul>
             <p className="text-muted-foreground mt-4 leading-relaxed">
               Anonymized data may be retained for statistical purposes indefinitely.
@@ -200,17 +222,40 @@ export default function PrivacyPolicy() {
               7. Cookies and Tracking Technologies
             </h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
-              Our website and event platforms may use cookies and similar technologies to:
+              <span className="font-semibold text-foreground">Analytics cookies (optional). </span>
+              We use Google Analytics to understand which pages are useful. It is switched off until
+              you choose Accept on the banner shown on your first visit. Until then, no request is
+              sent to Google and no analytics cookies are set. If you choose Decline, nothing is
+              loaded and any analytics cookies already set are removed.
             </p>
-            <ul className="list-disc list-inside space-y-2 text-muted-foreground leading-relaxed ml-4">
-              <li>Maintain secure login sessions</li>
-              <li>Understand site usage trends</li>
-              <li>Remember preferences</li>
-              <li>Improve content and user experience</li>
-            </ul>
-            <p className="text-muted-foreground mt-4 leading-relaxed">
-              You can manage cookie settings in your browser. Some features may not function
-              properly without cookies.
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              We have turned off Google signals and ad personalization, and we have set Google
+              Analytics to keep event data for 2 months, the shortest period it offers.
+            </p>
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              <span className="font-semibold text-foreground">
+                Your choice is stored in your browser{" "}
+              </span>
+              (local storage) so we do not ask again on every visit. It is not sent to us.
+            </p>
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              <span className="font-semibold text-foreground">Job board counts (no cookies). </span>
+              The job board counts page views and Apply clicks per job per day. This uses no
+              cookies, stores no IP address or browser details, and works whether or not you accept
+              analytics cookies.
+            </p>
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              <span className="font-semibold text-foreground">Change your mind at any time: </span>
+              <button
+                type="button"
+                onClick={() =>
+                  (window as unknown as { ndcConsent?: { open: () => void } }).ndcConsent?.open()
+                }
+                className="text-primary hover:underline"
+              >
+                open cookie settings
+              </button>
+              . You can also clear cookies in your browser settings.
             </p>
           </section>
 
