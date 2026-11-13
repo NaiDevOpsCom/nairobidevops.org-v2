@@ -64,7 +64,7 @@ jobs:
           npm ci --ignore-scripts
 
           echo "🔒 Validating lockfile integrity..."
-          npx --yes lockfile-lint@5.1.0 \
+          ./node_modules/.bin/lockfile-lint \
             --path package-lock.json \
             --type npm \
             --validate-https \
