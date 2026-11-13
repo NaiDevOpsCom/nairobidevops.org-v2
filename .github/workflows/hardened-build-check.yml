@@ -64,7 +64,7 @@ jobs:
           npm ci
 
           echo "🔒 Validating lockfile integrity..."
-          npx lockfile-lint \
+          npx --yes lockfile-lint@5.1.0 \
             --path package-lock.json \
             --type npm \
             --validate-https \
