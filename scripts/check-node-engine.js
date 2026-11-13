@@ -665,19 +665,19 @@ async function run() {
     return;
   }
 
-  const message = [
-    "engines.node cannot be updated automatically: dependency Node ranges",
-    "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
-    "",
-    "Current engines.node:",
-    `  ${sanitizeForLog(currentRange)}`,
-    "",
-    "Dependency ranges that constrain the project range:",
-    ...outcome.incompatible.map((range) => `  ${sanitizeForLog(range)}`),
-    "",
-    "Update engines.node in package.json to a range that is a subset of every range above.",
-  ].join("\n");
-  console.error(message);
+  console.error(
+    [
+      "engines.node cannot be updated automatically: dependency Node ranges",
+      "do not reduce to a single `>=` floor, so a safe range must be composed by hand.",
+      "",
+      "The current range and the dependency ranges that constrain it are not",
+      "printed here: they are read from package.json, and file content must not",
+      "be written to logs.",
+      "",
+      "Inspect engines.node in package.json and in each direct dependency's",
+      "manifest, then set the project range to a subset of every one of them.",
+    ].join("\n"),
+  );
   process.exitCode = 1;
 }
 
