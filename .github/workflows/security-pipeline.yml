@@ -59,7 +59,7 @@ jobs:
       # Install dependencies (lockfile guaranteed to exist here)
       # ------------------------------------------------------------
       - name: Verify lockfile integrity (npm ci)
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # ------------------------------------------------------------
       # Lint lockfile

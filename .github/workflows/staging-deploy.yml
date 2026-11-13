@@ -49,7 +49,7 @@ jobs:
       #
       - name: Install and Build (Staging)
         run: |
-          npm ci
+          npm ci --ignore-scripts
 
           # Build in staging mode (build:staging internally runs security:generate)
           npm run build:staging

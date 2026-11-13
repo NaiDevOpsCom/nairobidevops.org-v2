@@ -61,7 +61,7 @@ jobs:
       - name: Install and Validate Dependencies
         run: |
           echo "📦 Installing dependencies with lockfile validation..."
-          npm ci
+          npm ci --ignore-scripts
 
           echo "🔒 Validating lockfile integrity..."
           npx --yes lockfile-lint@5.1.0 \

@@ -47,7 +47,7 @@ jobs:
       #
       - name: Install and Build
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm run build
           # Validate build output
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
