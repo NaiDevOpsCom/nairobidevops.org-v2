@@ -56,17 +56,17 @@ jobs:
 
           # Validate build output
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
-            echo "Error: dist/ directory is missing or empty"
+            echo "Error: dist/ directory is missing or empty" >&2
             exit 1
           fi
 
           # Confirm PHP proxy files made it into the build
           if [ ! -f "dist/api/imagesCloudinary.php" ]; then
-            echo "Error: dist/api/imagesCloudinary.php is missing from build output"
+            echo "Error: dist/api/imagesCloudinary.php is missing from build output" >&2
             exit 1
           fi
           if [ ! -f "dist/api/luma.php" ]; then
-            echo "Error: dist/api/luma.php is missing from build output"
+            echo "Error: dist/api/luma.php is missing from build output" >&2
             exit 1
           fi
 
