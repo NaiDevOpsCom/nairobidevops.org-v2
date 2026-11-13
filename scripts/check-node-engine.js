@@ -637,10 +637,8 @@ async function run() {
   const outcome = evaluateEngines(currentRange, requiredRanges);
 
   if (outcome.status === "ok") {
-    // Deliberately does not echo `currentRange`: it is read from package.json
-    // and therefore untrusted input, and there is nothing actionable to print
-    // when nothing needs changing. The range is reported by the branches below
-    // when the operator actually has to act on it.
+    // Nothing needs changing, so there is nothing to report beyond the verdict:
+    // the range itself is package.json content and must never be logged.
     console.log(
       "Current engines.node range is supported by every dependency. No update needed.",
     );
@@ -658,8 +656,12 @@ async function run() {
       JSON.stringify(packageJson, null, 2) + "\n",
       "utf8",
     );
-    const message = `Updated package.json engines.node from ${sanitizeForLog(currentRange)} to ${sanitizeForLog(outcome.candidate)}`;
-    console.log(message);
+    // Neither the previous nor the new range is echoed: both are package.json
+    // content, which must never be written to the log. `git diff package.json`
+    // shows exactly what changed.
+    console.log(
+      "Updated package.json engines.node to a range every dependency supports (see `git diff package.json`).",
+    );
     return;
   }
 
