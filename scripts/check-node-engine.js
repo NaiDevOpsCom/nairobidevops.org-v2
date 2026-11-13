@@ -34,7 +34,7 @@ export function sanitizeForLog(value) {
   const text = typeof value === "object" ? toLogString(value) : String(value);
   const sanitized = text.replace(
     // eslint-disable-next-line no-control-regex -- stripping control chars is the point
-    /[\u0000-\u001F\u007F-\u009F]/g,
+    /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069]/g,
     "",
   );
   if (sanitized.length <= LOG_VALUE_MAX_LENGTH) return sanitized;

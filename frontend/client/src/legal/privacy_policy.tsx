@@ -72,17 +72,16 @@ export default function PrivacyPolicy() {
             </p>
             <ul className="list-disc list-inside space-y-2 text-muted-foreground leading-relaxed ml-4">
               <li>
-                <span className="font-semibold text-foreground">Identity Data:</span>{" "}
-                Full name, email address, phone number, gender (optional), country, and
-                organization.
+                <span className="font-semibold text-foreground">Identity Data:</span> Full name,
+                email address, phone number, gender (optional), country, and organization.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Professional Data:</span>{" "}
-                Job title, industry, area of expertise, or education background.
+                <span className="font-semibold text-foreground">Professional Data:</span> Job title,
+                industry, area of expertise, or education background.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Participation Data:</span>{" "}
-                Event registrations, feedback, photos, and videos from events.
+                <span className="font-semibold text-foreground">Participation Data:</span> Event
+                registrations, feedback, photos, and videos from events.
               </li>
               <li>
                 <span className="font-semibold text-foreground">Technical Data: </span>
@@ -91,16 +90,15 @@ export default function PrivacyPolicy() {
                 address to deliver pages, but we do not store it in our analytics counters.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Job Board Data:</span>{" "}
-                If you submit a job listing, we collect the contact email you provide and the
-                listing details. The contact email is used only to confirm and review your
-                submission and is never shown publicly. We also count, per job and per day, how many
-                times a job page is viewed and how many times Apply is clicked. These counts contain
-                no personal identifiers.
+                <span className="font-semibold text-foreground">Job Board Data:</span> If you submit
+                a job listing, we collect the contact email you provide and the listing details. The
+                contact email is used only to confirm and review your submission and is never shown
+                publicly. We also count, per job and per day, how many times a job page is viewed
+                and how many times Apply is clicked. These counts contain no personal identifiers.
               </li>
               <li>
-                <span className="font-semibold text-foreground">Communication Data:</span>{" "}
-                Messages or queries you send us via email, forms, or social media.
+                <span className="font-semibold text-foreground">Communication Data:</span> Messages
+                or queries you send us via email, forms, or social media.
               </li>
             </ul>
             <p className="text-muted-foreground mt-4 leading-relaxed">

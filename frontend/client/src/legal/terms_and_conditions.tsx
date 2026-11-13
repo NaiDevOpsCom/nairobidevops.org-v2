@@ -231,10 +231,9 @@ export default function TermsAndConditions() {
               <div>
                 <h3 className="text-xl font-semibold text-foreground mb-2">7.4. Labels:</h3>
                 <p>
-                  Labels such as &quot;Africa-friendly,&quot; &quot;Open worldwide,&quot; and
-                  &quot;Verified&quot; are guidance based on the information available to us. They
-                  are not guarantees that an employer will hire, or pay, candidates from your
-                  location.
+                  The &quot;Africa-friendly&quot; label is guidance based on the information
+                  available to us. It is not a guarantee that an employer will hire, or pay,
+                  candidates from your location.
                 </p>
               </div>
               <div>

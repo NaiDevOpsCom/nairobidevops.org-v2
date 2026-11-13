@@ -6,7 +6,7 @@
  * - The decision lives in localStorage, so one banner covers the React site
  *   and the Django job pages (same origin, same file).
  * - Decline and Accept carry equal weight. Consent can be changed later with
- *   window.ndcConsent.open() (wired to a "Cookie settings" link in the footer).
+ *   window.ndcConsent.open() (wired to the "open cookie settings" control in the privacy policy).
  * - No inline scripts: the CSP allows inline styles but not inline scripts.
  */
 (function () {
@@ -47,9 +47,10 @@
   let gaLoaded = false;
 
   function loadAnalytics() {
-    if (!gaAllowedHere || gaLoaded) return;
-    gaLoaded = true;
+    if (!gaAllowedHere) return;
     window["ga-disable-" + GA_ID] = false;
+    if (gaLoaded) return;
+    gaLoaded = true;
 
     window.dataLayer = window.dataLayer || [];
     function gtag() {
@@ -95,12 +96,60 @@
 
   // ── Banner ─────────────────────────────────────────────────────────────────
   const BANNER_ID = "ndc-consent-banner";
+  let themeObserver = null;
+  let themeMediaQuery = null;
+  let themeMediaListener = null;
 
   function isDark() {
     return (
       document.documentElement.classList.contains("dark") ||
       window.matchMedia("(prefers-color-scheme: dark)").matches
     );
+  }
+
+  function applyBannerTheme(root) {
+    const target = root || document.getElementById(BANNER_ID);
+    if (!target) return;
+    const dark = isDark();
+    target.style.setProperty("--ndc-bg", dark ? "#18181b" : "#ffffff");
+    target.style.setProperty("--ndc-fg", dark ? "#fafafa" : "#18181b");
+    target.style.setProperty("--ndc-border", dark ? "#3f3f46" : "#d4d4d8");
+  }
+
+  function stopBannerThemeSync() {
+    if (themeObserver) {
+      themeObserver.disconnect();
+      themeObserver = null;
+    }
+    if (themeMediaQuery && themeMediaListener) {
+      if (themeMediaQuery.removeEventListener) {
+        themeMediaQuery.removeEventListener("change", themeMediaListener);
+      } else if (themeMediaQuery.removeListener) {
+        themeMediaQuery.removeListener(themeMediaListener);
+      }
+    }
+    themeMediaQuery = null;
+    themeMediaListener = null;
+  }
+
+  function startBannerThemeSync() {
+    stopBannerThemeSync();
+    if (typeof MutationObserver !== "undefined") {
+      themeObserver = new MutationObserver(() => applyBannerTheme());
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
+    if (window.matchMedia) {
+      themeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      themeMediaListener = () => applyBannerTheme();
+      if (themeMediaQuery.addEventListener) {
+        themeMediaQuery.addEventListener("change", themeMediaListener);
+      } else if (themeMediaQuery.addListener) {
+        themeMediaQuery.addListener(themeMediaListener);
+      }
+    }
   }
 
   function injectStyles() {
@@ -129,6 +178,7 @@
   function closeBanner() {
     const existing = document.getElementById(BANNER_ID);
     if (existing) existing.remove();
+    stopBannerThemeSync();
   }
 
   function choose(value) {
@@ -149,14 +199,11 @@
     if (document.getElementById(BANNER_ID)) return;
     injectStyles();
 
-    const dark = isDark();
     const root = document.createElement("div");
     root.id = BANNER_ID;
     root.setAttribute("role", "region");
     root.setAttribute("aria-label", "Analytics cookie choice");
-    root.style.setProperty("--ndc-bg", dark ? "#18181b" : "#ffffff");
-    root.style.setProperty("--ndc-fg", dark ? "#fafafa" : "#18181b");
-    root.style.setProperty("--ndc-border", dark ? "#3f3f46" : "#d4d4d8");
+    applyBannerTheme(root);
 
     const box = document.createElement("div");
     box.className = "ndc-box";
@@ -179,9 +226,10 @@
     box.append(text, actions);
     root.appendChild(box);
     document.body.appendChild(root);
+    startBannerThemeSync();
   }
 
-  // Public hook for the footer's "Cookie settings" link.
+  // Public hook for the privacy policy's "open cookie settings" control.
   window.ndcConsent = {
     open: openBanner,
     status: readDecision,
@@ -190,9 +238,36 @@
   // ── Start ──────────────────────────────────────────────────────────────────
   function start() {
     const decision = readDecision();
-    if (decision === null) openBanner();
-    else apply(decision);
+    if (decision === null) {
+      stopAnalytics();
+      openBanner();
+    } else {
+      apply(decision);
+    }
   }
+
+  window.addEventListener("storage", function (event) {
+    if (event.key !== STORAGE_KEY) return;
+    let decision = null;
+    try {
+      const parsed = event.newValue ? JSON.parse(event.newValue) : null;
+      decision =
+        parsed && (parsed.value === "granted" || parsed.value === "denied") ? parsed.value : null;
+    } catch {
+      decision = null;
+    }
+
+    if (decision === "granted") {
+      apply("granted");
+      closeBanner();
+    } else if (decision === "denied") {
+      apply("denied");
+      closeBanner();
+    } else {
+      stopAnalytics();
+      openBanner();
+    }
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);

@@ -92,6 +92,11 @@ test("sanitizeForLog strips control characters so a tainted range cannot forge l
   );
   assert.equal(sanitizeForLog("^22.0.0\r\n\u001b[31mred"), "^22.0.0[31mred");
   assert.equal(sanitizeForLog("tab\there"), "tabhere");
+  // Unicode line/paragraph separators and bidi controls can reorder or
+  // visually disguise the text without breaking it into a new log line.
+  assert.equal(sanitizeForLog("a\u2028b\u2029c"), "abc");
+  assert.equal(sanitizeForLog("a\u202eb\u2066c\u2069d"), "abcd");
+  assert.equal(sanitizeForLog("\u200eleft\u200fright"), "leftright");
 });
 
 test("sanitizeForLog reports unset values and truncates oversized input", () => {
