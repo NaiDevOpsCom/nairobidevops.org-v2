@@ -1,0 +1,90 @@
+name: Django mount health check
+description: >
+  Poll <base-url>/job/health until it answers HTTP 200 with the Django JSON
+  body (a non-null "python" key). A 200 HTML shell, a 500, a 403/404, or any
+  body that does not parse as a JSON object with that key fails the gate.
+
+inputs:
+  base-url:
+    description: Base URL of the environment, e.g. https://nairobidevops.org
+    required: true
+  max-retries:
+    description: Number of attempts before the check fails.
+    required: false
+    default: "5"
+
+runs:
+  using: composite
+  steps:
+    - name: Check /job/health
+      shell: bash
+      env:
+        BASE_URL: ${{ inputs.base-url }}
+        MAX_RETRIES: ${{ inputs.max-retries }}
+      run: |
+        set -u
+
+        # Validate URL scheme (also catches an unset secret)
+        if ! printf '%s' "$BASE_URL" | grep -Eq '^https?://'; then
+          echo "::error::Invalid or missing environment URL (must start with http:// or https://)"
+          exit 1
+        fi
+
+        # JSON parsing is what makes this gate meaningful; fail loudly instead
+        # of silently falling back to substring matching if jq is unavailable.
+        if ! command -v jq >/dev/null 2>&1; then
+          echo "::error::jq is required to validate the /job/health JSON body"
+          exit 1
+        fi
+
+        BASE="${BASE_URL%/}"
+        BODY_FILE="$(mktemp)"
+        trap 'rm -f "$BODY_FILE"' EXIT
+        CODE="000"
+
+        for i in $(seq 1 "$MAX_RETRIES"); do
+          # Truncate first: curl does not touch -o FILE when the connection
+          # fails (exit 7, code 000), so the previous attempt's body would
+          # otherwise be inspected for the current attempt.
+          : > "$BODY_FILE"
+
+          # Capture the status code and body instead of discarding them: a bare
+          # "curl: (22) error: 500" gives no clue whether Django crashed, the
+          # mount vanished, or Passenger refused the app.
+          # `|| CODE=000` on the assignment (not `|| echo 000` inside it) so a
+          # transport failure replaces the code instead of appending to it.
+          CODE="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' \
+            --connect-timeout 10 --max-time 30 "$BASE/job/health")" || CODE="000"
+
+          echo "Attempt $i/$MAX_RETRIES: HTTP $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "  body: $(head -c 300 "$BODY_FILE" 2>/dev/null || true)"
+          fi
+
+          # 403/404 mean the mount or its permissions are gone. Retrying cannot
+          # fix that, so fail fast instead of burning the backoff budget. This
+          # must precede the success branch: an error body can carry the marker.
+          if [ "$CODE" = "403" ] || [ "$CODE" = "404" ]; then
+            echo "::error::/job/health returned HTTP $CODE - the /job mount is missing or blocked, not merely starting up."
+            exit 1
+          fi
+
+          # Success requires BOTH a 200 and a JSON object carrying a non-null
+          # "python" key. Substring matching is not enough: a Django debug
+          # traceback, a Passenger error page, or a JSON error payload can all
+          # contain "python" and would report a broken mount as healthy.
+          if [ "$CODE" = "200" ] && \
+            jq -e 'type == "object" and has("python") and (.python != null)' \
+              "$BODY_FILE" >/dev/null 2>&1; then
+            echo "✅ /job/health returned Django JSON (HTTP 200)"
+            exit 0
+          fi
+
+          echo "⏳ Attempt $i/$MAX_RETRIES: /job/health is not healthy yet"
+          if [ "$i" -lt "$MAX_RETRIES" ]; then
+            sleep "$((2 ** i))"
+          fi
+        done
+
+        echo "::error::/job/health did not return Django JSON after $MAX_RETRIES attempts (last HTTP $CODE)."
+        exit 1

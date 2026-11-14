@@ -13,6 +13,7 @@ on:
       - "frontend/**"
       - ".github/workflows/deploy.yml"
       - ".github/actions/cache-vite-npm/action.yml"
+      - ".github/actions/django-mount-health-check/action.yml"
 
 jobs:
   build:
@@ -84,25 +85,34 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
-    permissions: {}
+    permissions:
+      contents: read # Required for actions/checkout (local composite action)
 
     outputs:
       release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
 
     steps:
-      # 1. Download Build Artifact
+      # 1. Check out the code
+      #
+      # Only needed so the local composite action in .github/actions/ can be
+      # resolved by the health-check step at the end of this job. Runs first so
+      # actions/checkout's `git clean` cannot delete the downloaded artifact.
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # 2. Download Build Artifact
       - name: Download Build Artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: dist
           path: dist
 
-      # 2. Generate Release Timestamp
+      # 3. Generate Release Timestamp
       - name: Generate Release Timestamp
         id: timestamp
         run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
 
-      # 3. Setup SSH
+      # 4. Setup SSH
       - name: Setup SSH
         env:
           KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
@@ -161,7 +171,7 @@ jobs:
             exit 1
           fi
 
-      # 4. Create Release Directory
+      # 5. Create Release Directory
       - name: Create Release Directory
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
@@ -171,11 +181,11 @@ jobs:
           port: ${{ secrets.REMOTE_PORT || 22 }}
           script: |
             # Create the release dir and api/ subfolder upfront.
-            # The tarball extraction (step 6) will also create api/ — this is
+            # The tarball extraction (step 7) will also create api/ — this is
             # a safety measure to guarantee it exists before the inject step.
             mkdir -p "/home/${{ secrets.REMOTE_USER }}/releases/${{ steps.timestamp.outputs.timestamp }}/api"
 
-      # 5. Package and Sync to Release
+      # 6. Package and Sync to Release
       - name: Package and Sync to Release
         env:
           REMOTE_PORT: ${{ secrets.REMOTE_PORT || 22 }}
@@ -199,7 +209,7 @@ jobs:
             release.tar.gz \
             "${REMOTE_USER}@${REMOTE_HOST}:/home/${REMOTE_USER}/releases/${RELEASE_TIMESTAMP}/"
 
-      # 6. Extract Release on Server
+      # 7. Extract Release on Server
       - name: Extract Release on Server
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
@@ -212,7 +222,7 @@ jobs:
             tar -xzf release.tar.gz
             rm release.tar.gz
 
-      # 7. Inject Shared Secrets onto Server
+      # 8. Inject Shared Secrets onto Server
       #
       # WHY: Both imagesCloudinary.php and luma.php need Cloudinary credentials
       # to sign API requests. Credentials must never be in the repo or dist/.
@@ -286,7 +296,71 @@ jobs:
               exit 1
             fi
 
-      # 8. Atomically Switch Symlink
+      # 8b. Link the persistent Django mount into the new release
+      #
+      # WHY: Every frontend deploy replaces the whole document root, which wipes
+      # anything hand-placed inside it, including the /job Passenger mount.
+      # The real mount lives OUTSIDE any release at ~/jobsboard-mounts/production
+      # and is re-linked into each new release as `job`.
+      #
+      # This MUST run before the symlink switch (step 9) so /job is never
+      # missing on the live docroot, not even for a second.
+      #
+      # PREREQUISITE: the mount folder AND the Passenger .htaccess inside it must
+      # exist on the server. The step hard-fails when the .htaccess is missing,
+      # because a release without /job would silently serve the SPA on /job.
+      #
+      # Until the folder exists, the step warns and skips instead of failing the
+      # whole frontend deploy: production Django is not deployed yet, so the
+      # folder may not be there and a missing mount must not block frontend
+      # releases. It still fails hard when PRODUCTION_DJANGO_ENABLED is "true",
+      # so a missing mount cannot silently pass once Django is meant to be live.
+      - name: Restore Django Mount in Release
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+          DJANGO_ENABLED: ${{ vars.PRODUCTION_DJANGO_ENABLED }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP,DJANGO_ENABLED
+          script: |
+            set -euo pipefail
+
+            MOUNT="/home/$REMOTE_USER/jobsboard-mounts/production"
+            RELEASE_DIR="/home/$REMOTE_USER/releases/$RELEASE_TIMESTAMP"
+
+            if [ ! -d "$MOUNT" ]; then
+              if [ "${DJANGO_ENABLED:-}" = "true" ]; then
+                echo "❌ Mount folder $MOUNT is missing — aborting before the symlink switch."
+                exit 1
+              fi
+              echo "::warning::$MOUNT does not exist yet (production Django not deployed) — skipping /job link for this release."
+              echo "  Create it with the Passenger .htaccess before setting PRODUCTION_DJANGO_ENABLED=true."
+              exit 0
+            fi
+
+            # A real folder named `job` would swallow the link (ln -sfn would
+            # create it INSIDE the folder), so remove it first.
+            # No trailing slash: this deletes the folder or link, never the mount.
+            if [ -e "$RELEASE_DIR/job" ] && [ ! -L "$RELEASE_DIR/job" ]; then
+              rm -rf "$RELEASE_DIR/job"
+            fi
+
+            ln -sfn "$MOUNT" "$RELEASE_DIR/job"
+
+            # Confirm the link resolves to the Passenger block
+            if [ ! -f "$RELEASE_DIR/job/.htaccess" ]; then
+              echo "❌ $RELEASE_DIR/job/.htaccess not found — mount link is broken."
+              exit 1
+            fi
+
+            echo "✅ Django mount linked into release $RELEASE_TIMESTAMP"
+
+      # 9. Atomically Switch Symlink
       - name: Atomically Switch Symlink
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
@@ -322,6 +396,36 @@ jobs:
             ls -1t | tail -n +6 | tr '\n' '\0' | xargs -0 -r rm -rf 2>/dev/null || true
 
             echo "✅ Deployment successful."
+
+      # 10. Django mount health check
+      #
+      # Fails the deploy if /job fell back to the SPA (HTTP 200 HTML) or Django
+      # is down: health is only accepted as HTTP 200 whose body parses as a
+      # JSON object with a non-null "python" key. A 200 HTML shell, a 500, a
+      # 403/404, and invalid JSON all fail.
+      #
+      # The check itself lives in .github/actions/django-mount-health-check so
+      # production and staging share one implementation instead of two copies
+      # that can drift.
+      #
+      # NOTE: this runs AFTER the symlink switch, so a failure here marks the
+      # deploy failed and sends the failure email, but does not roll back the
+      # live release.
+      #
+      # Gated on the PRODUCTION_DJANGO_ENABLED Actions variable because the
+      # production Django app does not exist yet. While the variable is unset
+      # this step is skipped instead of failing every frontend deploy. Once
+      # production Django answers on /job/health, set it to "true"
+      # (Settings -> Secrets and variables -> Actions -> Variables) to turn
+      # this into a hard gate. Nothing here needs editing to re-enable it.
+      #
+      # Requires the PRODUCTION_URL secret (production environment),
+      # e.g. https://nairobidevops.org
+      - name: Django Mount Health Check
+        if: vars.PRODUCTION_DJANGO_ENABLED == 'true'
+        uses: ./.github/actions/django-mount-health-check
+        with:
+          base-url: ${{ secrets.PRODUCTION_URL }}
 
   notify:
     needs: [build, deploy]
