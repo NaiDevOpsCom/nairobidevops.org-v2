@@ -308,19 +308,30 @@ jobs:
       # The real mount lives OUTSIDE any release at ~/jobsboard-mounts/staging
       # and is re-linked into each new release as `job`.
       #
-      # This MUST run before the symlink switch (step 8) so /job is never
+      # This MUST run before the symlink switch (step 9) so /job is never
       # missing on the live docroot, not even for a second.
+      #
+      # PREREQUISITE: the mount folder AND the Passenger .htaccess inside it must
+      # exist on the server. The step hard-fails when the .htaccess is missing,
+      # because a release without /job would silently serve the SPA on /job.
+      #
+      # Until the folder exists, the step warns and skips instead of failing the
+      # whole frontend deploy: staging Django is not deployed yet, so the folder
+      # may not be there and a missing mount must not block frontend releases. It
+      # still fails hard when STAGING_DJANGO_ENABLED is "true", so a missing mount
+      # cannot silently pass once Django is meant to be live.
       - name: Restore Django Mount in Release
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+          DJANGO_ENABLED: ${{ vars.STAGING_DJANGO_ENABLED }}
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key_path: /home/runner/.ssh/id_rsa
           port: ${{ secrets.REMOTE_PORT || 22 }}
-          envs: REMOTE_USER,RELEASE_TIMESTAMP
+          envs: REMOTE_USER,RELEASE_TIMESTAMP,DJANGO_ENABLED
           script: |
             set -euo pipefail
 
@@ -328,8 +339,13 @@ jobs:
             RELEASE_DIR="/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP"
 
             if [ ! -d "$MOUNT" ]; then
-              echo "❌ Mount folder $MOUNT is missing — aborting before the symlink switch."
-              exit 1
+              if [ "${DJANGO_ENABLED:-}" = "true" ]; then
+                echo "❌ Mount folder $MOUNT is missing — aborting before the symlink switch."
+                exit 1
+              fi
+              echo "::warning::$MOUNT does not exist yet (staging Django not deployed) — skipping /job link for this release."
+              echo "  Create it with the Passenger .htaccess before setting STAGING_DJANGO_ENABLED=true."
+              exit 0
             fi
 
             # A real folder named `job` would swallow the link (ln -sfn would
