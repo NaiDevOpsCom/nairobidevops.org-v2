@@ -13,7 +13,7 @@ export default function TermsAndConditions() {
             Nairobi DevOps Community Terms and Conditions
           </h1>
           <p className="text-sm text-muted-foreground mb-8 text-center">
-            Last updated: July 12, 2025
+            Last updated: November 12, 2026
           </p>
           <p className="text-lg text-muted-foreground leading-relaxed">
             Welcome to the Nairobi DevOps Community (&quot;NDC&quot;). These Terms and Conditions
@@ -120,7 +120,11 @@ export default function TermsAndConditions() {
                 <p>
                   We collect basic personal information (name, email, job role) to facilitate
                   community engagement. Data will be handled per applicable privacy laws and will
-                  not be sold to third parties.
+                  not be sold to third parties. See our{" "}
+                  <a href="/privacy" className="text-primary hover:underline">
+                    Privacy Policy
+                  </a>{" "}
+                  for details on what we collect, how long we keep it, and your choices.
                 </p>
               </div>
               <div>
@@ -190,10 +194,71 @@ export default function TermsAndConditions() {
             </div>
           </section>
 
-          {/* Section 7: Changes to These Terms */}
+          {/* Section 7: Job Board */}
+          <section>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-foreground">7. Job Board</h2>
+            <div className="space-y-6 text-muted-foreground leading-relaxed">
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  7.1. Employer Submissions:
+                </h3>
+                <p>
+                  Employers who submit a listing confirm they have the right to post it and that the
+                  information is accurate. NDC may approve, reject, edit, or remove any listing at
+                  its discretion, with or without notice.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  7.2. Listings From Other Sources:
+                </h3>
+                <p>
+                  Some listings are collected from third-party job boards and company career pages.
+                  We do not guarantee that a listing is still open, accurate, or complete. Each
+                  listing shows its source.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  7.3. No Hiring Guarantees:
+                </h3>
+                <p>
+                  NDC is not an employer or recruiter and is not a party to any hiring decision,
+                  contract, or payment between employers and applicants. You are responsible for
+                  checking any employer before sharing personal information or accepting work.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">7.4. Labels:</h3>
+                <p>
+                  The &quot;Africa-friendly&quot; label is guidance based on the information
+                  available to us. It is not a guarantee that an employer will hire, or pay,
+                  candidates from your location.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">7.5. External Links:</h3>
+                <p>
+                  The Apply button takes you to the employer&apos;s or source&apos;s own website,
+                  which has its own terms and privacy practices.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  7.6. Featured Listings:
+                </h3>
+                <p>
+                  Featured placement, where offered, is arranged and invoiced separately. It does
+                  not guarantee applications or hires.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 8: Changes to These Terms */}
           <section>
             <h2 className="text-3xl md:text-4xl font-bold mb-6 text-foreground">
-              7. Changes to These Terms
+              8. Changes to These Terms
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               We may update these Terms periodically. Changes will be posted on our website.
@@ -201,9 +266,9 @@ export default function TermsAndConditions() {
             </p>
           </section>
 
-          {/* Section 8: Contact Us */}
+          {/* Section 9: Contact Us */}
           <section>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-foreground">8. Contact Us</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-foreground">9. Contact Us</h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
               For questions or concerns about these Terms, contact:
             </p>

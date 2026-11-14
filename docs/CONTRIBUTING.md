@@ -37,31 +37,31 @@ This is an internal project. Contributors are typically invited team members, bu
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js** (v20 or later recommended)
-- **npm** (comes with Node.js)
+- **Node.js** (`^22.22.2 || ^24.15.0 || >=26.0.0`) and **npm**
 
-Follow these steps to get your development environment ready:
+A backend runtime is not required. The previous PHP API has been removed and is
+being rewritten in a different language — see [Backend](#backend).
 
-1.  **Clone the Repository**
+### Frontend Setup
 
-    ```bash
-    git clone <repository-url>
-    cd ndc-redesign-website
-    ```
-
-2.  **Install Dependencies**
-    Use `npm ci` to install dependencies based on the `package-lock.json` file. This ensures a consistent and reliable setup that matches our CI environment.
+1.  **Install frontend dependencies:**
 
     ```bash
+    cd frontend
     npm ci
     ```
 
-3.  **Run the Development Server**
-    This command starts the Vite development server with hot-reloading.
+2.  **Start the frontend dev server:**
+
     ```bash
     npm run dev
     ```
+
     The application will be available at `http://localhost:5173`.
+
+    Jobs-related pages call the API at `VITE_API_URL` (set it in
+    `frontend/client/.env.local`). Until the rewritten backend is running, they
+    display their "temporarily unavailable" error state instead of data.
 
 ---
 
@@ -146,10 +146,11 @@ We use a branching model based on `main` and `pre-dev` (staging) branches:
 
 ## Code Quality and Standards
 
-### Linting and Formatting
+### Frontend
 
-- **Prettier**: We use Prettier for consistent code formatting. Run `npm run format` to format your code automatically.
-- **ESLint**: We use ESLint to catch potential bugs, security issues, and enforce best practices. Run `npm run lint` to check your code.
+- **Prettier**: Used for consistent code formatting. Run `npm run format` from `frontend/` to format automatically.
+- **ESLint**: Used to catch potential bugs, security issues, and enforce best practices. Run `npm run lint` from `frontend/`.
+- **TypeScript**: Strict type checking via `npm run typecheck`.
 
 **Key Linting Rules:**
 
@@ -158,9 +159,22 @@ We use a branching model based on `main` and `pre-dev` (staging) branches:
 - **Imports**: `eslint-plugin-unused-imports` ensures a clean codebase by stripping unused imports.
 - **Best Practices**: Stricter rules are in place. Address warnings (e.g., regarding impure functions) rather than suppressing them.
 
+**Run all frontend checks together:**
+
+```bash
+cd frontend && npm run check
+```
+
+### Backend
+
+The `backend/` directory is intentionally empty while the API is rewritten. Its
+code-quality and test commands will be documented here once the new stack lands.
+Until then, the frontend is the only part of the repository you need to build and
+test locally.
+
 ### Testing
 
-- **Vitest**: The project uses Vitest for unit and integration tests. Run `npm run test` to execute the test suite. All new features should include corresponding tests.
+- **Frontend (Vitest)**: Run `npm run test` from `frontend/` for unit and integration tests.
 
 ### Commit Message Convention
 
@@ -215,8 +229,18 @@ chore(deps): bump react-query version
 
 ## Important Scripts
 
-- `npm run dev`: Start the development server.
-- `npm run build`: Create a production-ready build.
-- `npm run test`: Run the test suite.
-- `npm run lint`: Run ESLint checks.
-- `npm run format`: Format all files with Prettier.
+### Frontend (`frontend/`)
+
+| Command                | Description                                |
+| ---------------------- | ------------------------------------------ |
+| `npm run dev`          | Start Vite dev server                      |
+| `npm run build`        | Production build                           |
+| `npm run preview`      | Preview production build                   |
+| `npm run test`         | Run Vitest tests                           |
+| `npm run test:watch`   | Run tests in watch mode                    |
+| `npm run lint`         | Run ESLint checks                          |
+| `npm run lint:fix`     | Run ESLint with auto-fix                   |
+| `npm run format`       | Format all files with Prettier             |
+| `npm run format:check` | Check formatting without modifying         |
+| `npm run typecheck`    | TypeScript type checking                   |
+| `npm run check`        | Run all checks (lint + typecheck + format) |

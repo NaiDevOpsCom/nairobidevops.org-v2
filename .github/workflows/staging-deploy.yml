@@ -13,9 +13,9 @@ on:
       - pre-staging
     paths:
       - "frontend/**"
-      - "backend/**"
       - ".github/workflows/staging-deploy.yml"
       - ".github/actions/cache-vite-npm/action.yml"
+      - ".github/actions/django-mount-health-check/action.yml"
 
 jobs:
   build:
@@ -50,24 +50,24 @@ jobs:
       #
       - name: Install and Build (Staging)
         run: |
-          npm ci
+          npm ci --ignore-scripts
 
           # Build in staging mode (build:staging internally runs security:generate)
           npm run build:staging
 
           # Validate build output
           if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
-            echo "Error: dist/ directory is missing or empty"
+            echo "Error: dist/ directory is missing or empty" >&2
             exit 1
           fi
 
           # Confirm PHP proxy files made it into the build
           if [ ! -f "dist/api/imagesCloudinary.php" ]; then
-            echo "Error: dist/api/imagesCloudinary.php is missing from build output"
+            echo "Error: dist/api/imagesCloudinary.php is missing from build output" >&2
             exit 1
           fi
           if [ ! -f "dist/api/luma.php" ]; then
-            echo "Error: dist/api/luma.php is missing from build output"
+            echo "Error: dist/api/luma.php is missing from build output" >&2
             exit 1
           fi
 
@@ -91,25 +91,34 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: staging
-    permissions: {}
+    permissions:
+      contents: read # Required for actions/checkout (local composite action)
 
     outputs:
       release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
 
     steps:
-      # 1. Download build artifact
+      # 1. Check out the code
+      #
+      # Only needed so the local composite action in .github/actions/ can be
+      # resolved by the Django health check at the end of this job. Runs first
+      # so actions/checkout's `git clean` cannot delete the downloaded artifact.
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # 2. Download build artifact
       - name: Download Build Artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: dist-staging
           path: dist
 
-      # 2. Generate release timestamp
+      # 3. Generate release timestamp
       - name: Generate Release Timestamp
         id: timestamp
         run: echo "timestamp=$(date +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
 
-      # 3. Setup SSH
+      # 4. Setup SSH
       - name: Setup SSH
         env:
           KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
@@ -168,7 +177,7 @@ jobs:
             exit 1
           fi
 
-      # 4. Create release directory on server
+      # 5. Create release directory on server
       - name: Create Release Directory
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
@@ -184,7 +193,7 @@ jobs:
             # Create staging releases directory structure
             mkdir -p "/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP/api"
 
-      # 5. Package and sync to server
+      # 6. Package and sync to server
       - name: Package and Sync to Release
         env:
           REMOTE_PORT: ${{ secrets.REMOTE_PORT || 22 }}
@@ -200,7 +209,7 @@ jobs:
             release.tar.gz \
             "$REMOTE_USER"@"$REMOTE_HOST":"/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP/"
 
-      # 6. Extract release on server
+      # 7. Extract release on server
       - name: Extract Release on Server
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
@@ -217,7 +226,7 @@ jobs:
             tar -xzf release.tar.gz
             rm release.tar.gz
 
-      # 7. Inject shared secrets onto server
+      # 8. Inject shared secrets onto server
       #
       # WHY: Both imagesCloudinary.php and luma.php need Cloudinary credentials
       # to sign API requests. Credentials must never be in the repo or dist/.
@@ -292,7 +301,71 @@ jobs:
               exit 1
             fi
 
-      # 8. Atomically switch symlink & clean ALL previous staging releases
+      # 8b. Link the persistent Django mount into the new release
+      #
+      # WHY: Every frontend deploy replaces the whole document root, which wipes
+      # anything hand-placed inside it, including the /job Passenger mount.
+      # The real mount lives OUTSIDE any release at ~/jobsboard-mounts/staging
+      # and is re-linked into each new release as `job`.
+      #
+      # This MUST run before the symlink switch (step 9) so /job is never
+      # missing on the live docroot, not even for a second.
+      #
+      # PREREQUISITE: the mount folder AND the Passenger .htaccess inside it must
+      # exist on the server. The step hard-fails when the .htaccess is missing,
+      # because a release without /job would silently serve the SPA on /job.
+      #
+      # Until the folder exists, the step warns and skips instead of failing the
+      # whole frontend deploy: staging Django is not deployed yet, so the folder
+      # may not be there and a missing mount must not block frontend releases. It
+      # still fails hard when STAGING_DJANGO_ENABLED is "true", so a missing mount
+      # cannot silently pass once Django is meant to be live.
+      - name: Restore Django Mount in Release
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          RELEASE_TIMESTAMP: ${{ steps.timestamp.outputs.timestamp }}
+          DJANGO_ENABLED: ${{ vars.STAGING_DJANGO_ENABLED }}
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key_path: /home/runner/.ssh/id_rsa
+          port: ${{ secrets.REMOTE_PORT || 22 }}
+          envs: REMOTE_USER,RELEASE_TIMESTAMP,DJANGO_ENABLED
+          script: |
+            set -euo pipefail
+
+            MOUNT="/home/$REMOTE_USER/jobsboard-mounts/staging"
+            RELEASE_DIR="/home/$REMOTE_USER/staging-releases/$RELEASE_TIMESTAMP"
+
+            if [ ! -d "$MOUNT" ]; then
+              if [ "${DJANGO_ENABLED:-}" = "true" ]; then
+                echo "❌ Mount folder $MOUNT is missing — aborting before the symlink switch."
+                exit 1
+              fi
+              echo "::warning::$MOUNT does not exist yet (staging Django not deployed) — skipping /job link for this release."
+              echo "  Create it with the Passenger .htaccess before setting STAGING_DJANGO_ENABLED=true."
+              exit 0
+            fi
+
+            # A real folder named `job` would swallow the link (ln -sfn would
+            # create it INSIDE the folder), so remove it first.
+            # No trailing slash: this deletes the folder or link, never the mount.
+            if [ -e "$RELEASE_DIR/job" ] && [ ! -L "$RELEASE_DIR/job" ]; then
+              rm -rf "$RELEASE_DIR/job"
+            fi
+
+            ln -sfn "$MOUNT" "$RELEASE_DIR/job"
+
+            # Confirm the link resolves to the Passenger block
+            if [ ! -f "$RELEASE_DIR/job/.htaccess" ]; then
+              echo "❌ $RELEASE_DIR/job/.htaccess not found — mount link is broken."
+              exit 1
+            fi
+
+            echo "✅ Django mount linked into release $RELEASE_TIMESTAMP"
+
+      # 9. Atomically switch symlink & clean ALL previous staging releases
       #
       # NOTE: Unlike production (which retains last 5 releases for rollback),
       # staging aggressively removes ALL previous releases to keep the server clean.
@@ -348,7 +421,7 @@ jobs:
 
             echo "✅ Staging deployment successful."
 
-      # 9. Health check — verify the staging URL responds
+      # 10. Health check — verify the staging URL responds
       - name: Health Check
         env:
           STAGING_URL: ${{ secrets.STAGING_URL }}
@@ -405,6 +478,30 @@ jobs:
             exit 1
           fi
 
+      # 11. Django mount health check
+      #
+      # The check above only proves the React shell is served. This one fails the
+      # deploy if /job fell back to the SPA (HTTP 200 HTML) or Django is down:
+      # health is only accepted as HTTP 200 whose body parses as a JSON object
+      # with a non-null "python" key. A 200 HTML shell, a 500, a 403/404, and
+      # invalid JSON all fail the gate.
+      #
+      # The check itself lives in .github/actions/django-mount-health-check so
+      # staging and production share one implementation instead of two copies
+      # that can drift.
+      #
+      # Gated on the STAGING_DJANGO_ENABLED Actions variable because the Django app
+      # is not implemented yet. While the variable is unset this step is skipped
+      # silently instead of failing every deploy against a backend that does not
+      # exist; once backend/ is deployed, set it to "true"
+      # (Settings -> Secrets and variables -> Actions -> Variables) to turn this
+      # back into a hard gate. Nothing here needs to be edited to re-enable it.
+      - name: Django Mount Health Check
+        if: vars.STAGING_DJANGO_ENABLED == 'true'
+        uses: ./.github/actions/django-mount-health-check
+        with:
+          base-url: ${{ secrets.STAGING_URL }}
+
   notify:
     name: Notify Staging Deployment
     needs: [build, deploy]
@@ -422,7 +519,7 @@ jobs:
       - name: Send Success Email
         if: ${{ needs.build.result == 'success' && needs.deploy.result == 'success' }}
         continue-on-error: true
-        uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c # v17
+        uses: dawidd6/action-send-mail@94de994a9f6fffee200243214e17002e2920bb59 # v18
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
@@ -457,7 +554,7 @@ jobs:
       - name: Send Failure Email
         if: ${{ needs.build.result != 'success' || needs.deploy.result != 'success' }}
         continue-on-error: true
-        uses: dawidd6/action-send-mail@42942bc2f8fba4e611b459a018967a6a7c78c68c # v17
+        uses: dawidd6/action-send-mail@94de994a9f6fffee200243214e17002e2920bb59 # v18
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}

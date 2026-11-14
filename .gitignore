@@ -45,6 +45,7 @@ Desktop.ini
 *.njsproj
 *.sln
 *.sw?
+.vscode/settings.json
 
 # ===== Tests / Coverage =====
 coverage/
@@ -73,7 +74,17 @@ npm-debug.log*
 # Ignore local-only files
 *.localqodana.sarif.json
 
+# ===== AI Workspace — local-only (provisioned per developer, not committed) =====
+.ai/
+
+# Graphify knowledge graph — commit graphify-out/ but ignore local cache
+graphify-out/cost.json
+graphify-out/cache/
+
 # Ignore local AI / tool state and generated config
+.claude/
+.windsurf/
+.github/instructions/
 .agents/
 .cursor/
 .jetro/
@@ -83,6 +94,7 @@ npm-debug.log*
 AGENT.md
 CLAUDE.md
 .github/copilot-instructions.md
+.graphifyignore
 
 
 
@@ -91,3 +103,21 @@ backend/config.php
 backend/config.local.php
 backend/config.staging.php
 backend/vendor/
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+
+backend/composer.phar
+backend/.phpunit.cache/
+backend/.php-cs-fixer.cache
+backend/test_res.txt
+
+# SonarQube scanner cache
+.scannerwork/
+
+# ===== CodeGraph — local semantic code graph index =====
+.codegraph/
+
+# Composer Installer
+composer-setup.php
+

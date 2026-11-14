@@ -26,6 +26,18 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@vitejs/plugin-react"
         update-types: ["version-update:semver-major"]
+      # ESLint 10 removes legacy eslintrc APIs that multiple plugins depend on.
+      # Block major bumps until the plugin ecosystem is fully compatible.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@hookform/resolvers"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-intersection-observer"
+        update-types: ["version-update:semver-major"]
     groups:
       frontend-dependencies:
         update-types: ["minor", "patch"]
@@ -82,11 +94,14 @@ updates:
           - "postcss"
           - "autoprefixer"
       tooling:
+        update-types: ["minor", "patch"]
         patterns:
           - "eslint*"
           - "@eslint/*"
           - "@typescript-eslint/*"
           - "@vitest/*"
+          - "globals"
+          - "jsdom"
           - "prettier"
           - "typescript"
           - "tsx"
@@ -95,9 +110,29 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "pre-staging"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
+    # Defer action majors that need manual migration work.
+    ignore:
+      - dependency-name: "actions/labeler"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dawidd6/action-send-mail"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "composer"
+    directory: "/backend"
+    target-branch: "pre-staging"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "composer"

@@ -10,9 +10,9 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import CodeOfConduct from "@/docs/code_of_conduct";
-import PrivacyPolicy from "@/docs/privacy_policy";
-import TermsAndConditions from "@/docs/terms_and_conditions";
+import CodeOfConduct from "@/legal/code_of_conduct";
+import PrivacyPolicy from "@/legal/privacy_policy";
+import TermsAndConditions from "@/legal/terms_and_conditions";
 import AboutUs from "@/pages/AboutUs";
 import BlogDetail from "@/pages/BlogDetail";
 import BlogPage from "@/pages/BlogPage";
@@ -21,6 +21,7 @@ import DonationPage from "@/pages/DonationPage";
 import Eventspage from "@/pages/Eventspage";
 import FAQPage from "@/pages/FAQPage";
 import Home from "@/pages/Home";
+import Jobs from "@/pages/jobs";
 import NotFound from "@/pages/not-found";
 import PartnershipPage from "@/pages/PartnershipPage";
 
@@ -39,6 +40,7 @@ const pathToComponent: Record<RoutePath, ComponentType> = {
   "/blogs": BlogPage,
   "/blogs/:slug": BlogDetail,
   "/donate": DonationPage,
+  "/jobs": Jobs,
 };
 
 if (import.meta.env.DEV) {

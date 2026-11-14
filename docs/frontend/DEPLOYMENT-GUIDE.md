@@ -352,8 +352,8 @@ aws s3 cp "backup_${DATE}.tar.gz" s3://backup-bucket/
 ### Documentation
 
 - **Project Repository:** github.com/NaiDevOpsCom/ndc-redesign-website
-- **Security Guide:** `docs/SECURITY-HEADERS.md`
-- **API Documentation:** `docs/API.md`
+- **Security Headers Guide:** `SECURITY-HEADERS.md`
+- **Deployment (CI/CD):** `deployment.md`
 
 ---
 

@@ -15,7 +15,7 @@ function sitemapPlugin(enabled: boolean): Plugin {
     async closeBundle() {
       if (!enabled) return;
       try {
-        const { generateSitemap } = await import("./scripts/generate-sitemap");
+        const { generateSitemap } = await import("./scripts/generate-sitemap.ts");
         await generateSitemap();
       } catch (err) {
         console.error("⚠  Sitemap generation failed:", err);
@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [tailwindcss(), react(), sitemapPlugin(isHardened)],
+    envDir: path.resolve(import.meta.dirname, "client"), // Load environment variables from .env.staging
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -73,18 +74,17 @@ export default defineConfig(({ mode }) => {
         external: [],
       },
     },
-    // Keep esbuild.drop as double protection: it runs during the transpilation phase
-    // to remove console/debugger before any minification. This ensures stripping
-    // even if minify: "terser" (used for hardening) is active.
-    esbuild: {
-      drop: isHardened ? ["console", "debugger"] : [],
-    },
     server: {
       fs: {
         strict: true,
         deny: ["**/.*"],
       },
       proxy: {
+        "/endpoints": {
+          target: "http://localhost:8000",
+          changeOrigin: false,
+          secure: false,
+        },
         "/api/luma": {
           target: "https://api.luma.com",
           changeOrigin: true,
