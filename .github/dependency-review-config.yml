@@ -48,4 +48,4 @@ allow-dependencies-licenses:
   # The JSON license clause ("Good not Evil") is a known nuisance in
   # the D3 ecosystem and is accepted as low-risk for front-end tooling.
   # Track for removal: evaluate recharts alternatives that drop victory-vendor.
-  - "pkg:npm/victory-vendor"
+  - "pkg:npm/victory-vendor@37.4.1"

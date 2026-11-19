@@ -92,7 +92,88 @@ function proxyRunMiddleware($allowedMethods = ['GET', 'POST', 'OPTIONS']) {
     ];
 }
 
+/**
+ * Check if a path resides within a trusted root directory.
+ */
+function proxyIsPathWithinRoot($path, $root) {
+    $isValid = false;
+    if ($path !== '' && $root !== '') {
+        $realPath = realpath($path);
+        $realRoot = realpath($root);
+        if ($realPath === false) {
+            $parent = dirname($path);
+            $realPath = realpath($parent);
+        }
+        if ($realPath !== false && $realRoot !== false) {
+            $normalizedPath = str_replace('\\', '/', $realPath);
+            $normalizedRoot = str_replace('\\', '/', $realRoot);
+            $isValid = ($normalizedPath === $normalizedRoot || strpos($normalizedPath . '/', rtrim($normalizedRoot, '/') . '/') === 0);
+        }
+    }
+    return $isValid;
+}
+
+function ensureDirectoryExists($dir) {
+    if (!is_dir($dir)) {
+        mkdir($dir, 0700, true);
+    }
+    return realpath($dir);
+}
+
+function getSafePathSegments($cacheFile, $responsesDir) {
+    $normalizedResponsesDir = rtrim(str_replace('\\', '/', $responsesDir), '/');
+    $normalizedFile = str_replace('\\', '/', $cacheFile);
+    if (strpos($normalizedFile, $normalizedResponsesDir . '/') === 0) {
+        $relativePath = substr($normalizedFile, strlen($normalizedResponsesDir) + 1);
+    } elseif ($normalizedFile === $normalizedResponsesDir) {
+        $relativePath = '';
+    } else {
+        $relativePath = $cacheFile;
+    }
+    $segments = explode('/', str_replace('\\', '/', $relativePath));
+    $canonicalSegments = [];
+    foreach ($segments as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            array_pop($canonicalSegments);
+        } else {
+            if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $segment)) {
+                proxyJsonError('Forbidden', 403);
+            }
+            $canonicalSegments[] = $segment;
+        }
+    }
+    if (empty($canonicalSegments)) {
+        proxyJsonError('Forbidden', 403);
+    }
+    return $canonicalSegments;
+}
+
+function proxySafeCachePath($cacheFile) {
+    $cacheRoot = ensureDirectoryExists(getProxyCacheDir());
+    if ($cacheRoot === false || $cacheRoot === '') {
+        proxyJsonError('Forbidden', 403);
+    }
+    $responsesDir = ensureDirectoryExists($cacheRoot . DIRECTORY_SEPARATOR . 'api_responses');
+    if ($responsesDir === false) {
+        proxyJsonError('Forbidden', 403);
+    }
+    $canonicalSegments = getSafePathSegments($cacheFile, $responsesDir);
+    $safePath = $responsesDir . DIRECTORY_SEPARATOR . implode(DIRECTORY_SEPARATOR, $canonicalSegments);
+    $parentDir = dirname($safePath);
+    if (ensureDirectoryExists($parentDir) === false) {
+        proxyJsonError('Forbidden', 403);
+    }
+    if (!proxyIsPathWithinRoot($safePath, $responsesDir)) {
+        proxyJsonError('Forbidden', 403);
+    }
+    return $safePath;
+}
+
 function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json; charset=utf-8') {
+    $cacheFile = proxySafeCachePath($cacheFile);
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
         $data = file_get_contents($cacheFile);
         if ($data) {
@@ -105,9 +186,7 @@ function proxyServeCache($cacheFile, $cacheTTL, $contentType = 'application/json
 }
 
 function proxyWriteCache($cacheFile, $data) {
-    if (!is_dir(dirname($cacheFile))) {
-        mkdir(dirname($cacheFile), 0700, true);
-    }
+    $cacheFile = proxySafeCachePath($cacheFile);
     file_put_contents($cacheFile . '.tmp', $data, LOCK_EX);
     rename($cacheFile . '.tmp', $cacheFile);
 }

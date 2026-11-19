@@ -581,6 +581,11 @@ export function evaluateEngines(currentRange, dependencyRanges) {
   const constraints = dependencyRanges.filter(
     (range) => !isUniversalRange(range),
   );
+  // No non-universal dependency constraints: nothing to violate. Treat as OK
+  // (e.g. engines.node unset with only universal dep ranges).
+  if (constraints.length === 0) {
+    return { status: "ok", incompatible: [] };
+  }
   const incompatible = rangesNotCoveredBy(currentRange, constraints);
   if (currentRange && incompatible.length === 0) {
     return { status: "ok", incompatible };

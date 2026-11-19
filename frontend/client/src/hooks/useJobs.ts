@@ -176,8 +176,27 @@ export function useJobs(filters: JobFilters): UseJobsResult {
   // Debounced search term — updated after SEARCH_DEBOUNCE_MS of silence
   const [debouncedQ, setDebouncedQ] = useState(filters.q);
 
-  // Track the previous filters (excluding q and page) to detect filter changes
-  const prevFiltersRef = useRef<Omit<JobFilters, "q" | "page"> | null>(null);
+  // Track previous filter key / debounced search to reset page during render
+  // (avoids the double fetch that effects firing in sequence would cause).
+  const prevFilterKeyRef = useRef<string | null>(null);
+  const prevDebouncedQRef = useRef<string | null>(null);
+
+  const filterKey = JSON.stringify({
+    role_type: filters.role_type,
+    location_type: filters.location_type,
+    africa_friendly: filters.africa_friendly,
+    sort: filters.sort,
+    per_page: filters.per_page,
+  });
+  if (prevFilterKeyRef.current !== null && prevFilterKeyRef.current !== filterKey) {
+    setCurrentPage(1);
+  }
+  prevFilterKeyRef.current = filterKey;
+
+  if (prevDebouncedQRef.current !== null && prevDebouncedQRef.current !== debouncedQ) {
+    setCurrentPage(1);
+  }
+  prevDebouncedQRef.current = debouncedQ;
 
   // ── Debounce the search query ───────────────────────────────────────────────
 
@@ -188,37 +207,6 @@ export function useJobs(filters: JobFilters): UseJobsResult {
 
     return () => clearTimeout(timer);
   }, [filters.q]);
-
-  // ── Reset to page 1 when non-page filters change ────────────────────────────
-
-  useEffect(() => {
-    const nonPageFilters: Omit<JobFilters, "q" | "page"> = {
-      role_type: filters.role_type,
-      location_type: filters.location_type,
-      africa_friendly: filters.africa_friendly,
-      sort: filters.sort,
-      per_page: filters.per_page,
-    };
-
-    const prev = prevFiltersRef.current;
-
-    if (prev !== null && JSON.stringify(prev) !== JSON.stringify(nonPageFilters)) {
-      setCurrentPage(1);
-    }
-
-    prevFiltersRef.current = nonPageFilters;
-  }, [
-    filters.role_type,
-    filters.location_type,
-    filters.africa_friendly,
-    filters.sort,
-    filters.per_page,
-  ]);
-
-  // Reset to page 1 when the debounced search term changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedQ]);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
@@ -238,8 +226,10 @@ export function useJobs(filters: JobFilters): UseJobsResult {
       };
 
       const queryString = buildQueryString(activeFilters);
-      const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+      const apiBase = import.meta.env.VITE_API_URL ?? "/job";
       const url = `${apiBase}/?action=jobs&${queryString}`;
+
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
       try {
         const response = await fetch(url, { signal: controller.signal });
@@ -249,6 +239,10 @@ export function useJobs(filters: JobFilters): UseJobsResult {
         }
 
         const data: JobsApiResponse = await response.json();
+
+        if (!Array.isArray(data?.jobs)) {
+          throw new Error("API response missing jobs array");
+        }
 
         setJobs(data.jobs);
         setTotal(data.total);
@@ -267,6 +261,7 @@ export function useJobs(filters: JobFilters): UseJobsResult {
 
         setIsLoading(false);
       } catch (err) {
+        clearTimeout(timeout);
         // Ignore AbortError — it's expected when a newer request cancels this one
         if (err instanceof Error && err.name === "AbortError") return;
 

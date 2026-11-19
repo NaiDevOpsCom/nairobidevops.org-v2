@@ -64,7 +64,8 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     environment: production
-    permissions: {}
+    permissions:
+      contents: read
 
     outputs:
       release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
@@ -229,10 +230,16 @@ jobs:
 
             RELEASE_DIR="/home/$REMOTE_USER/backend-releases/$RELEASE_TIMESTAMP"
             TMP_LINK="${TARGET_LINK}.tmp"
+            PREVIOUS_LINK_FILE="/home/$REMOTE_USER/.backend-prod-previous"
 
             if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
               echo "CRITICAL ERROR: $TARGET_LINK is not a symlink — aborting."
               exit 1
+            fi
+
+            # Record the previous target so a bad release can be restored.
+            if [ -L "$TARGET_LINK" ]; then
+              readlink "$TARGET_LINK" > "$PREVIOUS_LINK_FILE" || true
             fi
 
             ln -sfn "$RELEASE_DIR" "$TMP_LINK"

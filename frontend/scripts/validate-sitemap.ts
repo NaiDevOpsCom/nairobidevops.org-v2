@@ -128,8 +128,8 @@ function validateLastmod(dateStr: string, loc: string): void {
 }
 
 function validateUrlBlock(block: string, seenUrls: Set<string>): void {
-  const locPattern = /<loc>(.*?)<\/loc>/;
-  const lastmodPattern = /<lastmod>(.*?)<\/lastmod>/;
+  const locPattern = /<loc>([\s\S]*?)<\/loc>/;
+  const lastmodPattern = /<lastmod>([\s\S]*?)<\/lastmod>/;
 
   const locMatch = locPattern.exec(block);
   const lastmodMatch = lastmodPattern.exec(block);

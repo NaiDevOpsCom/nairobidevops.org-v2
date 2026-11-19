@@ -48,23 +48,20 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Dependencies
-        run: |
-          echo "📦 Installing dependencies..."
-          npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
-
-      # Runs after the install: lockfile-lint is a devDependency and comes from
-      # the lockfile being validated, so nothing is fetched on demand here.
+      # Validate the lockfile with a pinned, trusted tool BEFORE installing
+      # project dependencies. lockfile-lint is a devDependency that ships in
+      # the lockfile being validated, so running it from node_modules would let
+      # a PR-controlled lockfile fetch and execute an unapproved binary before
+      # --allowed-hosts npm is enforced. Pin the tool version and resolve it
+      # independently of the project lockfile.
       - name: Validate Lockfile Integrity
         run: |
           echo "🔒 Validating lockfile with lockfile-lint..."
-          # Ensure lockfile exists
           if [ ! -f package-lock.json ]; then
             echo "::error::package-lock.json is required"
             exit 1
           fi
-          # Use lockfile-lint for comprehensive validation
-          ./node_modules/.bin/lockfile-lint \
+          npx --yes lockfile-lint@4.14.1 \
             --path package-lock.json \
             --type npm \
             --validate-https \
@@ -72,6 +69,11 @@ jobs:
             --validate-integrity \
             --validate-package-names
           echo "✅ Lockfile validation passed"
+
+      - name: Install Dependencies
+        run: |
+          echo "📦 Installing dependencies..."
+          npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
 
       # npm audit exits non-zero in two very different situations:
       #   1. it FOUND vulnerabilities  -> a valid report, and the gate must fail
@@ -87,6 +89,13 @@ jobs:
           FAIL_LEVEL: ${{ inputs.fail-level }}
         run: |
           echo "🔍 Running npm audit..."
+
+          # Fail fast on an invalid/empty fail-level instead of letting it fall
+          # through the retry path and masquerade as a registry failure.
+          case "${FAIL_LEVEL}" in
+            info|low|moderate|high|critical) ;;
+            *) echo "::error::Invalid fail-level '${FAIL_LEVEL}' (expected: info|low|moderate|high|critical)"; exit 1 ;;
+          esac
 
           # The verdict comes from scripts/audit-gate.mjs - the same module the
           # Quality Gates security leg runs - so the two required checks cannot
@@ -127,11 +136,11 @@ jobs:
         with:
           base-ref: ${{ github.event.pull_request.base.sha }}
           head-ref: ${{ github.event.pull_request.head.sha }}
-          # License policy is managed in .github/dependency-review-config.yml
-          # to ensure compound SPDX expressions (e.g. "ISC AND JSON AND MIT")
-          # are parsed as atomic allow-list entries (not split on comma).
-          # The inline allow-licenses string format does not reliably handle
-          # compound expressions — use the external YAML list format instead.
+          # License policy is managed in .github/dependency-review-config.yml.
+          # Compound SPDX expressions (e.g. "ISC AND JSON AND MIT") are NOT
+          # matched by allow-licenses; the victory-vendor exemption is applied
+          # through allow-dependencies-licenses (PURL) instead. See the config
+          # file for the rationale.
           config-file: .github/dependency-review-config.yml
           # Pass the caller's fail-level through explicitly so the action input
           # and the config file agree.

@@ -101,10 +101,10 @@
   let themeMediaListener = null;
 
   function isDark() {
-    return (
-      document.documentElement.classList.contains("dark") ||
-      window.matchMedia("(prefers-color-scheme: dark)").matches
-    );
+    const el = document.documentElement;
+    if (el.classList.contains("dark")) return true;
+    if (el.classList.contains("light")) return false;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
   }
 
   function applyBannerTheme(root) {
@@ -265,7 +265,20 @@
       closeBanner();
     } else {
       stopAnalytics();
-      openBanner();
+      const show = function () {
+        if (document.body) {
+          openBanner();
+        } else {
+          document.addEventListener("DOMContentLoaded", function () {
+            if (readDecision() === null) openBanner();
+          }, { once: true });
+        }
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", show, { once: true });
+      } else {
+        show();
+      }
     }
   });
 
