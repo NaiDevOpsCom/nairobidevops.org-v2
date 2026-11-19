@@ -269,9 +269,13 @@
         if (document.body) {
           openBanner();
         } else {
-          document.addEventListener("DOMContentLoaded", function () {
-            if (readDecision() === null) openBanner();
-          }, { once: true });
+          document.addEventListener(
+            "DOMContentLoaded",
+            function () {
+              if (readDecision() === null) openBanner();
+            },
+            { once: true }
+          );
         }
       };
       if (document.readyState === "loading") {

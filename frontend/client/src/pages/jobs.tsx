@@ -110,7 +110,8 @@ function currencySymbol(code: string): string {
 function formatSalary(job: Job): string | null {
   if (job.salary_min === null && job.salary_max === null) return null;
   const currency = job.salary_currency ?? "USD";
-  const period = job.salary_period === "annual" ? "yr" : job.salary_period === "monthly" ? "mo" : null;
+  const period =
+    job.salary_period === "annual" ? "yr" : job.salary_period === "monthly" ? "mo" : null;
   const symbol = currencySymbol(currency);
 
   if (job.salary_min !== null && job.salary_max !== null) {
@@ -179,7 +180,9 @@ function UrgencyIndicator({ job }: { readonly job: Job }) {
   const days =
     job.days_remaining ??
     (job.closes_at
-      ? Math.ceil((new Date(job.closes_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+      ? Math.ceil(
+          (new Date(job.closes_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+        )
       : null);
 
   if (days === null) {
@@ -790,7 +793,12 @@ export default function Jobs() {
                 </SheetDescription>
               </SheetHeader>
               <div className="py-6">
-                <FilterPanel idPrefix="desktop-" filters={filters} onChange={patchFilters} onClear={clearFilters} />
+                <FilterPanel
+                  idPrefix="desktop-"
+                  filters={filters}
+                  onChange={patchFilters}
+                  onClear={clearFilters}
+                />
               </div>
             </SheetContent>
           </Sheet>
@@ -822,7 +830,12 @@ export default function Jobs() {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar (desktop) */}
           <aside className="hidden md:block w-full lg:w-[220px] shrink-0 lg:sticky lg:top-24 self-start bg-card border border-border rounded-xl p-5 shadow-sm">
-            <FilterPanel idPrefix="mobile-" filters={filters} onChange={patchFilters} onClear={clearFilters} />
+            <FilterPanel
+              idPrefix="mobile-"
+              filters={filters}
+              onChange={patchFilters}
+              onClear={clearFilters}
+            />
           </aside>
 
           {/* Jobs list */}
