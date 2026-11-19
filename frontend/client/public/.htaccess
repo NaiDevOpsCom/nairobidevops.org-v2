@@ -84,7 +84,13 @@ Options -MultiViews
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-  
+
+  # Canonical host: send www to the apex with a permanent redirect.
+  # Matches only www.nairobidevops.org, so staging and other domains are untouched.
+  # Runs before every other rule so Django never sees the www host.
+  RewriteCond %{HTTP_HOST} ^www\.nairobidevops\.org$ [NC]
+  RewriteRule ^(.*)$ https://nairobidevops.org/$1 [R=301,L]
+
   # Prevent directory indexing and folder name conflicts
   <IfModule mod_autoindex.c>
     Options -Indexes
@@ -104,9 +110,9 @@ Options -MultiViews
   # Bypass SPA routing for /api/ requests (allow 404/405 from PHP instead of rewriting to index.html)
   RewriteRule ^/?api/ - [L]
 
-  # Bypass SPA routing for /jobs-api/ PHP backend
-  RewriteRule ^/?jobs-api/ - [L]
-  RewriteRule ^/?job/ - [L]
+  # Bypass SPA routing for the Django app mounted at /job (symlink created by the deploy workflow).
+  # "/jobs" (the React listing) does not match this pattern and stays with the SPA.
+  RewriteRule ^/?job(/|$) - [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

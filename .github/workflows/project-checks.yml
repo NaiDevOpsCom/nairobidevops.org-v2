@@ -34,6 +34,15 @@ jobs:
         working-directory: frontend
         run: npm ci --ignore-scripts
 
+      # The root manifest only carries what scripts/ imports, so this install is
+      # one package - it also proves package.json and package-lock.json still
+      # agree after the duplicate dependency block was removed.
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run root script tests
+        run: npm run test:root
+
       - name: Run root checks
         working-directory: frontend
         run: npm run check
