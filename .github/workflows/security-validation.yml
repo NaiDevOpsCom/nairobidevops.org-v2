@@ -61,7 +61,7 @@ jobs:
             echo "::error::package-lock.json is required"
             exit 1
           fi
-          npm install -g lockfile-lint@4.14.1
+          npm install -g --ignore-scripts lockfile-lint@4.14.1
           lockfile-lint \
             --path package-lock.json \
             --type npm \
