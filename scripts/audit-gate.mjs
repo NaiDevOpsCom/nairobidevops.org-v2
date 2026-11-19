@@ -125,7 +125,7 @@ export function formatSummary(result) {
   }
 
   const lines = ["📊 Vulnerability summary (all dependencies):"];
-  for (const level of LEVELS.slice(1)) {
+  for (const level of LEVELS) {
     lines.push(`   ${level.padEnd(9)} ${result.counts[level]}`);
   }
   return lines.join("\n");
@@ -136,7 +136,7 @@ function detailsFor(result) {
     return result.reason;
   }
   const { counts } = result;
-  return `${counts.critical} critical, ${counts.high} high, ${counts.moderate} moderate, ${counts.low} low`;
+  return `${counts.critical} critical, ${counts.high} high, ${counts.moderate} moderate, ${counts.low} low, ${counts.info} info`;
 }
 
 function parseArgs(argv) {
@@ -207,10 +207,11 @@ function main(argv) {
   console.log(formatSummary(result));
 
   if (args.githubEnv && process.env.GITHUB_ENV) {
-    const status = result.outcome === "fail" ? "failed" : "success";
+    const status = result.outcome === "pass" ? "success" : "failed";
+    const details = detailsFor(result).replace(/\r?\n/g, " ");
     appendFileSync(
       process.env.GITHUB_ENV,
-      `security-status=${status}\nsecurity-details=${detailsFor(result)}\n`,
+      `security-status=${status}\nsecurity-details=${details}\n`,
     );
   }
 

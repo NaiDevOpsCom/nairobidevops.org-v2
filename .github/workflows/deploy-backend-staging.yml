@@ -64,7 +64,8 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     environment: staging
-    permissions: {}
+    permissions:
+      contents: read
 
     outputs:
       release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
@@ -268,8 +269,8 @@ jobs:
           STAGING_URL: ${{ secrets.STAGING_URL }}
         run: |
           if [ -z "$STAGING_URL" ]; then
-            echo "STAGING_URL is not set — skipping health check"
-            exit 0
+            echo "::error::STAGING_URL is not set — cannot verify the backend release"
+            exit 1
           fi
 
           MAX_RETRIES=5
@@ -281,7 +282,7 @@ jobs:
               --connect-timeout 10 \
               --max-time 30 \
               -w '%{http_code}' \
-              "$STAGING_URL" 2>/dev/null || echo "000")
+              "${STAGING_URL%/}/jobs-api" 2>/dev/null || echo "000")
 
             case "$HTTP_CODE" in
               2* | 3*)

@@ -110,16 +110,17 @@ function currencySymbol(code: string): string {
 function formatSalary(job: Job): string | null {
   if (job.salary_min === null && job.salary_max === null) return null;
   const currency = job.salary_currency ?? "USD";
-  const period = job.salary_period === "annual" ? "yr" : "mo";
+  const period =
+    job.salary_period === "annual" ? "yr" : job.salary_period === "monthly" ? "mo" : null;
   const symbol = currencySymbol(currency);
 
   if (job.salary_min !== null && job.salary_max !== null) {
-    return `${symbol}${job.salary_min.toLocaleString()} – ${symbol}${job.salary_max.toLocaleString()} / ${period}`;
+    return `${symbol}${job.salary_min.toLocaleString()} – ${symbol}${job.salary_max.toLocaleString()}${period ? ` / ${period}` : ""}`;
   }
   if (job.salary_min !== null) {
-    return `From ${symbol}${job.salary_min.toLocaleString()} / ${period}`;
+    return `From ${symbol}${job.salary_min.toLocaleString()}${period ? ` / ${period}` : ""}`;
   }
-  return `Up to ${symbol}${job.salary_max!.toLocaleString()} / ${period}`;
+  return `Up to ${symbol}${job.salary_max!.toLocaleString()}${period ? ` / ${period}` : ""}`;
 }
 
 /**
@@ -176,9 +177,24 @@ function UrgencyIndicator({ job }: { readonly job: Job }) {
     );
   }
 
-  const days = job.days_remaining ?? 0;
+  const days =
+    job.days_remaining ??
+    (job.closes_at
+      ? Math.ceil(
+          (new Date(job.closes_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+        )
+      : null);
 
-  if (days === 0) {
+  if (days === null) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+        Closing soon
+      </span>
+    );
+  }
+
+  if (days <= 0) {
     return (
       <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
         <span
@@ -235,7 +251,7 @@ function JobCard({ job }: { readonly job: Job }) {
       {/* Featured badge */}
       {isFeatured && (
         <div className="absolute -top-2 left-4">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/20 text-primary border border-primary/30">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/20 text-blue-700 dark:text-blue-300 border border-primary/30">
             ⭐ Featured
           </span>
         </div>
@@ -363,10 +379,12 @@ function FilterPanel({
   filters,
   onChange,
   onClear,
+  idPrefix = "",
 }: {
   readonly filters: JobFilters;
   readonly onChange: (patch: Partial<JobFilters>) => void;
   readonly onClear: () => void;
+  readonly idPrefix?: string;
 }) {
   const activeCount = countActiveFilters(filters);
 
@@ -409,7 +427,7 @@ function FilterPanel({
         </span>
         <div className="space-y-2">
           {ROLE_OPTIONS.map((role) => {
-            const id = `role-${role.replace(/\s+/g, "-").toLowerCase()}`;
+            const id = `${idPrefix}role-${role.replace(/\s+/g, "-").toLowerCase()}`;
             return (
               <label
                 key={role}
@@ -436,7 +454,7 @@ function FilterPanel({
         </span>
         <div className="space-y-2">
           {LOCATION_OPTIONS.map(({ label, value }) => {
-            const id = `loc-${value}`;
+            const id = `${idPrefix}loc-${value}`;
             return (
               <label
                 key={value}
@@ -620,12 +638,13 @@ export default function Jobs() {
           ...(firstPage.jobs ?? []),
           ...remainingPages.flatMap((pageData) => pageData.jobs ?? []),
         ]);
+        setAllJobsFetched(true);
       } catch (err) {
         if (err instanceof Error && err.name !== "AbortError") {
           console.error("Failed to fetch job count:", err);
         }
       } finally {
-        setAllJobsFetched(true);
+        // Allow retry after transient failure: only mark fetched on success.
       }
     };
 
@@ -668,7 +687,7 @@ export default function Jobs() {
 
           {/* Stats bar */}
           <div className="inline-flex flex-wrap items-center justify-center gap-x-4 gap-y-1 bg-ndc-darkblue text-white rounded-full px-6 py-2.5 text-xs font-mono shadow-md">
-            <span className="font-semibold text-primary">
+            <span className="font-semibold text-white">
               {isLoading ? "—" : `${total} open roles`}
             </span>
             <span className="text-white/30 hidden md:inline">|</span>
@@ -677,8 +696,12 @@ export default function Jobs() {
                 ? `${closingSoonCount} closing this week`
                 : "Updated " + lastSync}
             </span>
-            <span className="text-white/50 hidden md:inline">|</span>
-            <span className="text-white/70">Updated {lastSync}</span>
+            {closingSoonCount > 0 && (
+              <>
+                <span className="text-white/50 hidden md:inline">|</span>
+                <span className="text-white/70">Updated {lastSync}</span>
+              </>
+            )}
           </div>
 
           {/* Search bar */}
@@ -703,9 +726,6 @@ export default function Jobs() {
                 </button>
               )}
             </div>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 font-semibold rounded-lg">
-              Search
-            </Button>
           </div>
 
           {/* Quick filter pills */}
@@ -721,6 +741,7 @@ export default function Jobs() {
                       : [...filters.location_type, value];
                     patchFilters({ location_type: next, page: 1 });
                   }}
+                  aria-pressed={active}
                   className={[
                     "px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all",
                     active
@@ -733,6 +754,7 @@ export default function Jobs() {
               );
             })}
             <button
+              aria-pressed={filters.africa_friendly}
               onClick={() => patchFilters({ africa_friendly: !filters.africa_friendly, page: 1 })}
               className={[
                 "px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all",
@@ -771,7 +793,12 @@ export default function Jobs() {
                 </SheetDescription>
               </SheetHeader>
               <div className="py-6">
-                <FilterPanel filters={filters} onChange={patchFilters} onClear={clearFilters} />
+                <FilterPanel
+                  idPrefix="desktop-"
+                  filters={filters}
+                  onChange={patchFilters}
+                  onClear={clearFilters}
+                />
               </div>
             </SheetContent>
           </Sheet>
@@ -803,7 +830,12 @@ export default function Jobs() {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar (desktop) */}
           <aside className="hidden md:block w-full lg:w-[220px] shrink-0 lg:sticky lg:top-24 self-start bg-card border border-border rounded-xl p-5 shadow-sm">
-            <FilterPanel filters={filters} onChange={patchFilters} onClear={clearFilters} />
+            <FilterPanel
+              idPrefix="mobile-"
+              filters={filters}
+              onChange={patchFilters}
+              onClear={clearFilters}
+            />
           </aside>
 
           {/* Jobs list */}

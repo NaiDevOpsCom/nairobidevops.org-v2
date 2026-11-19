@@ -20,7 +20,8 @@ env/
 __pycache__/
 *.egg-info/
 .tox/
-target/            # Java/Maven, Rust
+# Java/Maven, Rust
+target/
 .gradle/
 .m2/
 
@@ -92,7 +93,7 @@ Thumbs.db
 ## --- Secrets (should never be indexed or sent as context) ---
 .env
 .env.local
-.env.*.local
+.env.*
 .env.staging
 .env.production
 *.env.php
