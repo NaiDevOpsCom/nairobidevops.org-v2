@@ -110,22 +110,26 @@ jobs:
         if: matrix.check == 'types'
         run: |
           echo "🔷 Running TypeScript validation..."
-          # Run typecheck and capture output
-          TYPECHECK_OUTPUT=$(npm run typecheck 2>&1 || true)
-          echo "$TYPECHECK_OUTPUT"
+          set -o pipefail
 
-          # Count TypeScript errors properly
-          ERROR_COUNT=$(echo "$TYPECHECK_OUTPUT" | grep -c "error TS" || echo "0")
+          # Capture the real exit status. Previously the failure was only
+          # written to $GITHUB_ENV and never exited, so this leg reported green
+          # even with type errors - a gate that could not fail.
+          STATUS=0
+          TYPECHECK_OUTPUT=$(npm run typecheck 2>&1) || STATUS=$?
+          printf '%s\n' "$TYPECHECK_OUTPUT"
 
-          # Ensure ERROR_COUNT is a clean numeric value
-          ERROR_COUNT=$(echo "$ERROR_COUNT" | sed 's/[^0-9]*//g' | xargs printf "%d" 2>/dev/null || echo "0")
-
-          if [ "${ERROR_COUNT:-0}" -eq 0 ]; then
-            echo "type-status=success" >> "$GITHUB_ENV"
-          else
+          if [ "$STATUS" -ne 0 ]; then
+            ERROR_COUNT=$(printf '%s\n' "$TYPECHECK_OUTPUT" | grep -c "error TS" || true)
             echo "type-status=failed" >> "$GITHUB_ENV"
+            echo "type-errors=${ERROR_COUNT}" >> "$GITHUB_ENV"
+            echo "::error::TypeScript validation failed with ${ERROR_COUNT} error(s)."
+            exit 1
           fi
-          echo "type-errors=${ERROR_COUNT:-0}" >> "$GITHUB_ENV"
+
+          echo "type-status=success" >> "$GITHUB_ENV"
+          echo "type-errors=0" >> "$GITHUB_ENV"
+          echo "✅ No TypeScript errors"
 
       - name: Unit Tests
         if: matrix.check == 'tests'
@@ -136,11 +140,14 @@ jobs:
           echo "🔍 Looking for test files..."
           TEST_FILES=$(find client -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" \) 2>/dev/null || true)
 
+          # A test gate must not pass vacuously: if the suite disappears (bad
+          # rename, deleted directory, wrong root) this has to fail loudly rather
+          # than report a green check with nothing executed.
           if [ -z "$TEST_FILES" ]; then
-            echo "::warning::No test files found in client directory"
-            echo "::warning::Expected patterns: **/*.test.ts, **/*.spec.ts, **/__tests__/*.ts"
-            echo "test-status=skipped" >> "$GITHUB_ENV"
-            exit 0
+            echo "::error::No test files found in client directory. Refusing to pass the test gate with nothing to run."
+            echo "::error::Expected patterns: **/*.test.ts, **/*.spec.ts, **/__tests__/*.ts"
+            echo "test-status=missing" >> "$GITHUB_ENV"
+            exit 1
           fi
 
           echo "Found test files:"
@@ -153,10 +160,13 @@ jobs:
           # Run actual tests with coverage
           echo "⏳ Running test suite with coverage..."
 
-          # Run tests - using the exact command that works locally
+          # Run tests - using the exact command that works locally.
+          # Under the default `bash -e`, a failing suite aborted the step before
+          # TEST_EXIT_CODE was captured; suspend -e so the reporting path runs.
+          set +e
           npm test -- --coverage
-
           TEST_EXIT_CODE=$?
+          set -e
 
           # Report test results
           if [ "$TEST_EXIT_CODE" -eq 0 ]; then
@@ -168,58 +178,48 @@ jobs:
             exit 1
           fi
 
-      # UPDATED: More nuanced security audit handling
+      # Single security policy for both required checks: audit ALL dependencies
+      # and fail at "moderate" or above, matching Hardened Build Verification
+      # (.github/workflows/security-validation.yml, fail-level: moderate).
+      # This leg previously gated production dependencies only and merely warned
+      # on moderate risk, so the two required checks could disagree about the
+      # same lockfile - a dev-only advisory failed one and passed the other.
       - name: Security Audit
         if: matrix.check == 'security'
+        env:
+          AUDIT_FAIL_LEVEL: moderate
         run: |
           echo "🛡️ Running security audit..."
 
-          # 1) Gate on production dependencies only
-          # This avoids failing the pipeline on dev-only tooling issues.
-          AUDIT_RESULT=$(npm audit --audit-level=moderate --omit=dev --json || true)
+          # Adjudicated by scripts/audit-gate.mjs, the same module Hardened Build
+          # Verification uses, so both required checks apply one threshold to one
+          # lockfile. Exit 2 means the report was unusable - retry, then fail
+          # closed. A registry error must never read as "0 vulnerabilities", which
+          # is exactly what the previous `jq ... // 0` counting did.
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            npm audit --json > audit-results.json 2> audit-stderr.txt || true
 
-          # Extract vulnerability counts
-          CRITICAL_VULNS=$(echo "$AUDIT_RESULT" | jq -r '.metadata.vulnerabilities.critical // 0')
-          HIGH_VULNS=$(echo "$AUDIT_RESULT" | jq -r '.metadata.vulnerabilities.high // 0')
-          MODERATE_VULNS=$(echo "$AUDIT_RESULT" | jq -r '.metadata.vulnerabilities.moderate // 0')
+            rc=0
+            node "$GITHUB_WORKSPACE/scripts/audit-gate.mjs" \
+              --level "$AUDIT_FAIL_LEVEL" \
+              --report audit-results.json \
+              --github-env || rc=$?
 
-          echo "📊 Vulnerability Summary (prod deps only):"
-          echo "  Critical: $CRITICAL_VULNS"
-          echo "  High: $HIGH_VULNS"
-          echo "  Moderate: $MODERATE_VULNS"
+            case "$rc" in
+              0|1) exit "$rc" ;;
+            esac
 
-          # STRICT: Fail on critical or high vulnerabilities
-          if [ $((CRITICAL_VULNS + HIGH_VULNS)) -gt 0 ]; then
-            echo "security-status=failed" >> "$GITHUB_ENV"
-            echo "security-details=${CRITICAL_VULNS} critical, ${HIGH_VULNS} high vulnerabilities" >> "$GITHUB_ENV"
-            echo "::error::CRITICAL/HIGH security vulnerabilities detected: ${CRITICAL_VULNS} critical, ${HIGH_VULNS} high"
-            exit 1
-          fi
+            echo "::warning::npm audit returned no usable report (attempt ${attempt}/3)."
+            sed -n '1,15p' audit-stderr.txt 2>/dev/null || true
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le 3 ]; then
+              sleep $(( (attempt - 1) * 15 ))
+            fi
+          done
 
-          # LENIENT: Warn on moderate vulnerabilities but don't fail
-          # This allows dev dependencies like ESLint to have moderate issues
-          if [ "$MODERATE_VULNS" -gt 0 ]; then
-            echo "security-status=warning" >> "$GITHUB_ENV"
-            echo "security-details=${MODERATE_VULNS} moderate vulnerabilities (prod deps)" >> "$GITHUB_ENV"
-            echo "::warning::${MODERATE_VULNS} moderate vulnerabilities detected in production dependencies - please review and update when possible"
-            
-            # Show details for tracking
-            echo "📋 Moderate vulnerability details:"
-            npm audit --audit-level=moderate --omit=dev || true
-          else
-            echo "security-status=success" >> "$GITHUB_ENV"
-            echo "security-details=No vulnerabilities found" >> "$GITHUB_ENV"
-          fi
-
-          # 2) Optional visibility into dev dependency issues (do not fail the job)
-          echo ""
-          echo "🧰 Dev dependency audit (informational only)..."
-          npm audit --audit-level=moderate --omit=prod --omit=peer --omit=optional --json > audit-dev.json || true
-          # Use default if file is missing or invalid
-          DEV_CRITICAL=$(jq -r '.metadata.vulnerabilities.critical // 0' audit-dev.json 2>/dev/null || echo "0")
-          DEV_HIGH=$(jq -r '.metadata.vulnerabilities.high // 0' audit-dev.json 2>/dev/null || echo "0")
-          DEV_MODERATE=$(jq -r '.metadata.vulnerabilities.moderate // 0' audit-dev.json 2>/dev/null || echo "0")
-          echo "Dev deps: Critical=$DEV_CRITICAL High=$DEV_HIGH Moderate=$DEV_MODERATE"
+          echo "::error::npm audit could not complete after 3 attempts - the npm registry or its advisory endpoint was unreachable. This is an infrastructure failure, not a dependency finding; re-run the job."
+          exit 1
 
       - name: Build and Security Generation
         if: matrix.check == 'build'
@@ -347,18 +347,22 @@ jobs:
     if: always()
 
     steps:
-      - name: Generate Quality Report
+      # This job previously printed a fixed report and could never fail, so it
+      # advertised success while the matrix beside it was red. It now propagates
+      # the upstream result, making it a truthful aggregate gate.
+      - name: Verify upstream quality results
         run: |
           echo "# 📊 Quality Gates Summary"
-          echo "| Check | Status | Details |"
-          echo "|-------|--------|--------|"
+          echo ""
+          echo "Comprehensive Quality Validation: ${{ needs.quality-checks.result }}"
+          echo ""
 
-          # Download all artifacts
-          mkdir -p reports
+          if [ "${{ needs.quality-checks.result }}" != "success" ]; then
+            echo "::error::Quality checks did not pass (result: ${{ needs.quality-checks.result }})."
+            exit 1
+          fi
 
-          # Parse results (would need artifact downloads in real implementation)
-          echo "✅ Quality validation completed"
-          echo "📈 All checks processed"
+          echo "✅ All quality checks passed"
 
   # NOTE: Deployment health check has moved to staging-deploy.yml.
   # The health-check step there curls STAGING_URL after the cPanel deploy
