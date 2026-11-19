@@ -42,6 +42,10 @@ jobs:
   verify-hardening:
     name: Verify Hardening
     needs: security-scan
+    # Run even when the security scan fails: hardening verification is an
+    # independent signal and must not silently disappear (it previously showed
+    # as "skipped" whenever npm audit errored). The workflow still fails overall.
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

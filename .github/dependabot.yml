@@ -5,6 +5,11 @@ updates:
     target-branch: "pre-staging"
     schedule:
       interval: "weekly"
+      # Stagger the run: all four PRs previously landed in the same minute and
+      # their CI jobs then failed together against the npm advisory endpoint.
+      day: "monday"
+      time: "05:00"
+      timezone: "Africa/Nairobi"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -113,6 +118,10 @@ updates:
     target-branch: "pre-staging"
     schedule:
       interval: "weekly"
+      # Offset from the npm run so the two ecosystems never fire at once.
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Nairobi"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -126,13 +135,3 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "dawidd6/action-send-mail"
         update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: "composer"
-    directory: "/backend"
-    target-branch: "pre-staging"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "composer"
