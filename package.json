@@ -8,6 +8,7 @@
     "check:format": "npm --prefix frontend run format:check",
     "update:node-engine": "node scripts/check-node-engine.js",
     "test:node-engine": "node --test scripts/check-node-engine.test.mjs",
+    "test:root": "node --test scripts/*.test.mjs",
     "check": "npm --prefix frontend run check",
     "build": "npm --prefix frontend run build",
     "build:staging": "npm --prefix frontend run build:staging",

@@ -88,74 +88,41 @@ jobs:
         run: |
           echo "🔍 Running npm audit..."
 
-          # Validate fail-level input
-          case "$FAIL_LEVEL" in
-            low|moderate|high|critical) ;;
-            *) echo "::error::Invalid fail-level: $FAIL_LEVEL (expected: low|moderate|high|critical)"; exit 2 ;;
-          esac
-
-          report_ok=0
-          for attempt in 1 2 3; do
+          # The verdict comes from scripts/audit-gate.mjs - the same module the
+          # Quality Gates security leg runs - so the two required checks cannot
+          # disagree about one lockfile. Exit 2 means the report was unusable
+          # (registry or advisory endpoint unreachable): retry that, then fail
+          # closed. The threshold itself is unchanged.
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
             # `|| true` keeps the step alive so the report can still be uploaded;
             # success is judged below by the report body, not by this exit code.
             npm audit --json > audit-results.json 2> audit-stderr.txt || true
 
-            if node -e '
-              const fs = require("fs");
-              let report;
-              try {
-                report = JSON.parse(fs.readFileSync("audit-results.json", "utf8"));
-              } catch {
-                process.exit(1);
-              }
-              const counts = report && report.metadata && report.metadata.vulnerabilities;
-              process.exit(counts && typeof counts === "object" ? 0 : 1);
-            '; then
-              report_ok=1
-              break
-            fi
+            rc=0
+            node "$GITHUB_WORKSPACE/scripts/audit-gate.mjs" \
+              --level "$FAIL_LEVEL" \
+              --report audit-results.json || rc=$?
 
-            echo "::warning::npm audit returned no vulnerability report (attempt ${attempt}/3)."
+            case "$rc" in
+              0|1) exit "$rc" ;;
+            esac
+
+            echo "::warning::npm audit returned no usable report (attempt ${attempt}/3)."
             sed -n '1,15p' audit-stderr.txt 2>/dev/null || true
-            if [ "$attempt" -lt 3 ]; then
-              sleep $(( attempt * 15 ))
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le 3 ]; then
+              sleep $(( (attempt - 1) * 15 ))
             fi
           done
 
-          if [ "$report_ok" -ne 1 ]; then
-            echo "::error::npm audit could not complete after 3 attempts - the npm registry or its advisory endpoint was unreachable. This is an infrastructure failure, not a dependency finding; re-run the job."
-            exit 1
-          fi
-
-          node <<'EOF'
-          const fs = require('fs');
-
-          const LEVELS = ['info', 'low', 'moderate', 'high', 'critical'];
-          const report = JSON.parse(fs.readFileSync('audit-results.json', 'utf8'));
-          const counts = report.metadata.vulnerabilities;
-          const failLevel = process.env.FAIL_LEVEL;
-          const threshold = LEVELS.indexOf(failLevel);
-
-          console.log('📊 Vulnerability summary (all dependencies):');
-          for (const level of LEVELS.slice(1)) {
-            console.log(`   ${level.padEnd(9)} ${counts[level] ?? 0}`);
-          }
-
-          const failing = LEVELS.slice(threshold)
-            .reduce((total, level) => total + (counts[level] ?? 0), 0);
-
-          if (failing > 0) {
-            console.error(`::error::${failing} vulnerability(ies) at or above "${failLevel}" severity.`);
-            process.exit(1);
-          }
-
-          console.log(`✅ No vulnerabilities at or above "${failLevel}" severity`);
-          EOF
+          echo "::error::npm audit could not complete after 3 attempts - the npm registry or its advisory endpoint was unreachable. This is an infrastructure failure, not a dependency finding; re-run the job."
+          exit 1
 
       # Runs even if the audit step failed, so dependency findings are still
       # reported instead of being masked by an unrelated failure above.
       - name: Dependency Review (PR only)
-        if: always() && github.event.pull_request != null
+        if: ${{ !cancelled() && github.event.pull_request != null }}
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           base-ref: ${{ github.event.pull_request.base.sha }}

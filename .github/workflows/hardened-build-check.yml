@@ -45,7 +45,10 @@ jobs:
     # Run even when the security scan fails: hardening verification is an
     # independent signal and must not silently disappear (it previously showed
     # as "skipped" whenever npm audit errored). The workflow still fails overall.
-    if: always()
+    # `!cancelled()` rather than `always()`: hardening is still verified after a
+    # failed scan, but a superseded run cancelled by concurrency stops here
+    # instead of holding a 15-minute build open.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

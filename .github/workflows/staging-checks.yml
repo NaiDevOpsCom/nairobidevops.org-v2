@@ -186,54 +186,40 @@ jobs:
       # same lockfile - a dev-only advisory failed one and passed the other.
       - name: Security Audit
         if: matrix.check == 'security'
+        env:
+          AUDIT_FAIL_LEVEL: moderate
         run: |
           echo "🛡️ Running security audit..."
 
-          # Fail closed. The previous version read counts through
-          # `jq ... // 0`, so a registry error body produced "0 vulnerabilities"
-          # and the gate reported success without having audited anything.
-          report_ok=0
-          for attempt in 1 2 3; do
+          # Adjudicated by scripts/audit-gate.mjs, the same module Hardened Build
+          # Verification uses, so both required checks apply one threshold to one
+          # lockfile. Exit 2 means the report was unusable - retry, then fail
+          # closed. A registry error must never read as "0 vulnerabilities", which
+          # is exactly what the previous `jq ... // 0` counting did.
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
             npm audit --json > audit-results.json 2> audit-stderr.txt || true
-            if jq -e '.metadata.vulnerabilities' audit-results.json > /dev/null 2>&1; then
-              report_ok=1
-              break
-            fi
-            echo "::warning::npm audit returned no vulnerability report (attempt ${attempt}/3)."
+
+            rc=0
+            node "$GITHUB_WORKSPACE/scripts/audit-gate.mjs" \
+              --level "$AUDIT_FAIL_LEVEL" \
+              --report audit-results.json \
+              --github-env || rc=$?
+
+            case "$rc" in
+              0|1) exit "$rc" ;;
+            esac
+
+            echo "::warning::npm audit returned no usable report (attempt ${attempt}/3)."
             sed -n '1,15p' audit-stderr.txt 2>/dev/null || true
-            if [ "$attempt" -lt 3 ]; then
-              sleep $(( attempt * 15 ))
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le 3 ]; then
+              sleep $(( (attempt - 1) * 15 ))
             fi
           done
 
-          if [ "$report_ok" -ne 1 ]; then
-            echo "::error::npm audit could not complete after 3 attempts - the npm registry or its advisory endpoint was unreachable. This is an infrastructure failure, not a dependency finding; re-run the job."
-            exit 1
-          fi
-
-          CRITICAL_VULNS=$(jq -r '.metadata.vulnerabilities.critical // 0' audit-results.json)
-          HIGH_VULNS=$(jq -r '.metadata.vulnerabilities.high // 0' audit-results.json)
-          MODERATE_VULNS=$(jq -r '.metadata.vulnerabilities.moderate // 0' audit-results.json)
-          LOW_VULNS=$(jq -r '.metadata.vulnerabilities.low // 0' audit-results.json)
-
-          echo "📊 Vulnerability Summary (all dependencies):"
-          echo "  Critical: $CRITICAL_VULNS"
-          echo "  High:     $HIGH_VULNS"
-          echo "  Moderate: $MODERATE_VULNS"
-          echo "  Low:      $LOW_VULNS"
-
-          FAILING=$(( CRITICAL_VULNS + HIGH_VULNS + MODERATE_VULNS ))
-          if [ "$FAILING" -gt 0 ]; then
-            echo "security-status=failed" >> "$GITHUB_ENV"
-            echo "security-details=${CRITICAL_VULNS} critical, ${HIGH_VULNS} high, ${MODERATE_VULNS} moderate" >> "$GITHUB_ENV"
-            echo "::error::${FAILING} vulnerability(ies) at or above moderate severity (${CRITICAL_VULNS} critical, ${HIGH_VULNS} high, ${MODERATE_VULNS} moderate)."
-            npm audit --audit-level=moderate || true
-            exit 1
-          fi
-
-          echo "security-status=success" >> "$GITHUB_ENV"
-          echo "security-details=No vulnerabilities at or above moderate severity" >> "$GITHUB_ENV"
-          echo "✅ No vulnerabilities at or above moderate severity"
+          echo "::error::npm audit could not complete after 3 attempts - the npm registry or its advisory endpoint was unreachable. This is an infrastructure failure, not a dependency finding; re-run the job."
+          exit 1
 
       - name: Build and Security Generation
         if: matrix.check == 'build'

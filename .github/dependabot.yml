@@ -3,13 +3,12 @@ updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
     target-branch: "pre-staging"
+    # One `schedule` per ecosystem, and Dependabot opens every group in a single
+    # run, so the four npm groups cannot be staggered from this file. Concurrent
+    # audit runs are absorbed by the retrying, fail-closed gate in
+    # .github/workflows/security-validation.yml instead.
     schedule:
       interval: "weekly"
-      # Stagger the run: all four PRs previously landed in the same minute and
-      # their CI jobs then failed together against the npm advisory endpoint.
-      day: "monday"
-      time: "05:00"
-      timezone: "Africa/Nairobi"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -118,10 +117,6 @@ updates:
     target-branch: "pre-staging"
     schedule:
       interval: "weekly"
-      # Offset from the npm run so the two ecosystems never fire at once.
-      day: "monday"
-      time: "06:00"
-      timezone: "Africa/Nairobi"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
