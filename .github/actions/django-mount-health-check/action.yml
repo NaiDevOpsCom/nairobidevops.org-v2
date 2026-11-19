@@ -24,6 +24,16 @@ runs:
       run: |
         set -u
 
+        # Validate max-retries: bounded positive integer.
+        if ! printf '%s' "$MAX_RETRIES" | grep -Eq '^[1-9][0-9]*$'; then
+          echo "::error::max-retries must be a positive integer (got '$MAX_RETRIES')"
+          exit 1
+        fi
+        if [ "$MAX_RETRIES" -gt 20 ]; then
+          echo "::error::max-retries must be <= 20 (got '$MAX_RETRIES')"
+          exit 1
+        fi
+
         # Validate URL scheme (also catches an unset secret)
         if ! printf '%s' "$BASE_URL" | grep -Eq '^https?://'; then
           echo "::error::Invalid or missing environment URL (must start with http:// or https://)"
@@ -42,7 +52,8 @@ runs:
         trap 'rm -f "$BODY_FILE"' EXIT
         CODE="000"
 
-        for i in $(seq 1 "$MAX_RETRIES"); do
+        i=1
+        while [ "$i" -le "$MAX_RETRIES" ]; do
           # Truncate first: curl does not touch -o FILE when the connection
           # fails (exit 7, code 000), so the previous attempt's body would
           # otherwise be inspected for the current attempt.
@@ -54,11 +65,12 @@ runs:
           # `|| CODE=000` on the assignment (not `|| echo 000` inside it) so a
           # transport failure replaces the code instead of appending to it.
           CODE="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' \
-            --connect-timeout 10 --max-time 30 "$BASE/job/health")" || CODE="000"
+            --connect-timeout 10 --max-time 30 --max-filesize 10240 \
+            "$BASE/job/health")" || CODE="000"
 
           echo "Attempt $i/$MAX_RETRIES: HTTP $CODE"
           if [ "$CODE" != "200" ]; then
-            echo "  body: $(head -c 300 "$BODY_FILE" 2>/dev/null || true)"
+            echo "  body: $(printf '%q' "$(head -c 300 "$BODY_FILE" 2>/dev/null || true)")"
           fi
 
           # 403/404 mean the mount or its permissions are gone. Retrying cannot
@@ -74,7 +86,7 @@ runs:
           # traceback, a Passenger error page, or a JSON error payload can all
           # contain "python" and would report a broken mount as healthy.
           if [ "$CODE" = "200" ] && \
-            jq -e 'type == "object" and has("python") and (.python != null)' \
+            jq -s -e 'length == 1 and (.[0] | type == "object" and has("python") and (.python != null))' \
               "$BODY_FILE" >/dev/null 2>&1; then
             echo "✅ /job/health returned Django JSON (HTTP 200)"
             exit 0
@@ -82,8 +94,11 @@ runs:
 
           echo "⏳ Attempt $i/$MAX_RETRIES: /job/health is not healthy yet"
           if [ "$i" -lt "$MAX_RETRIES" ]; then
-            sleep "$((2 ** i))"
+            BACKOFF=$((2 ** i))
+            if [ "$BACKOFF" -gt 64 ]; then BACKOFF=64; fi
+            sleep "$BACKOFF"
           fi
+          i=$((i + 1))
         done
 
         echo "::error::/job/health did not return Django JSON after $MAX_RETRIES attempts (last HTTP $CODE)."

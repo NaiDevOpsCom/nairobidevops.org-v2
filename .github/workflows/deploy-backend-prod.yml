@@ -35,10 +35,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
           php-version: ${{ env.PHP_VERSION }}
           coverage: none
@@ -64,17 +64,18 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     environment: production
-    permissions: {}
+    permissions:
+      contents: read
 
     outputs:
       release_timestamp: ${{ steps.timestamp.outputs.timestamp }}
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
           php-version: ${{ env.PHP_VERSION }}
           coverage: none
@@ -229,10 +230,16 @@ jobs:
 
             RELEASE_DIR="/home/$REMOTE_USER/backend-releases/$RELEASE_TIMESTAMP"
             TMP_LINK="${TARGET_LINK}.tmp"
+            PREVIOUS_LINK_FILE="/home/$REMOTE_USER/.backend-prod-previous"
 
             if [ -e "$TARGET_LINK" ] && [ ! -L "$TARGET_LINK" ]; then
               echo "CRITICAL ERROR: $TARGET_LINK is not a symlink — aborting."
               exit 1
+            fi
+
+            # Record the previous target so a bad release can be restored.
+            if [ -L "$TARGET_LINK" ]; then
+              readlink "$TARGET_LINK" > "$PREVIOUS_LINK_FILE" || true
             fi
 
             ln -sfn "$RELEASE_DIR" "$TMP_LINK"

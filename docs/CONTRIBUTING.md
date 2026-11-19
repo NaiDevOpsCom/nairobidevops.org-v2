@@ -27,7 +27,12 @@ This is an internal project. Contributors are typically invited team members, bu
 
 1.  Before starting work, **open an issue** or comment on an existing issue describing your proposed contribution.
 2.  Tag or mention the maintainers to request approval or guidance.
-3.  Once approved and added as a contributor, **clone the repository**.
+3.  Once approved and added as a contributor, **clone the repository**:
+
+    ```bash
+    git clone https://github.com/NaiDevOpsCom/nairobidevops.org-v2.git
+    cd nairobidevops.org-v2
+    ```
 4.  Work on your local clone following this guide.
 5.  Open Pull Requests (PRs) back to the main repository.
 

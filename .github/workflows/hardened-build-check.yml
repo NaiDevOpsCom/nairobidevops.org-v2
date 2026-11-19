@@ -42,6 +42,13 @@ jobs:
   verify-hardening:
     name: Verify Hardening
     needs: security-scan
+    # Run even when the security scan fails: hardening verification is an
+    # independent signal and must not silently disappear (it previously showed
+    # as "skipped" whenever npm audit errored). The workflow still fails overall.
+    # `!cancelled()` rather than `always()`: hardening is still verified after a
+    # failed scan, but a superseded run cancelled by concurrency stops here
+    # instead of holding a 15-minute build open.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -51,7 +58,7 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
         uses: ./.github/actions/cache-vite-npm

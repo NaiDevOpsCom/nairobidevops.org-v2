@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # Need full history for dependency review on PRs
 
@@ -48,23 +48,21 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Dependencies
-        run: |
-          echo "📦 Installing dependencies..."
-          npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
-
-      # Runs after the install: lockfile-lint is a devDependency and comes from
-      # the lockfile being validated, so nothing is fetched on demand here.
+      # Validate the lockfile with a pinned, trusted tool BEFORE installing
+      # project dependencies. lockfile-lint is a devDependency that ships in
+      # the lockfile being validated, so running it from node_modules would let
+      # a PR-controlled lockfile fetch and execute an unapproved binary before
+      # --allowed-hosts npm is enforced. Pin the tool version and resolve it
+      # independently of the project lockfile.
       - name: Validate Lockfile Integrity
         run: |
           echo "🔒 Validating lockfile with lockfile-lint..."
-          # Ensure lockfile exists
           if [ ! -f package-lock.json ]; then
             echo "::error::package-lock.json is required"
             exit 1
           fi
-          # Use lockfile-lint for comprehensive validation
-          ./node_modules/.bin/lockfile-lint \
+          npm install -g --ignore-scripts lockfile-lint@4.14.1
+          lockfile-lint \
             --path package-lock.json \
             --type npm \
             --validate-https \
@@ -73,6 +71,19 @@ jobs:
             --validate-package-names
           echo "✅ Lockfile validation passed"
 
+      - name: Install Dependencies
+        run: |
+          echo "📦 Installing dependencies..."
+          npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+
+      # npm audit exits non-zero in two very different situations:
+      #   1. it FOUND vulnerabilities  -> a valid report, and the gate must fail
+      #   2. the advisory endpoint was unreachable or rate-limited -> no report
+      # The exit code cannot distinguish them, so a transient registry error used
+      # to fail this required check with no diagnostic (every Dependabot PR at
+      # once). This step retries only when no usable report was produced, and
+      # evaluates the severity gate from that single report - no second query,
+      # so the gate can never contradict itself. The threshold is unchanged.
       - name: Run NPM Audit
         id: npm-audit
         env:
@@ -80,53 +91,57 @@ jobs:
         run: |
           echo "🔍 Running npm audit..."
 
-          # Validate fail-level input
-          case "$FAIL_LEVEL" in
-            low|moderate|high|critical) ;;
-            *) echo "::error::Invalid fail-level: $FAIL_LEVEL (expected: low|moderate|high|critical)"; exit 2 ;;
+          # Fail fast on an invalid/empty fail-level instead of letting it fall
+          # through the retry path and masquerade as a registry failure.
+          case "${FAIL_LEVEL}" in
+            info|low|moderate|high|critical) ;;
+            *) echo "::error::Invalid fail-level '${FAIL_LEVEL}' (expected: info|low|moderate|high|critical)"; exit 1 ;;
           esac
 
-          # First, generate the JSON report for the artifact upload step.
-          # The `|| true` ensures this command doesn't fail the step,
-          # allowing the artifact to be created even if vulnerabilities are found.
-          npm audit --json > audit-results.json || true
+          # The verdict comes from scripts/audit-gate.mjs - the same module the
+          # Quality Gates security leg runs - so the two required checks cannot
+          # disagree about one lockfile. Exit 2 means the report was unusable
+          # (registry or advisory endpoint unreachable): retry that, then fail
+          # closed. The threshold itself is unchanged.
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            # `|| true` keeps the step alive so the report can still be uploaded;
+            # success is judged below by the report body, not by this exit code.
+            npm audit --json > audit-results.json 2> audit-stderr.txt || true
 
-          # Verify report exists and is not empty
-          if [ ! -s audit-results.json ]; then
-            echo "::error::npm audit failed to generate a report. The command may have failed."
-            exit 1
-          fi
+            rc=0
+            node "$GITHUB_WORKSPACE/scripts/audit-gate.mjs" \
+              --level "$FAIL_LEVEL" \
+              --report audit-results.json || rc=$?
 
-          # Verify report is valid JSON (guard against registry/auth/network errors producing non-JSON output)
-          node <<'EOF'
-          const fs = require('fs');
-          try {
-            JSON.parse(fs.readFileSync('audit-results.json', 'utf8'));
-          } catch (e) {
-            console.error('::error::Failed to parse audit-results.json. This usually indicates a registry or network issue on the runner.');
-            console.error(e.message);
-            process.exit(1);
-          }
-          EOF
+            case "$rc" in
+              0|1) exit "$rc" ;;
+            esac
 
-          # Now, run npm audit again, this time allowing it to fail the step
-          # based on its native exit code and the specified audit level.
-          # This simplifies the logic by removing manual parsing and failure checks.
-          npm audit --audit-level="$FAIL_LEVEL"
+            echo "::warning::npm audit returned no usable report (attempt ${attempt}/3)."
+            sed -n '1,15p' audit-stderr.txt 2>/dev/null || true
+            attempt=$((attempt + 1))
+            if [ "$attempt" -le 3 ]; then
+              sleep $(( (attempt - 1) * 15 ))
+            fi
+          done
 
-          echo "✅ No vulnerabilities found at $FAIL_LEVEL level or above"
+          echo "::error::npm audit could not complete after 3 attempts - the npm registry or its advisory endpoint was unreachable. This is an infrastructure failure, not a dependency finding; re-run the job."
+          exit 1
 
+      # Runs even if the audit step failed, so dependency findings are still
+      # reported instead of being masked by an unrelated failure above.
       - name: Dependency Review (PR only)
-        if: github.event.pull_request != null
+        if: ${{ !cancelled() && github.event.pull_request != null }}
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           base-ref: ${{ github.event.pull_request.base.sha }}
           head-ref: ${{ github.event.pull_request.head.sha }}
-          # License policy is managed in .github/dependency-review-config.yml
-          # to ensure compound SPDX expressions (e.g. "ISC AND JSON AND MIT")
-          # are parsed as atomic allow-list entries (not split on comma).
-          # The inline allow-licenses string format does not reliably handle
-          # compound expressions — use the external YAML list format instead.
+          # License policy is managed in .github/dependency-review-config.yml.
+          # Compound SPDX expressions (e.g. "ISC AND JSON AND MIT") are NOT
+          # matched by allow-licenses; the victory-vendor exemption is applied
+          # through allow-dependencies-licenses (PURL) instead. See the config
+          # file for the rationale.
           config-file: .github/dependency-review-config.yml
           # Pass the caller's fail-level through explicitly so the action input
           # and the config file agree.
@@ -137,7 +152,7 @@ jobs:
 
       - name: Upload Audit Results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: security-audit-results
           path: frontend/audit-results.json

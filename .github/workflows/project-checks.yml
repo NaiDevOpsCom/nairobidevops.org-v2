@@ -23,7 +23,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
         uses: ./.github/actions/cache-vite-npm
@@ -33,6 +33,15 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci --ignore-scripts
+
+      # The root manifest only carries what scripts/ imports, so this install is
+      # one package - it also proves package.json and package-lock.json still
+      # agree after the duplicate dependency block was removed.
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run root script tests
+        run: npm run test:root
 
       - name: Run root checks
         working-directory: frontend
